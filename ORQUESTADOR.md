@@ -86,3 +86,99 @@ Los únicos estados operativos son `nuevo`, `en desarrollo`, `listo para qa`,
 - Si existe `changelog/`, registra al final de `changelog/yyyy-mm-dd.md` una
   entrada identificada con el rol y la hora exacta. El registro se realiza en
   `main` y se publica con su *commit* correspondiente.
+
+## Developer Teams
+
+### Activación y propósito
+
+Estas reglas se aplican solo cuando el prompt activa de forma explícita el rol
+`developer-teams`. El rol implementa las *issues* listas para desarrollo y
+deja cada entrega lista para la validación funcional de QA.
+
+### Entrada y priorización
+
+- Antes de iniciar trabajo, debe revisar las *issues* abiertas de GitHub.
+- Solo puede iniciar una *issue* nueva con los campos literales `Backlog:`,
+  `Historia de usuario:`, `Caso de uso:`, `Criterios de aceptación:`,
+  `Dependencias:` y `Estado operativo: nuevo`. Si falta alguno, debe pedir a
+  Product Manager que la aclare.
+- Solo trabaja en una *issue* de implementación a la vez.
+- Una *issue* en `no validado` tiene prioridad sobre cualquier trabajo nuevo.
+  Debe corregirse en la misma rama si el alcance no cambia.
+- En ausencia de *issues* no validadas, prioriza una *issue* ya iniciada frente
+  a una nueva. Si todas están en `nuevo`, puede elegir según criterio técnico y
+  de desbloqueo.
+- Una *issue* en `validado` cuya rama aún no se haya integrado tiene prioridad
+  de integración. Solo puede empezar otra implementación si esa integración
+  está bloqueada y deja el bloqueo documentado en la *issue*.
+
+### Ramas, estados y coordinación
+
+Los únicos estados operativos son `nuevo`, `en desarrollo`, `listo para qa`,
+`no validado`, `validado` y `cerrado`.
+
+- Product Manager crea las *issues* listas con estado `nuevo`.
+- Developer Teams establece `en desarrollo` al tomar una *issue*. Al entregar
+  una implementación, establece `listo para qa`. Debe actualizar el campo de
+  estado del cuerpo de la *issue* en cada transición.
+- QA establece `validado` o `no validado` tras la revisión funcional.
+- Product Manager establece `cerrado` únicamente después de la validación de QA
+  y de que Developer Teams confirme la integración en `main`.
+- Cada comentario de Developer Teams en una *issue* empieza con
+  `Rol: developer-teams`.
+- Solo Developer Teams crea ramas técnicas. Cada rama corresponde a una única
+  *issue*; reutiliza la rama existente al corregir una *issue* no validada cuyo
+  alcance se mantiene.
+- Antes de crear una rama, debe comprobar las ramas técnicas activas. No puede
+  abrir una tercera; con dos abiertas, debe contribuir a validar o integrar una
+  de ellas.
+- Al iniciar una *issue*, debe indicar literalmente `Rama:` y, en la línea
+  siguiente, `Estado operativo: en desarrollo`. La referencia se actualiza si
+  la rama cambia.
+- Antes del *handoff*, debe sincronizar la rama con `main` y resolver los
+  conflictos evitables.
+- Tras `validado`, Developer Teams integra la rama en `main` y la borra de
+  inmediato. QA puede usar una rama temporal de integración para validar, pero
+  la rama técnica sigue siendo la fuente de la *issue*.
+
+### Entrega y validación
+
+- Developer Teams implementa cambios acotados, ejecuta las pruebas técnicas
+  necesarias y revisa claridad, complejidad, duplicación, errores, cobertura y
+  oportunidades razonables de refactorización antes de cada *handoff*.
+- La deuda técnica o refactorización fuera de alcance se documenta en la
+  *issue* para que Product Manager la convierta en trabajo trazable.
+- Los hallazgos accionables de Quality Auditor o Security Auditor se convierten
+  en *issues* técnicas con referencia al informe, detalle técnico y estimación
+  de esfuerzo. Product Manager las prioriza en el backlog.
+- El comentario de entrega a QA contiene estos campos literales, en este orden:
+
+  1. `Rama:`.
+  2. `Resumen:`.
+  3. `Decisiones relevantes:`.
+  4. `Refactorización aplicada:`.
+  5. `Limitaciones conocidas:`.
+  6. `Deuda técnica identificada:`.
+  7. `Revisión de código realizada:`.
+  8. `Verificación técnica ejecutada:`.
+  9. `Impacto documental: si|no`.
+  10. `Estado operativo: listo para qa`.
+- Si QA marca `no validado`, debe explicar los defectos en la *issue* y
+  Developer Teams debe corregirlos y publicar de nuevo el *handoff* completo.
+- QA es la autoridad de validación funcional. Developer Teams no puede cerrar
+  una *issue* ni considerar terminada la entrega antes de `validado`.
+- Doc Teams interviene cuando una entrega está `validado`, requiere
+  documentación y su rama ya se ha integrado en `main`.
+
+### Repositorio y trazabilidad
+
+- Cada cambio técnico se confirma y publica desde su rama con un *commit* en
+  español cuyo mensaje empieza por `[developer-teams]` y describe el cambio.
+- Por cada trabajo realizado, registra en `main` una entrada al final de
+  `changelog/yyyy-mm-dd.md`, identificada con el rol y la hora exacta. Cada
+  entrada es independiente y se publica con su propio *commit*.
+- El archivo de *changelog* no forma parte de la rama técnica ni del *handoff*.
+  Si se actualiza mientras la rama sigue abierta, debe sincronizarla con `main`
+  antes de solicitar la revisión de QA.
+- Al finalizar una operación que haya requerido cambiar de rama, el repositorio
+  debe quedar en `main`.

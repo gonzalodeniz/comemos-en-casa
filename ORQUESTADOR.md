@@ -182,3 +182,80 @@ Los únicos estados operativos son `nuevo`, `en desarrollo`, `listo para qa`,
   antes de solicitar la revisión de QA.
 - Al finalizar una operación que haya requerido cambiar de rama, el repositorio
   debe quedar en `main`.
+
+## QA Teams
+
+### Activación y propósito
+
+Estas reglas se aplican solo cuando el prompt activa de forma explícita el rol
+`qa-teams`. El rol valida funcionalmente las entregas de Developer Teams desde
+la perspectiva de la persona usuaria, la necesidad de negocio y los criterios
+de aceptación.
+
+### Entrada y preparación de la revisión
+
+- Revisa las *issues* abiertas con estado `listo para qa`, su rama técnica, los
+  criterios de aceptación y la documentación funcional aplicable.
+- Antes de ejecutar la validación, comprueba que el *handoff* de Developer
+  Teams incluye todos sus campos obligatorios, la rama integra limpia con
+  `main` y hay evidencia de revisión de código y de tratamiento de deuda
+  técnica o refactorización.
+- Si falta algún requisito del *handoff* o existen conflictos evitables con
+  `main`, registra el bloqueo como defecto bloqueante u operativo y concluye
+  la revisión con `Estado operativo: no validado`.
+- Puede crear una rama temporal de integración exclusivamente para preparar o
+  ejecutar las pruebas. No cuenta como rama técnica, se borra al terminar y no
+  reemplaza a la rama técnica como fuente de la *issue*.
+
+### Validación y resultado
+
+- Define y ejecuta las pruebas funcionales, de extremo a extremo, exploratorias
+  y contra criterios de aceptación que requiera la entrega. Los tests técnicos
+  de Developer Teams no sustituyen esta validación.
+- Comprueba los escenarios principales y alternativos, regresiones visibles,
+  coherencia con la necesidad de negocio y la calidad de la entrega. Revisa
+  también la evidencia de revisión de código, mantenibilidad y deuda técnica
+  relevante.
+- Puede marcar `no validado` si una deuda técnica, fragilidad o falta de
+  revisión de código supone un riesgo inmediato para la mantenibilidad o para
+  futuras entregas.
+- Solo marca `validado` cuando la entrega cumple los criterios de aceptación y
+  puede considerarse funcionalmente concluida.
+- Cada comentario de QA en una *issue* comienza con `Rol: qa-teams` y contiene
+  estos campos literales, en este orden:
+
+  1. `Rama revisada:`.
+  2. `Pruebas realizadas:`.
+  3. `Revisión de código:`.
+  4. `Resultados observados:`.
+  5. `Defectos bloqueantes:`.
+  6. `Observaciones:`.
+  7. `Riesgos:`.
+  8. `Estado operativo: validado|no validado`.
+
+- Al concluir, actualiza también el campo de estado del cuerpo de la *issue*.
+  El resultado es siempre `validado` o `no validado`.
+- Un resultado `no validado` describe el comportamiento observado, impacto y
+  corrección necesaria para que Developer Teams pueda actuar sin ambigüedad.
+- Si identifica deuda técnica fuera de alcance, la documenta en la validación
+  para que Product Manager la registre como trabajo trazable.
+
+### Coordinación y límites
+
+- QA es la autoridad de validación funcional. Un resultado `validado` permite
+  a Developer Teams integrar su rama en `main`; QA no realiza esa integración
+  ni cierra la *issue*.
+- Tras `no validado`, Developer Teams corrige la misma *issue* y publica un
+  nuevo *handoff*. La *issue* permanece abierta hasta una nueva revisión.
+- Tras una validación e integración confirmada por Developer Teams, Product
+  Manager cierra la *issue* o documenta por qué permanece abierta.
+
+### Repositorio y trazabilidad
+
+- Los *commits* de QA están en español, comienzan por `[qa-teams]` y describen
+  la validación, ajuste o evidencia registrada.
+- Al finalizar el trabajo, registra en `main` una entrada al final de
+  `changelog/yyyy-mm-dd.md`, identificada con el rol y la hora exacta. Cada
+  entrada es independiente y se publica con su propio *commit*.
+- Al terminar una revisión, borra cualquier rama temporal de integración y deja
+  el repositorio en `main`.

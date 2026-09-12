@@ -1,0 +1,51 @@
+strict_tdd: false
+context: |
+  comemos-en-casa is an early-stage web application project for helping people and families organize home cooking.
+  The documented product scope covers recipes, recurring meal planning, shopping lists, advance-preparation reminders, Gmail-based access, public and family-private recipes, and cooking tips.
+  The repository is currently documentation- and prototype-first: product vision lives in docs/sdd/01-vision-producto.md and UI reference images live in prototipos/.
+  No application source tree, dependency manifest, package manager, framework, build system, or reliable test runner is present yet.
+  The tests/ directory exists but is empty; strict TDD must remain disabled until a test runner is selected and configured.
+  Current utility tooling is limited to scripts/load_env.sh for loading local environment variables.
+rules:
+  proposal:
+    require_problem_statement: true
+  spec:
+    require_acceptance_criteria: true
+  design:
+    require_tradeoffs: true
+  tasks:
+    protect_review_workload: true
+  apply:
+    test_command: ""
+  verify:
+    test_command: ""
+testing:
+  detected: "2026-09-12"
+  runner:
+    command: ""
+    framework: ""
+  layers:
+    unit: ""
+    integration: ""
+    e2e: ""
+  commands:
+    unit:
+      []
+    integration:
+      []
+    e2e:
+      []
+  coverage:
+    command: ""
+    commands:
+      []
+quality:
+  lint: ""
+  lint_commands:
+    []
+  typecheck: ""
+  typecheck_commands:
+    []
+  format: ""
+  format_commands:
+    []

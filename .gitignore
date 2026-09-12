@@ -2,3 +2,5 @@ reports/
 tmp/
 
 .env
+# Local Pi runtime state
+.atl/

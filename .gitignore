@@ -2,3 +2,8 @@ reports/
 tmp/
 
 .env
+.venv/
+__pycache__/
+*.py[cod]
+# Local Pi runtime state
+.atl/

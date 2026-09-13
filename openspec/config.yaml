@@ -1,10 +1,9 @@
-strict_tdd: false
+strict_tdd: true
 context: |
   comemos-en-casa is an early-stage web application project for helping people and families organize home cooking.
   The documented product scope covers recipes, recurring meal planning, shopping lists, advance-preparation reminders, Gmail-based access, public and family-private recipes, and cooking tips.
   The repository is currently documentation- and prototype-first: product vision lives in docs/sdd/01-vision-producto.md and UI reference images live in prototipos/.
-  No application source tree, dependency manifest, package manager, framework, build system, or reliable test runner is present yet.
-  The tests/ directory exists but is empty; strict TDD must remain disabled until a test runner is selected and configured.
+  Pytest is configured as the unit test runner through pyproject.toml and requirements-dev.txt; the tests/ directory contains only infrastructure smoke coverage, not product behavior.
   Current utility tooling is limited to scripts/load_env.sh for loading local environment variables.
 rules:
   proposal:
@@ -16,21 +15,21 @@ rules:
   tasks:
     protect_review_workload: true
   apply:
-    test_command: ""
+    test_command: "pytest"
   verify:
-    test_command: ""
+    test_command: "pytest"
 testing:
   detected: "2026-09-12"
   runner:
-    command: ""
-    framework: ""
+    command: "pytest"
+    framework: "pytest"
   layers:
-    unit: ""
+    unit: "pytest"
     integration: ""
     e2e: ""
   commands:
     unit:
-      []
+      - "pytest"
     integration:
       []
     e2e:

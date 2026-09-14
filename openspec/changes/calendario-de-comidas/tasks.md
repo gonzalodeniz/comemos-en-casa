@@ -7,9 +7,9 @@
 | Estimated changed lines | 2,800–3,800 |
 | 400-line budget risk | High |
 | Chained PRs recommended | Yes |
-| Suggested split | PR 1 foundation/schema → PR 2 calendar API → PR 3 resilience/access → PR 4 frontend state/UI → PR 5 accessibility/docs/acceptance |
-| Delivery strategy | ask-on-risk (preconfigured; no delivery decision is made here) |
-| Chain strategy | feature-branch-chain |
+| Suggested split | PR 1 foundation/schema → PR 2A persistence/catalogue foundations → PR 2B calendar HTTP API/route integration → PR 3 resilience/access → PR 4 frontend state/UI → PR 5 accessibility/docs/acceptance |
+| Delivery strategy | ask-on-risk (preconfigured; the PR 2 split requires a chain-strategy decision before apply) |
+| Chain strategy | pending |
 
 Decision needed before apply: Yes
 Chained PRs recommended: Yes
@@ -33,9 +33,10 @@ For every work unit, retain the exact test names and command output: **RED** pro
 | Work unit / PR | Start boundary | Finish boundary | Verification | Rollback boundary |
 |---|---|---|---|---|
 | PR 1 — foundation and schema | Existing pytest smoke test | Python domain boundary plus an expand-only PostgreSQL migration | Unit and ephemeral-PostgreSQL migration tests | Leave schema/data in place; do not run destructive downgrade |
-| PR 2 — calendar API | PR 1 schema and recipe-table prerequisite available | Read/search/assignment HTTP contract and repository behavior | API contract and PostgreSQL integration tests | Remove API routing while retaining compatible schema |
-| PR 3 — resilience and access | PR 2 endpoints callable | Guest gate, rate limits, retries, and error mapping | Failure-injection, access, and atomic-limit tests | Set guest false and restart; retain plans and schema |
-| PR 4 — frontend calendar | PR 2 contract stable, PR 3 context/error contract stable | Week store, assignment flows, and responsive grid | Focused frontend state/component tests | Remove feature route/client without changing persisted plans |
+| PR 2A — persistence and catalogue foundations (target: 300–390 changed lines) | PR 1 schema plus the concrete recipe-catalogue/migration discovery target available | PostgreSQL repository and catalogue-adapter behavior, including idempotency and current/tombstone recipe reads | Focused PostgreSQL repository/catalogue integration tests | Remove repository/catalogue implementation while retaining the compatible PR 1 schema |
+| PR 2B — calendar HTTP API and route integration (target: 280–380 changed lines) | PR 2A repository/catalogue contract passing | Read/search/assignment HTTP resources and registered application routes | API contract tests plus PR 2A regression suite | Unregister calendar routes while retaining compatible schema and repository behavior |
+| PR 3 — resilience and access | PR 2B endpoints callable | Guest gate, rate limits, retries, and error mapping | Failure-injection, access, and atomic-limit tests | Set guest false and restart; retain plans and schema |
+| PR 4 — frontend calendar | PR 2B contract stable, PR 3 context/error contract stable | Week store, assignment flows, and responsive grid | Focused frontend state/component tests | Remove feature route/client without changing persisted plans |
 | PR 5 — accessible delivery | PR 4 interactions present | Accessibility/responsive behavior, OpenAPI, user docs, acceptance coverage | Contract, manual viewport/assistive-tech, and full suite | Withdraw UI/docs together; do not delete calendar data |
 
 ## PR 1 — foundation, temporal rules, and PostgreSQL schema
@@ -46,12 +47,23 @@ For every work unit, retain the exact test names and command output: **RED** pro
 - [x] TRIANGULATE — extend the same unit and ephemeral-PostgreSQL tests for duplicate assignments, invalid check combinations, Unicode code-point boundaries, normalized HTML-like input, and migration preservation of a recipe assignment after `ON DELETE SET NULL`. <!-- sdd-owner: implementation -->
 - [x] REFACTOR — consolidate domain constants and validation helpers inside `backend/src/comemos_en_casa/meal_calendar/` without changing the migration contract, then run `pytest` for the foundation tests and full baseline suite. <!-- sdd-owner: implementation -->
 
-## PR 2 — repository, catalogue adapter, and HTTP calendar contract
+## PR 2A — persistence and catalogue foundations (target: 300–390 changed lines)
 
-- [ ] RED — add failing API and PostgreSQL integration tests in `backend/tests/meal_calendar/test_api_contract.py` and `test_repository.py` covering `/context` (read-only), Monday-validated weekly reads, normalized public recipe search/cursors, recipe detail, ordered mixed assignments, and the documented POST/PATCH/DELETE status/error payloads. <!-- sdd-owner: implementation -->
-- [ ] GREEN — implement `backend/src/comemos_en_casa/meal_calendar/{repository.py,api.py,catalog_adapter.py}` and the application route registration discovery target so `/api/v1/meal-calendar` (read-only) serves the specified JSON UTF-8, `Cache-Control: no-store` resources using PostgreSQL as the source of truth. <!-- sdd-owner: implementation -->
-- [ ] TRIANGULATE — extend those tests for duplicate UUID-backed creates, repeat-create same-payload `200`, differing-payload `409 idempotency_conflict`, idempotent repeated delete, `404` after delete, current recipe-title joins, and the unavailable-recipe payload with no copied title/image snapshot. <!-- sdd-owner: implementation -->
-- [ ] REFACTOR — isolate HTTP translation from service and SQL concerns at the listed backend boundaries, retain stable error envelopes and ordering tie-breaks, and run `pytest` for API/repository plus all earlier tests. <!-- sdd-owner: implementation -->
+**Dependency:** PR 1 schema is merged and the concrete owner of `recipes(id)` and its migration history is identified; do not invent a catalogue table or foreign key. **Start:** repository/catalogue behavior absent. **Finish:** PostgreSQL repository and catalogue adapter satisfy their contract without an HTTP route. **Verification:** focused PostgreSQL integration tests, then the PR 1 regression suite. **Rollback:** remove only this repository/catalogue unit; retain the expand-only schema. **Out of scope:** HTTP route registration, access/rate middleware, retries, and frontend work.
+
+- [ ] RED — add failing PostgreSQL repository/catalogue integration cases in `backend/tests/meal_calendar/test_repository.py` for Monday-validated weekly reads, ordered mixed assignments, normalized public recipe search with cursors, recipe detail, and the concrete recipe-catalogue discovery target’s current-title/tombstone reads. <!-- sdd-owner: implementation -->
+- [ ] GREEN — implement `backend/src/comemos_en_casa/meal_calendar/{repository.py,catalog_adapter.py}` against PostgreSQL and the discovered catalogue/migration owner so weekly reads, recipe search/detail, and assignment persistence use the source of truth without copied title/image snapshots. <!-- sdd-owner: implementation -->
+- [ ] TRIANGULATE — extend `backend/tests/meal_calendar/test_repository.py` for duplicate UUID-backed creates, repeat-create same-payload persistence, differing-payload idempotency conflict, idempotent repeated delete, `404` after delete, current recipe-title joins, and the unavailable-recipe payload data after catalogue deletion. <!-- sdd-owner: implementation -->
+- [ ] REFACTOR — isolate SQL transaction, catalogue adaptation, ordering tie-break, and persistence-error boundaries within `backend/src/comemos_en_casa/meal_calendar/{repository.py,catalog_adapter.py}`, then run `pytest` for repository/catalogue and all PR 1 tests. <!-- sdd-owner: implementation -->
+
+## PR 2B — calendar HTTP API and route integration (target: 280–380 changed lines)
+
+**Dependency:** PR 2A repository/catalogue tests pass. **Start:** stable repository/catalogue contract with no calendar routes. **Finish:** registered calendar HTTP resources translate that contract without changing its persistence semantics. **Verification:** API contract tests plus the PR 2A and PR 1 regression suites. **Rollback:** unregister only the calendar routes; retain compatible repository and schema. **Out of scope:** guest access, rate limiting, retry policy, and frontend work.
+
+- [ ] RED — add failing API contract tests in `backend/tests/meal_calendar/test_api_contract.py` for `/context` (read-only), Monday validation for `GET /weeks/{weekStart}` (read-only), `GET /recipes` and `GET /recipes/{recipeId}` (read-only), and the documented POST/PATCH/DELETE JSON status and error payloads. <!-- sdd-owner: implementation -->
+- [ ] GREEN — implement `backend/src/comemos_en_casa/meal_calendar/api.py` and the application route-registration discovery target so `/api/v1/meal-calendar` (read-only) exposes JSON UTF-8, `Cache-Control: no-store` resources backed solely by the PR 2A repository/catalogue contract. <!-- sdd-owner: implementation -->
+- [ ] TRIANGULATE — extend `backend/tests/meal_calendar/test_api_contract.py` for the `201` then `200` repeat-create response, `409 idempotency_conflict` for a differing payload, repeated-delete `204`, post-delete `404`, stable error envelopes, and HTTP serialization of ordered current and unavailable recipe assignments. <!-- sdd-owner: implementation -->
+- [ ] REFACTOR — isolate HTTP request validation and response/error translation in `backend/src/comemos_en_casa/meal_calendar/api.py` and the route-registration target without moving SQL or catalogue logic into the route layer; run `pytest` for API/repository plus all earlier tests. <!-- sdd-owner: implementation -->
 
 ## PR 3 — retries, idempotency/concurrency, guest access, and rate limiting
 

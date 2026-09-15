@@ -1,7 +1,7 @@
 # Exploration: recipe catalogue foundation
 
 **Change:** `recetas-publicas-privadas`
-**Product source:** GitHub issue #5, “Feature: Recetas públicas y privadas”
+**Product source:** GitHub issue #5, “Feature: Gestión y organización de recetas”
 **Status:** exploration complete for a first catalogue foundation slice; full recipe management remains a later delivery.
 
 ## Problem and value
@@ -30,7 +30,7 @@ Implement the smallest independent catalogue foundation that owns the `recipes(i
 
 ### Deferred
 
-- Authentication and private-recipes authorization; issue #6 owns access control.
+- Authenticated recipe management; issue #6 owns access control. Private recipe visibility does not exist.
 - Full recipe editor, drafts, collections, favorites, frontend, and shopping-list integration.
 - Calendar API or calendar repository implementation; those remain PR2A/PR2B work.
 - Inventing a substitute catalogue table solely inside the calendar change.

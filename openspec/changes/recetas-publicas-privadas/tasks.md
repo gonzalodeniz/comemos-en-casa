@@ -11,11 +11,11 @@
 
 ## Scope boundary
 
-This change owns the canonical public `recipes(id)` relation and minimum current title/image/detail read contract. It does not implement private access, authentication, full recipe management, collections, favorites, frontend, HTTP routes, or calendar code. Calendar PR2 remains untouched until this foundation is merged; it then owns the later `meal_assignments.recipe_id REFERENCES recipes(id) ON DELETE SET NULL` migration.
+This change owns the canonical public `recipes(id)` relation and minimum current title/image/detail read contract. It does not implement authenticated management, full recipe management, collections, favorites, frontend, HTTP routes, or calendar code. Private recipe visibility does not exist and must not be introduced. Calendar PR2 remains untouched until this foundation is merged; it then owns the later `meal_assignments.recipe_id REFERENCES recipes(id) ON DELETE SET NULL` migration.
 
-## Strict TDD rule
+## Verification approach
 
-For every work unit, retain exact test names and command output: RED, GREEN, TRIANGULATE, and REFACTOR. Use `.venv/bin/pytest -q` and the existing PostgreSQL Compose service. Do not claim a passing result without executing the configured runner.
+Use proportionate verification for each work unit. Run `.venv/bin/pytest -q` and the existing PostgreSQL Compose service when the changed behavior requires it, and report the commands and results actually executed. Strict TDD sequencing is not required.
 
 ## Work units
 
@@ -42,5 +42,5 @@ For every work unit, retain exact test names and command output: RED, GREEN, TRI
 
 ## Final boundary check
 
-- [x] Confirm no calendar source, calendar migration, calendar OpenSpec artifact, private-access behavior, authentication, full recipe UI, collection/favorite workflow, or HTTP route was introduced.
+- [x] Confirm no calendar source, calendar migration, calendar OpenSpec artifact, authenticated management, private recipe visibility, full recipe UI, collection/favorite workflow, or HTTP route was introduced.
 - [x] Confirm the catalogue migration is independently applicable before calendar integration and that PR2 can add the FK without redefining `recipes`.

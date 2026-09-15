@@ -1,13 +1,13 @@
 # Proposal: recipe catalogue foundation
 
 **Change:** `recetas-publicas-privadas`  
-**Product source:** approved GitHub issue #5, “Feature: Recetas públicas y privadas”  
+**Product source:** approved GitHub issue #5, “Feature: Gestión y organización de recetas”
 **Status:** proposal  
 **Basis:** `openspec/changes/recetas-publicas-privadas/exploration.md`
 
 ## Intent
 
-Establish the smallest independent recipe-catalogue foundation that owns the canonical PostgreSQL `recipes(id)` contract required by meal-calendar integration. This slice provides stable recipe identity and the minimum public recipe data boundary needed for catalogue reads, while deliberately leaving the complete recipe product and private access for later changes.
+Establish the smallest independent recipe-catalogue foundation that owns the canonical PostgreSQL `recipes(id)` contract required by meal-calendar integration. This slice provides stable recipe identity and the minimum public recipe data boundary needed for catalogue reads, while deliberately leaving the complete public recipe product for later changes. The product has no private recipes or private-recipe visibility model.
 
 ## Problem
 
@@ -21,7 +21,7 @@ This foundation is needed now because calendar PR1 is merged and calendar PR2 is
 2. Define the minimum public recipe data contract needed for calendar search, detail, current title, and current image reads.
 3. Keep recipe presentation data in the catalogue so consumers read current values instead of snapshotting them.
 4. Establish validation and normalization rules for the foundation fields at a Python domain/schema boundary.
-5. Preserve an additive path to the public/private recipe experience approved in issue #5 once issue #6 supplies identity and access-control prerequisites.
+5. Preserve an additive path to the complete public recipe experience approved in issue #5, including authenticated management, collections, and favorites.
 6. Document migration order and ownership so calendar integration can add its foreign key without coupling catalogue creation to calendar delivery.
 
 ## Scope
@@ -52,7 +52,7 @@ The specification and design may choose exact column names, nullability, normali
 - Full recipe create, edit, delete, draft, publishing, moderation, or administration workflows.
 - Recipe frontend screens, catalogue browsing UI, editor UI, upload flows, or complete recipe-detail UX.
 - Collections, favorites, family libraries, sharing workflows, shopping-list integration, nutrition, ingredients, portions, steps, tags, or other rich recipe features beyond the minimum foundation contract.
-- Private-recipe authorization, household membership, ownership, roles, permissions, or any substitute identity model.
+- Recipe-private visibility, household sharing, or any private-recipe authorization model.
 - Authentication or Gmail login; issue #6 owns that capability.
 - Calendar endpoints, calendar repositories, calendar UI, or changes to the existing `calendario-de-comidas` OpenSpec artifacts.
 - Adding the calendar foreign key in the catalogue migration or otherwise making this migration depend on calendar tables.
@@ -62,7 +62,7 @@ The specification and design may choose exact column names, nullability, normali
 
 ### Product constraints
 
-- The first slice supports only the public catalogue foundation. It must not claim that issue #5's private-access outcome is delivered.
+- The first slice supports only the public catalogue foundation. It must not claim that the complete recipe-management product is delivered.
 - Public recipe records must have stable identities suitable for references from other product areas.
 - Title and image remain catalogue-owned current values. Calendar assignments must not duplicate them as snapshots.
 - The data model must remain additively extensible for later ownership, household, visibility, collections, and richer recipe content.
@@ -76,13 +76,11 @@ The specification and design may choose exact column names, nullability, normali
 - The catalogue must not depend on `meal_assignments` or any calendar migration to exist.
 - Recipe deletion must be compatible with the calendar's tombstone behavior: after integration, deleting a recipe must allow `meal_assignments.recipe_id` to become `NULL` through `ON DELETE SET NULL` rather than deleting the assignment.
 - No database driver, framework, or repository abstraction may be selected without design-phase justification based on an established application boundary.
-- Future implementation follows repository pytest and strict-TDD policy; this proposal itself adds no source code.
+- Future implementation uses proportionate verification with the repository's pytest runner when applicable; this proposal itself adds no source code.
 
 ## Dependency on issue #6
 
-Issue #6 is a prerequisite for private recipe access because private visibility requires an authenticated identity and an agreed ownership or household boundary. This foundation must not infer users, families, ownership, or authorization rules before #6 defines them.
-
-Issue #6 does not block creation or use of the public catalogue foundation. The later private-access slice must integrate with #6 and extend this foundation additively; it must not reinterpret a boolean flag as sufficient authorization or expose private data through public reads.
+Issue #6 remains a prerequisite for authenticated recipe management, but not for the public catalogue foundation. This change must not infer users, ownership, or permissions; any later management API must use the authentication contract without introducing private recipe visibility.
 
 ## Migration ownership and ordering
 
@@ -96,12 +94,13 @@ Ownership is intentionally split by bounded context:
 
 ## Explicit follow-up boundary
 
-A separate follow-up to issue #5 will deliver the complete recipe product: recipe-management APIs and UI, richer recipe content, collections/favorites, and publication workflows. Private recipe creation, discovery, and access are a distinct follow-up that additionally depends on issue #6 for identity and authorization semantics.
+A separate follow-up to issue #5 will deliver the complete public recipe product: recipe-management APIs and UI, richer recipe content, collections/favorites, and publication workflows. All recipes remain publicly readable; authentication controls who may manage recipes, not whether a recipe is private.
 
 Until those follow-ups are specified and delivered:
 
 - only the public foundation is considered available;
-- no private-access guarantee is made;
+- no full recipe-management guarantee is made;
+- all catalogue records are public by product decision;
 - no collections or full recipe UI are included;
 - no temporary access-control scheme may be added to this slice;
 - calendar integration may rely only on stable identity and the explicitly specified public-read contract.
@@ -110,7 +109,7 @@ Until those follow-ups are specified and delivered:
 
 - **Under-modeling:** A deliberately small schema may require additive migrations when richer recipe behavior is designed. This is accepted to avoid guessing at issue #5's later UI and domain rules.
 - **Premature infrastructure:** Adding a driver, framework, or repository before an application boundary exists could create unnecessary architecture. Design must omit those pieces unless they are required for a testable boundary.
-- **Authorization leakage:** Modeling private recipes before issue #6 could create records that cannot be protected correctly. This slice therefore excludes private access rather than simulating it.
+- **Authorization leakage:** Modeling recipe-private visibility would create a product capability that is explicitly out of scope. This slice therefore keeps the catalogue public and leaves authenticated management to a later change.
 - **Consumer coupling:** Calendar code could couple to table details beyond the supported contract. Specifications and design must keep the consumer boundary limited to stable identity and current public recipe reads.
 - **Migration ordering:** Applying the calendar foreign key before `recipes` exists will fail. Ownership and ordering documentation are mandatory.
 - **Deletion mismatch:** A restrictive or cascading foreign key would violate the calendar tombstone behavior. The later calendar-owned constraint must use `ON DELETE SET NULL`.
@@ -127,7 +126,7 @@ The specification and design phases must turn at least the following outcomes in
 6. Recipe identifiers remain stable across ordinary catalogue reads and updates.
 7. Migration documentation identifies this change as owner of `recipes` and the calendar integration as owner of the later `meal_assignments.recipe_id` foreign key.
 8. The later calendar-owned foreign key can target `recipes(id)` with `ON DELETE SET NULL`, preserving an assignment as a tombstone when its recipe is deleted.
-9. No authenticated/private recipe behavior, collections, rich recipe management, or recipe UI is required for this foundation to pass.
+9. No authenticated recipe-management behavior, collections, rich recipe management, or recipe UI is required for this foundation to pass; private recipe visibility is not a product requirement.
 10. Focused pytest coverage verifies each implemented foundation behavior without requiring implementation of calendar PR2.
 
 ## Success criteria
@@ -136,7 +135,7 @@ The specification and design phases must turn at least the following outcomes in
 - The catalogue migration can be applied independently and before the calendar integration constraint.
 - The supported public-read boundary supplies stable identity and current title/image/detail values needed by calendar consumers.
 - No calendar source or existing calendar OpenSpec artifact is changed as part of this foundation.
-- No private-access, collection, or full recipe-UI behavior is represented as complete.
+- No authenticated management, collection, or full recipe-UI behavior is represented as complete; private recipe visibility is explicitly excluded from the product.
 - The planned implementation remains within the 400 changed-line review budget or explicitly pauses for a delivery decision under `ask-on-risk`.
 
 ## Rollback and recovery
@@ -147,4 +146,4 @@ After recipes or calendar references exist, operational rollback must leave the 
 
 ## Next phase
 
-Write focused specifications for recipe identity, minimum public recipe fields, catalogue reads, migration ordering, and calendar-compatible deletion semantics. The subsequent design must decide whether a repository adapter and PostgreSQL driver are necessary, document tradeoffs, and forecast implementation size without expanding into the deferred recipe product.
+Write focused specifications for recipe identity, minimum public recipe fields, catalogue reads, migration ordering, and calendar-compatible deletion semantics. The subsequent design must decide whether a repository adapter and PostgreSQL driver are necessary, document tradeoffs, and forecast implementation size without expanding into the deferred public recipe product.

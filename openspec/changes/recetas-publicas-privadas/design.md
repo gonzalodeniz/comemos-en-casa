@@ -9,7 +9,7 @@
 
 Add a catalogue-owned `0002_recipe_catalogue_foundation.sql` migration, a standard-library Python recipe schema boundary, and a small synchronous Psycopg 3 repository. The table stores a stable UUID plus current `title`, `image_url`, and `detail`. An internal `title_search_key` is written atomically with the title and indexed with PostgreSQL `pg_trgm` for accent-insensitive, case-insensitive substring search.
 
-No web framework, ORM, migration framework, authentication model, visibility flag, or calendar implementation is introduced. All rows in this slice belong to the public catalogue. A later identity/private-recipe change can add ownership and visibility columns, backfill existing rows as public, and then add public filters without reinterpreting this foundation as authorization.
+No web framework, ORM, migration framework, authentication model, visibility flag, or calendar implementation is introduced. All rows in this slice belong to the public catalogue. The product has no private recipes; a later authenticated-management change may add author or ownership data for editing permissions, but it must not add private visibility.
 
 The catalogue migration does not inspect or alter `meal_assignments`. After this change is merged, calendar PR2 must take the next migration number and add its own `REFERENCES recipes(id) ON DELETE SET NULL` constraint. Existing calendar source, tests, and OpenSpec artifacts remain untouched.
 
@@ -50,7 +50,7 @@ Recipe schema boundary
 - **SQLAlchemy or another ORM:** four explicit SQL operations do not justify a mapping/session layer. A direct repository makes selected columns and transaction ownership visible.
 - **Pydantic:** the existing domain uses dataclasses and standard-library validation. Pydantic would duplicate framework-independent rules and add a dependency solely for three fields.
 - **PostgreSQL `unaccent` as the canonical normalizer:** PostgreSQL 16 lowercasing does not provide Python-equivalent Unicode case folding, and expression indexing requires function-volatility workarounds. Deriving one key in Python is smaller and has deterministic cross-environment behavior.
-- **A `visibility` boolean:** it would imply private-access semantics without issue #6 identity and authorization. Existing rows are public by definition; future visibility must be an additive, authorization-aware model.
+- **A `visibility` boolean:** private recipe visibility is not part of the product. Existing rows are public by definition, and future management metadata must not reinterpret this foundation as private authorization.
 
 ## 3. PostgreSQL design
 
@@ -128,7 +128,7 @@ LIMIT :limit
 
 The repository escapes `\`, `%`, and `_`, so user input is literal rather than a SQL pattern. Values remain bound parameters. An empty normalized query omits the predicate and returns the first ordered page. Cursor pagination and HTTP response shapes are deferred because neither is required by this foundation's specification.
 
-All rows are public in this slice, so the `public` method names state consumer intent rather than applying a nonexistent authorization predicate. When private recipes are designed, those methods must add the approved visibility/identity predicate before private rows can be stored.
+All rows are public by product decision, so the `public` method names state consumer intent rather than applying an authorization predicate. Future authenticated management may restrict writes, but public reads remain public and no private rows may be stored.
 
 No generic repository protocol, unit-of-work abstraction, pool, retry loop, or exception-to-HTTP translation is added. Those policies belong to the future application service. A future calendar repository may use a `LEFT JOIN recipes` for current title/image reads; it must not copy those values into `meal_assignments`.
 
@@ -191,7 +191,7 @@ No calendar source, calendar tests, calendar migrations, calendar OpenSpec artif
 
 ## 9. Test design
 
-Implementation follows strict TDD using the existing pytest configuration.
+Implementation uses proportionate verification with the existing pytest configuration; strict TDD is not required.
 
 ### Unit tests
 
@@ -272,6 +272,6 @@ No delivery decision is required at design time because the smallest implementat
 - `title_search_key` can drift only if an operator bypasses the supported Python/repository write boundary. The explicit same-statement write contract and integration tests mitigate this; a database trigger is rejected as duplicated normalization logic.
 - Trigram indexes may not accelerate every very short query, but results remain correct. Query-volume tuning is deferred until an HTTP boundary and production catalogue size exist.
 - Installing `pg_trgm` requires database permission to create trusted extensions. Deployment must verify this before migration; if unavailable, delivery pauses rather than silently dropping the indexed-search requirement.
-- Public-only rows cannot safely become private until issue #6 defines identity and authorization. No private data may be inserted under this schema and treated as protected.
+- The product does not support private recipe rows. No private data may be inserted under this schema or treated as protected.
 
 **Next step:** create bounded implementation tasks with a fresh changed-line forecast. Do not restore or modify calendar PR2 planning until this catalogue foundation is merged.

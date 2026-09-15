@@ -96,10 +96,10 @@ The catalogue schema MUST permit a recipe to be deleted without defining a calen
 
 ### Requirement: Foundation Scope Boundaries
 
-This foundation SHALL provide only the public recipe identity and read-data contract defined here. It SHALL NOT implement or claim private recipe access, authentication, authorization, users, households, ownership, roles, permissions, collections, favorites, rich recipe content, recipe-management workflows, publishing workflows, or any recipe frontend or full recipe-detail UI. It SHALL NOT add calendar endpoints, calendar repositories, calendar UI, or the calendar-owned foreign-key migration.
+This foundation SHALL provide only the public recipe identity and read-data contract defined here. It SHALL NOT implement or claim authenticated recipe management, authorization, users, households, ownership, roles, permissions, collections, favorites, rich recipe content, publishing workflows, or any recipe frontend or full recipe-detail UI. The product SHALL NOT define or implement private recipe visibility. It SHALL NOT add calendar endpoints, calendar repositories, calendar UI, or the calendar-owned foreign-key migration.
 
 #### Scenario: Evaluating the delivered foundation scope
 
 - GIVEN only this foundation change is applied
 - WHEN a consumer evaluates its supported capabilities
-- THEN it can rely on stable public recipe identity and current title, image URL, and detail reads, but cannot rely on private access or a full recipe-management or recipe-UI capability
+- THEN it can rely on stable public recipe identity and current title, image URL, and detail reads, but cannot rely on authenticated management or a full recipe-management or recipe-UI capability; private recipe visibility is not supported

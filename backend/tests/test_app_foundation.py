@@ -34,6 +34,16 @@ def test_database_url_is_loaded_without_modification() -> None:
     assert settings.database_url == "postgresql://user:pass@db/app"
 
 
+def test_guest_user_access_defaults_to_enabled_and_accepts_explicit_disable() -> None:
+    default_settings = load_settings({"DATABASE_URL": "postgresql://user:pass@db/app"})
+    disabled_settings = load_settings(
+        {"DATABASE_URL": "postgresql://user:pass@db/app", "ENABLE_GUEST_USER": "false"}
+    )
+
+    assert default_settings.enable_guest_user is True
+    assert disabled_settings.enable_guest_user is False
+
+
 def test_app_import_requires_database_url(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("DATABASE_URL", raising=False)
     sys.modules.pop("comemos_en_casa.app", None)

@@ -10,6 +10,8 @@ The calendar owns `0003_meal_calendar_recipe_fk.sql`. Apply all migrations in le
 
 `0005_recipe_management.sql` expands the catalogue after authentication. It adds the explicitly public `draft`/`published` status, allows recipes without an image until a local upload is attached, and adds normalized ordered `recipe_ingredients` and `recipe_preparation_steps` relations. It leaves `meal_assignments.recipe_id` intact, so the existing `ON DELETE SET NULL` behavior remains in force when a recipe is deleted.
 
+`0006_collections_favorites.sql` adds private, user-owned `recipe_favorites`, `recipe_collections`, and `collection_recipes` relations. Apply it after `0005`. It does not restrict the public recipe catalogue: every saved recipe reference is protected by foreign keys, and deleting a recipe cascades cleanup of favorites and collection memberships.
+
 ## Local verification
 
 Start the PostgreSQL service before running the migration integration test:

@@ -8,6 +8,7 @@ from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from .auth.api import register_routes as register_auth_routes
+from .collections.api import register_routes as register_collection_routes
 from .config import load_settings
 from .database import get_connection
 from .meal_calendar.api import register_routes
@@ -30,6 +31,7 @@ def create_app() -> FastAPI:
     register_auth_routes(application)
     register_routes(application)
     register_recipe_routes(application)
+    register_collection_routes(application)
     return application
 
 

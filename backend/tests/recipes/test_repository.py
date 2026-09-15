@@ -77,7 +77,7 @@ def _open_postgres_connection() -> Any:
     )
     with connection.cursor() as cursor:
         cursor.execute("CREATE SCHEMA recipe_catalogue_test")
-        cursor.execute("SET LOCAL search_path TO recipe_catalogue_test")
+        cursor.execute("SET LOCAL search_path TO recipe_catalogue_test, public")
     return connection
 
 

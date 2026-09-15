@@ -1,5 +1,31 @@
 # Manual de desarrollo
 
+## Arranque con Docker Compose
+
+Para levantar PostgreSQL, FastAPI y el frontend juntos:
+
+```bash
+docker compose up --build
+```
+
+- Frontend: `http://localhost:5173`
+- API: `http://localhost:8000`
+- PostgreSQL: `localhost:5433`
+
+En una base nueva, PostgreSQL ejecuta las migraciones SQL históricas desde `backend/migrations/versions/` durante la inicialización del volumen. Si el volumen ya existía, las migraciones no se repiten automáticamente; aplícalas o registra el baseline siguiendo la sección de migraciones.
+
+## Comandos Make
+
+Ejecuta `make` sin argumentos para mostrar todas las opciones. Las más habituales son:
+
+```bash
+make up       # levantar la aplicación
+make down     # parar los contenedores
+make logs     # seguir los logs
+make test     # ejecutar backend y frontend
+make ps       # consultar el estado
+```
+
 ## Backend
 
 Requisitos: Python, PostgreSQL y el entorno virtual del proyecto.

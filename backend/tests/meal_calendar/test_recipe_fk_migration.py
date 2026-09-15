@@ -17,7 +17,7 @@ def test_recipe_foreign_key_migration_integrates_calendar_and_catalogue() -> Non
     script = f"""\
 BEGIN;
 CREATE SCHEMA meal_calendar_recipe_fk_test;
-SET LOCAL search_path TO meal_calendar_recipe_fk_test;
+SET LOCAL search_path TO meal_calendar_recipe_fk_test, public;
 {migration_sql}
 INSERT INTO recipes (id, title, image_url, detail, title_search_key)
 VALUES

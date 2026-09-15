@@ -1,45 +1,47 @@
 import { FormEvent, useEffect, useReducer, useState } from "react";
 import { Link, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import {
+  addRecipeToCollection,
   ApiError,
   createAssignment,
+  createCollection,
   deleteAssignment,
   getCalendarContext,
   getCalendarWeek,
+  getCollections,
+  getCurrentUser,
+  getFavorites,
   getPublicRecipe,
+  getRecipeCatalogue,
   searchPublicRecipes,
+  setFavorite,
   updateAssignment,
 } from "./api";
 import { calendarReducer, initialCalendarState } from "./calendarReducer";
-import type { AssignmentWritePayload, CalendarAssignment, MealSlot, RecipeDetail } from "./types";
+import type { AssignmentWritePayload, AuthenticatedUser, CalendarAssignment, MealSlot, RecipeCollection, RecipeDetail, RecipeSummary } from "./types";
 
-const mealRows: Array<{ slot: MealSlot; label: string }> = [
-  { slot: "lunch", label: "Lunch" },
-  { slot: "dinner", label: "Dinner" },
+const mealRows: Array<{ slot: MealSlot; label: string; icon: string }> = [
+  { slot: "lunch", label: "Comida", icon: "☀" },
+  { slot: "dinner", label: "Cena", icon: "☾" },
 ];
+
+type SessionState = { status: "loading" | "ready" | "error"; user: AuthenticatedUser | null };
+type LoadState<T> = { status: "loading" | "ready" | "error"; data: T; error: string | null };
 
 function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
-  return "Unable to reach the calendar. Please try again.";
+  return "No se pudo conectar con el servicio. Inténtalo de nuevo.";
 }
 
-function toDate(value: string): Date {
-  return new Date(`${value}T12:00:00`);
-}
-
+function toDate(value: string): Date { return new Date(`${value}T12:00:00`); }
 function toIsoDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
-
 function shiftWeek(weekStart: string, amount: number): string {
   const date = toDate(weekStart);
   date.setDate(date.getDate() + amount * 7);
   return toIsoDate(date);
 }
-
 function weekDays(weekStart: string): string[] {
   return Array.from({ length: 7 }, (_, offset) => {
     const date = toDate(weekStart);
@@ -47,59 +49,105 @@ function weekDays(weekStart: string): string[] {
     return toIsoDate(date);
   });
 }
-
 function dayLabel(value: string): string {
-  return new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short" }).format(toDate(value));
+  return new Intl.DateTimeFormat("es", { weekday: "short", day: "numeric", month: "short" }).format(toDate(value));
 }
-
 function weekLabel(weekStart: string): string {
   const dates = weekDays(weekStart);
-  const formatter = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
+  const formatter = new Intl.DateTimeFormat("es", { month: "long", day: "numeric" });
   return `${formatter.format(toDate(dates[0]))} – ${formatter.format(toDate(dates[6]))}`;
 }
+function normalizeFreeText(value: string): string { return value.trim().replace(/\s+/g, " "); }
 
-function normalizeFreeText(value: string): string {
-  return value.trim().replace(/\s+/g, " ");
+function SiteHeader({ session }: { session: SessionState }) {
+  const userLabel = session.user?.displayName ?? session.user?.email;
+  return (
+    <header className="site-header">
+      <Link className="brand" to="/" aria-label="Comemos en casa, ir al calendario">
+        <span className="brand-mark" aria-hidden="true">⌂</span>
+        <span><strong>Comemos en casa</strong><small>Planifica. Cocina. Disfruta.</small></span>
+      </Link>
+      <nav className="primary-nav" aria-label="Navegación principal">
+        <Link to="/">Calendario</Link>
+        <Link to="/recetas">Recetas</Link>
+        {session.user ? <Link to="/mis-recetas">Mis recetas</Link> : null}
+      </nav>
+      <div className="session-entry">
+        {session.status === "loading" ? <span className="session-status" role="status">Comprobando sesión…</span> : null}
+        {userLabel ? <span className="user-name" title={session.user?.email}>{userLabel}</span> : null}
+        {session.status === "ready" && !session.user ? <a className="login-link" href="/api/v1/auth/login">Iniciar sesión</a> : null}
+      </div>
+    </header>
+  );
 }
 
-function AssignmentCard({
-  assignment,
-  deleting,
-  onEdit,
-  onDelete,
-}: {
-  assignment: CalendarAssignment;
-  deleting: boolean;
-  onEdit: () => void;
-  onDelete: () => void;
-}) {
+function AssignmentCard({ assignment, deleting, onEdit, onDelete }: { assignment: CalendarAssignment; deleting: boolean; onEdit: () => void; onDelete: () => void }) {
   const title = assignment.kind === "recipe" ? assignment.recipe?.title : assignment.text;
   const imageUrl = assignment.kind === "recipe" ? assignment.recipe?.coverImageUrl : null;
   const recipeId = assignment.kind === "recipe" && assignment.recipe?.available ? assignment.recipe.id : null;
-
   return (
     <article className="assignment-card">
       {imageUrl ? <img className="assignment-image" src={imageUrl} alt="" /> : null}
-      <span>{title ?? "Meal unavailable"}</span>
-      {assignment.kind === "recipe" && !assignment.recipe?.available ? <small>Recipe unavailable</small> : null}
+      <span>{title ?? "Comida no disponible"}</span>
+      {assignment.kind === "recipe" && !assignment.recipe?.available ? <small>Receta no disponible</small> : null}
       <div className="assignment-actions">
-        {recipeId ? <Link to={`/recipes/${recipeId}`}>View recipe</Link> : null}
-        <button type="button" className="text-button" onClick={onEdit} disabled={deleting}>Edit</button>
-        <button type="button" className="danger-button" onClick={onDelete} disabled={deleting}>
-          {deleting ? "Deleting…" : "Delete"}
-        </button>
+        {recipeId ? <Link to={`/recetas/${recipeId}`}>Ver receta</Link> : null}
+        <button type="button" className="text-button" onClick={onEdit} disabled={deleting}>Editar</button>
+        <button type="button" className="danger-button" onClick={onDelete} disabled={deleting}>{deleting ? "Eliminando…" : "Eliminar"}</button>
       </div>
     </article>
   );
 }
 
-function RecipeDetailPage() {
+function RecipeCard({ recipe, action }: { recipe: RecipeSummary; action?: React.ReactNode }) {
+  return <article className="recipe-card">
+    {recipe.coverImageUrl ? <img src={recipe.coverImageUrl} alt="" /> : <div className="recipe-image-placeholder" aria-hidden="true">🍲</div>}
+    <div className="recipe-card-content">
+      {recipe.status === "draft" ? <span className="status-pill">Borrador público</span> : null}
+      <h3><Link to={`/recetas/${recipe.id}`}>{recipe.title}</Link></h3>
+      <div className="recipe-card-actions"><Link to={`/recetas/${recipe.id}`}>Ver receta</Link>{action}</div>
+    </div>
+  </article>;
+}
+
+function RecipeCataloguePage() {
+  const [query, setQuery] = useState("");
+  const [load, setLoad] = useState<LoadState<RecipeSummary[]>>({ status: "loading", data: [], error: null });
+  const [reload, setReload] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoad((current) => ({ ...current, status: "loading", error: null }));
+    getRecipeCatalogue(query, controller.signal)
+      .then((recipes) => setLoad({ status: "ready", data: recipes, error: null }))
+      .catch((error: unknown) => {
+        if (!(error instanceof DOMException && error.name === "AbortError")) setLoad((current) => ({ ...current, status: "error", error: errorMessage(error) }));
+      });
+    return () => controller.abort();
+  }, [query, reload]);
+
+  return <main className="app-shell">
+    <section className="page-hero" aria-labelledby="catalogue-title">
+      <div><p className="eyebrow">Recetario público</p><h1 id="catalogue-title">Recetas para cada día</h1><p>Explora recetas públicas, incluidos los borradores, y guárdalas en tus listas al iniciar sesión.</p></div>
+      <Link className="primary-link" to="/">Ver calendario</Link>
+    </section>
+    <form className="catalogue-search" role="search" onSubmit={(event) => event.preventDefault()}>
+      <label htmlFor="catalogue-query">Buscar recetas</label>
+      <input id="catalogue-query" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nombre de receta o ingrediente" />
+    </form>
+    {load.status === "loading" ? <p className="loading-state" role="status">Cargando recetas…</p> : null}
+    {load.status === "error" ? <div className="notice error-notice" role="alert"><p>{load.error}</p><button type="button" onClick={() => setReload((value) => value + 1)}>Reintentar</button></div> : null}
+    {load.status === "ready" && load.data.length === 0 ? <p className="empty-state">No hay recetas que coincidan con la búsqueda.</p> : null}
+    {load.data.length > 0 ? <section className="recipe-catalogue" aria-label="Resultados de recetas">{load.data.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} />)}</section> : null}
+  </main>;
+}
+
+function RecipeDetailPage({ session }: { session: SessionState }) {
   const { recipeId } = useParams();
-  const [detail, setDetail] = useState<{ status: "loading" | "ready" | "error"; data: RecipeDetail | null; error: string | null }>({
-    status: "loading",
-    data: null,
-    error: null,
-  });
+  const [detail, setDetail] = useState<LoadState<RecipeDetail | null>>({ status: "loading", data: null, error: null });
+  const [saved, setSaved] = useState<LoadState<{ favorites: RecipeSummary[]; collections: RecipeCollection[] }>>({ status: "ready", data: { favorites: [], collections: [] }, error: null });
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [selectedCollection, setSelectedCollection] = useState("");
 
   useEffect(() => {
     if (!recipeId) return;
@@ -108,29 +156,103 @@ function RecipeDetailPage() {
     getPublicRecipe(recipeId, controller.signal)
       .then((recipe) => setDetail({ status: "ready", data: recipe, error: null }))
       .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        setDetail({ status: "error", data: null, error: errorMessage(error) });
+        if (!(error instanceof DOMException && error.name === "AbortError")) setDetail({ status: "error", data: null, error: errorMessage(error) });
       });
     return () => controller.abort();
   }, [recipeId]);
 
-  return (
-    <main className="app-shell detail-page">
-      <Link className="back-link" to="/">← Back to calendar</Link>
-      {detail.status === "loading" ? <p className="loading-state" role="status">Loading recipe…</p> : null}
-      {detail.status === "error" ? <p className="notice error-notice" role="alert">{detail.error}</p> : null}
-      {detail.data ? (
-        <article className="recipe-detail">
-          <img src={detail.data.coverImageUrl} alt="" />
-          <div>
-            <p className="eyebrow">Public recipe</p>
-            <h1>{detail.data.title}</h1>
-            <p>{detail.data.detail}</p>
-          </div>
-        </article>
-      ) : null}
-    </main>
-  );
+  useEffect(() => {
+    if (!session.user) return;
+    const controller = new AbortController();
+    setSaved((current) => ({ ...current, status: "loading", error: null }));
+    Promise.all([getFavorites(controller.signal), getCollections(controller.signal)])
+      .then(([favorites, collections]) => setSaved({ status: "ready", data: { favorites, collections }, error: null }))
+      .catch((error: unknown) => {
+        if (!(error instanceof DOMException && error.name === "AbortError")) setSaved((current) => ({ ...current, status: "error", error: errorMessage(error) }));
+      });
+    return () => controller.abort();
+  }, [session.user]);
+
+  const isFavorite = Boolean(detail.data && saved.data.favorites.some((recipe) => recipe.id === detail.data?.id));
+  async function toggleFavorite() {
+    if (!detail.data) return;
+    setSaveMessage(null);
+    try {
+      await setFavorite(detail.data.id, !isFavorite);
+      setSaved((current) => ({ ...current, data: { ...current.data, favorites: isFavorite ? current.data.favorites.filter((recipe) => recipe.id !== detail.data?.id) : [...current.data.favorites, detail.data!] } }));
+      setSaveMessage(isFavorite ? "Se eliminó de tus favoritos." : "Se guardó en tus favoritos.");
+    } catch (error) { setSaveMessage(errorMessage(error)); }
+  }
+  async function saveToCollection() {
+    if (!detail.data || !selectedCollection) return;
+    setSaveMessage(null);
+    try {
+      await addRecipeToCollection(selectedCollection, detail.data.id);
+      setSaveMessage("La receta se añadió a la colección.");
+    } catch (error) { setSaveMessage(errorMessage(error)); }
+  }
+
+  return <main className="app-shell detail-page">
+    <Link className="back-link" to="/recetas">← Volver a recetas</Link>
+    {detail.status === "loading" ? <p className="loading-state" role="status">Cargando receta…</p> : null}
+    {detail.status === "error" ? <p className="notice error-notice" role="alert">{detail.error}</p> : null}
+    {detail.data ? <article className="recipe-detail">
+      <div className="recipe-detail-image">{detail.data.coverImageUrl ? <img src={detail.data.coverImageUrl} alt="" /> : <div className="recipe-image-placeholder" aria-hidden="true">🍲</div>}</div>
+      <div className="recipe-detail-content">
+        <p className="eyebrow">{detail.data.status === "draft" ? "Borrador público" : "Receta pública"}</p>
+        <h1>{detail.data.title}</h1>
+        <p className="recipe-description">{detail.data.detail}</p>
+        {session.user ? <section className="recipe-saved-actions" aria-labelledby="save-recipe-title">
+          <h2 id="save-recipe-title">Guardar receta</h2>
+          {saved.status === "loading" ? <p role="status">Cargando tus listas…</p> : null}
+          {saved.status === "error" ? <p className="inline-error" role="alert">{saved.error}</p> : null}
+          {saved.status === "ready" ? <div className="saved-controls"><button type="button" className={isFavorite ? "secondary-button is-favorite" : "secondary-button"} onClick={() => void toggleFavorite()}>{isFavorite ? "♥ En favoritos" : "♡ Añadir a favoritos"}</button>
+            <label>Guardar en una colección<select value={selectedCollection} onChange={(event) => setSelectedCollection(event.target.value)}><option value="">Selecciona una colección</option>{saved.data.collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.name}</option>)}</select></label>
+            <button type="button" onClick={() => void saveToCollection()} disabled={!selectedCollection}>Guardar</button>
+            <Link to="/mis-recetas">Gestionar mis recetas</Link></div> : null}
+          {saveMessage ? <p className="save-message" role="status">{saveMessage}</p> : null}
+        </section> : <p className="login-callout">Inicia sesión para guardar esta receta en favoritos o colecciones. <a href="/api/v1/auth/login">Iniciar sesión</a></p>}
+        <section className="recipe-content-section" aria-labelledby="ingredients-title"><h2 id="ingredients-title">Ingredientes</h2>{detail.data.ingredients.length ? <ul className="ingredient-list">{detail.data.ingredients.map((ingredient, index) => <li key={`${ingredient.name}-${index}`}><span>{ingredient.name}</span>{ingredient.quantity ? <span>{ingredient.quantity}</span> : null}</li>)}</ul> : <p>No se han añadido ingredientes.</p>}</section>
+        <section className="recipe-content-section" aria-labelledby="steps-title"><h2 id="steps-title">Preparación</h2>{detail.data.steps.length ? <ol className="step-list">{detail.data.steps.map((step, index) => <li key={`${step.instruction}-${index}`}>{step.instruction}</li>)}</ol> : <p>No se han añadido pasos de preparación.</p>}</section>
+      </div>
+    </article> : null}
+  </main>;
+}
+
+function CollectionsPage({ session }: { session: SessionState }) {
+  const [load, setLoad] = useState<LoadState<{ favorites: RecipeSummary[]; collections: RecipeCollection[] }>>({ status: "loading", data: { favorites: [], collections: [] }, error: null });
+  const [name, setName] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  const [reload, setReload] = useState(0);
+  useEffect(() => {
+    if (!session.user) return;
+    const controller = new AbortController();
+    setLoad((current) => ({ ...current, status: "loading", error: null }));
+    Promise.all([getFavorites(controller.signal), getCollections(controller.signal)])
+      .then(([favorites, collections]) => setLoad({ status: "ready", data: { favorites, collections }, error: null }))
+      .catch((error: unknown) => {
+        if (!(error instanceof DOMException && error.name === "AbortError")) setLoad((current) => ({ ...current, status: "error", error: errorMessage(error) }));
+      });
+    return () => controller.abort();
+  }, [session.user, reload]);
+  async function submitCollection(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const normalizedName = normalizeFreeText(name);
+    if (!normalizedName) { setMessage("Escribe un nombre para la colección."); return; }
+    try {
+      const collection = await createCollection(normalizedName);
+      setLoad((current) => ({ ...current, data: { ...current.data, collections: [collection, ...current.data.collections] } }));
+      setName(""); setMessage("La colección se creó correctamente.");
+    } catch (error) { setMessage(errorMessage(error)); }
+  }
+  if (!session.user && session.status === "ready") return <main className="app-shell"><section className="empty-state"><h1>Mis recetas</h1><p>Inicia sesión para ver tus favoritos y colecciones privadas.</p><a className="primary-link" href="/api/v1/auth/login">Iniciar sesión</a></section></main>;
+  return <main className="app-shell"><section className="page-hero" aria-labelledby="my-recipes-title"><div><p className="eyebrow">Espacio privado</p><h1 id="my-recipes-title">Mis recetas</h1><p>Organiza las recetas públicas que quieres conservar.</p></div></section>
+    {load.status === "loading" ? <p className="loading-state" role="status">Cargando tus recetas…</p> : null}
+    {load.status === "error" ? <div className="notice error-notice" role="alert"><p>{load.error}</p><button type="button" onClick={() => setReload((value) => value + 1)}>Reintentar</button></div> : null}
+    {load.status === "ready" ? <><section className="private-section" aria-labelledby="favorites-title"><h2 id="favorites-title">Favoritos</h2>{load.data.favorites.length ? <div className="recipe-catalogue compact-catalogue">{load.data.favorites.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} />)}</div> : <p>Aún no tienes recetas favoritas.</p>}</section>
+      <section className="private-section" aria-labelledby="collections-title"><div className="section-heading"><div><h2 id="collections-title">Colecciones</h2><p>Estas colecciones solo son visibles para ti.</p></div></div><form className="create-collection" onSubmit={submitCollection}><label htmlFor="collection-name">Nueva colección</label><input id="collection-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Por ejemplo, Cenas rápidas" /><button type="submit">Crear colección</button></form>{message ? <p className="save-message" role="status">{message}</p> : null}
+        {load.data.collections.length ? <div className="collection-grid">{load.data.collections.map((collection) => <article className="collection-card" key={collection.id}><h3>{collection.name}</h3><p>{collection.recipes.length} {collection.recipes.length === 1 ? "receta" : "recetas"}</p>{collection.recipes.length ? <ul>{collection.recipes.slice(0, 4).map((recipe) => <li key={recipe.id}><Link to={`/recetas/${recipe.id}`}>{recipe.title}</Link></li>)}</ul> : <p className="muted">Todavía no hay recetas en esta colección.</p>}</article>)}</div> : <p>Aún no tienes colecciones.</p>}</section></> : null}
+  </main>;
 }
 
 function CalendarPage() {
@@ -139,261 +261,36 @@ function CalendarPage() {
   const [state, dispatch] = useReducer(calendarReducer, initialCalendarState);
   const [reloadVersion, setReloadVersion] = useState(0);
   const activeWeekStart = weekStartFromPath ?? state.context.data?.currentWeekStart;
-
-  useEffect(() => {
-    const controller = new AbortController();
-    dispatch({ type: "context/loading" });
-    getCalendarContext(controller.signal)
-      .then((context) => dispatch({ type: "context/success", payload: context }))
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        dispatch({ type: "context/error", payload: errorMessage(error) });
-      });
-    return () => controller.abort();
-  }, [reloadVersion]);
-
-  useEffect(() => {
-    if (!activeWeekStart) return;
-    const controller = new AbortController();
-    dispatch({ type: "week/loading" });
-    getCalendarWeek(activeWeekStart, controller.signal)
-      .then((week) => dispatch({ type: "week/success", payload: week }))
-      .catch((error: unknown) => {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        dispatch({ type: "week/error", payload: errorMessage(error) });
-      });
-    return () => controller.abort();
-  }, [activeWeekStart, reloadVersion]);
-
-  function retryCalendar() {
-    setReloadVersion((version) => version + 1);
-  }
-
-  function navigateWeek(amount: number) {
-    if (activeWeekStart) navigate(`/weeks/${shiftWeek(activeWeekStart, amount)}`);
-  }
-
-  function openCurrentWeek() {
-    if (state.context.data) navigate(`/weeks/${state.context.data.currentWeekStart}`);
-  }
-
-  async function submitRecipeSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    dispatch({ type: "recipes/loading" });
-    try {
-      const results = await searchPublicRecipes(state.recipeQuery);
-      dispatch({ type: "recipes/success", payload: results });
-    } catch (error: unknown) {
-      dispatch({ type: "recipes/error", payload: errorMessage(error) });
-    }
-  }
-
+  useEffect(() => { const controller = new AbortController(); dispatch({ type: "context/loading" }); getCalendarContext(controller.signal).then((context) => dispatch({ type: "context/success", payload: context })).catch((error: unknown) => { if (!(error instanceof DOMException && error.name === "AbortError")) dispatch({ type: "context/error", payload: errorMessage(error) }); }); return () => controller.abort(); }, [reloadVersion]);
+  useEffect(() => { if (!activeWeekStart) return; const controller = new AbortController(); dispatch({ type: "week/loading" }); getCalendarWeek(activeWeekStart, controller.signal).then((week) => dispatch({ type: "week/success", payload: week })).catch((error: unknown) => { if (!(error instanceof DOMException && error.name === "AbortError")) dispatch({ type: "week/error", payload: errorMessage(error) }); }); return () => controller.abort(); }, [activeWeekStart, reloadVersion]);
+  function retryCalendar() { setReloadVersion((version) => version + 1); }
+  function navigateWeek(amount: number) { if (activeWeekStart) navigate(`/semanas/${shiftWeek(activeWeekStart, amount)}`); }
+  function openCurrentWeek() { if (state.context.data) navigate(`/semanas/${state.context.data.currentWeekStart}`); }
+  async function submitRecipeSearch(event: FormEvent<HTMLFormElement>) { event.preventDefault(); dispatch({ type: "recipes/loading" }); try { dispatch({ type: "recipes/success", payload: await searchPublicRecipes(state.recipeQuery) }); } catch (error) { dispatch({ type: "recipes/error", payload: errorMessage(error) }); } }
   async function saveAssignment(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const editor = state.editor;
-    if (!editor || state.mutation.status === "loading") return;
-
+    event.preventDefault(); const editor = state.editor; if (!editor || state.mutation.status === "loading") return;
     let payload: AssignmentWritePayload;
-    if (editor.kind === "recipe") {
-      if (!state.selectedRecipe) {
-        dispatch({ type: "mutation/error", payload: "Choose a public recipe from the search results before saving." });
-        return;
-      }
-      payload = { date: editor.date, slot: editor.slot, kind: "recipe", recipeId: state.selectedRecipe.id };
-    } else {
-      const text = normalizeFreeText(editor.freeText);
-      if (!text) {
-        dispatch({ type: "mutation/error", payload: "Enter a meal description before saving." });
-        return;
-      }
-      dispatch({ type: "editor/freeTextChanged", payload: text });
-      payload = { date: editor.date, slot: editor.slot, kind: "free_text", text };
-    }
-
-    const assignmentId = editor.assignmentId;
-    const isEditing = assignmentId !== null;
-    dispatch({ type: "mutation/loading", payload: { type: isEditing ? "update" : "create", assignmentId } });
-    try {
-      const assignment = assignmentId
-        ? await updateAssignment(assignmentId, payload)
-        : await createAssignment({ ...payload, id: crypto.randomUUID() });
-      dispatch({ type: "week/assignmentSaved", payload: assignment });
-      dispatch({ type: "mutation/success", payload: isEditing ? "Meal assignment updated." : "Meal assignment saved." });
-      dispatch({ type: "editor/close" });
-    } catch (error: unknown) {
-      dispatch({ type: "mutation/error", payload: errorMessage(error) });
-    }
+    if (editor.kind === "recipe") { if (!state.selectedRecipe) { dispatch({ type: "mutation/error", payload: "Elige una receta pública antes de guardar." }); return; } payload = { date: editor.date, slot: editor.slot, kind: "recipe", recipeId: state.selectedRecipe.id }; }
+    else { const text = normalizeFreeText(editor.freeText); if (!text) { dispatch({ type: "mutation/error", payload: "Escribe una descripción para la comida." }); return; } dispatch({ type: "editor/freeTextChanged", payload: text }); payload = { date: editor.date, slot: editor.slot, kind: "free_text", text }; }
+    const assignmentId = editor.assignmentId; const isEditing = assignmentId !== null; dispatch({ type: "mutation/loading", payload: { type: isEditing ? "update" : "create", assignmentId } });
+    try { const assignment = assignmentId ? await updateAssignment(assignmentId, payload) : await createAssignment({ ...payload, id: crypto.randomUUID() }); dispatch({ type: "week/assignmentSaved", payload: assignment }); dispatch({ type: "mutation/success", payload: isEditing ? "La comida se actualizó." : "La comida se guardó." }); dispatch({ type: "editor/close" }); } catch (error) { dispatch({ type: "mutation/error", payload: errorMessage(error) }); }
   }
-
-  async function removeAssignment(assignment: CalendarAssignment) {
-    if (state.mutation.status === "loading") return;
-    if (!window.confirm(`Delete ${assignment.kind === "recipe" ? assignment.recipe?.title : assignment.text ?? "this meal"}?`)) return;
-
-    dispatch({ type: "mutation/loading", payload: { type: "delete", assignmentId: assignment.id } });
-    try {
-      await deleteAssignment(assignment.id);
-      dispatch({ type: "week/assignmentDeleted", payload: assignment.id });
-      dispatch({ type: "mutation/success", payload: "Meal assignment deleted." });
-      if (state.editor?.assignmentId === assignment.id) dispatch({ type: "editor/close" });
-    } catch (error: unknown) {
-      dispatch({ type: "mutation/error", payload: errorMessage(error) });
-    }
-  }
-
-  const assignments = state.week.data?.assignments ?? [];
-  const days = activeWeekStart ? weekDays(activeWeekStart) : [];
-  const editor = state.editor;
-  const isSaving = state.mutation.status === "loading" && (state.mutation.type === "create" || state.mutation.type === "update");
-  const canChooseRecipe = !editor || editor.kind === "recipe";
-
-  return (
-    <main className="app-shell">
-      <header className="page-header">
-        <div>
-          <p className="eyebrow">Shared meal planning</p>
-          <h1>Comemos en casa</h1>
-          <p className="intro">See the week at a glance and browse recipes that are public to everyone.</p>
-        </div>
-        {state.context.data?.guestMode ? <p className="guest-banner" role="status">Guest mode is on: this calendar is shared with every visitor.</p> : null}
-      </header>
-
-      <section className="calendar-section" aria-labelledby="calendar-title">
-        <div className="section-heading">
-          <div>
-            <h2 id="calendar-title">Weekly calendar</h2>
-            <p>{activeWeekStart ? weekLabel(activeWeekStart) : "Loading current week…"}</p>
-          </div>
-          <div className="week-controls" aria-label="Week navigation">
-            <button type="button" onClick={() => navigateWeek(-1)} disabled={!activeWeekStart}>Previous week</button>
-            <button type="button" onClick={openCurrentWeek} disabled={!state.context.data}>Current week</button>
-            <button type="button" onClick={() => navigateWeek(1)} disabled={!activeWeekStart}>Next week</button>
-          </div>
-        </div>
-
-        {state.context.status === "error" ? <div className="notice error-notice" role="alert"><p>{state.context.error}</p><button type="button" onClick={retryCalendar}>Retry</button></div> : null}
-        {state.week.status === "error" ? <div className="notice error-notice" role="alert"><p>{state.week.error}</p><button type="button" onClick={retryCalendar}>Retry</button></div> : null}
-        {state.context.status === "loading" || state.week.status === "loading" ? <p className="loading-state" role="status">Loading calendar…</p> : null}
-
-        {activeWeekStart && state.week.status === "ready" ? (
-          <div className="calendar-scroll">
-            <table className="calendar-grid">
-              <thead><tr><th scope="col">Meal</th>{days.map((day) => <th scope="col" key={day}>{dayLabel(day)}</th>)}</tr></thead>
-              <tbody>
-                {mealRows.map(({ slot, label }) => (
-                  <tr key={slot}>
-                    <th scope="row">{label}</th>
-                    {days.map((day) => {
-                      const cellAssignments = assignments.filter((assignment) => assignment.date === day && assignment.slot === slot);
-                      const selected = editor?.date === day && editor.slot === slot;
-                      return (
-                        <td className={selected ? "selected-calendar-cell" : undefined} key={`${day}-${slot}`}>
-                          {cellAssignments.length > 0 ? cellAssignments.map((assignment) => (
-                            <AssignmentCard
-                              key={assignment.id}
-                              assignment={assignment}
-                              deleting={state.mutation.status === "loading" && state.mutation.type === "delete" && state.mutation.assignmentId === assignment.id}
-                              onEdit={() => dispatch({ type: "editor/openEdit", payload: assignment })}
-                              onDelete={() => void removeAssignment(assignment)}
-                            />
-                          )) : <span className="empty-cell">No plan</span>}
-                          <button type="button" className="add-assignment" onClick={() => dispatch({ type: "editor/openCreate", payload: { date: day, slot } })}>
-                            Add meal
-                          </button>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : null}
-
-        {state.mutation.status === "success" ? <p className="notice success-notice" role="status">{state.mutation.message}</p> : null}
-        {state.mutation.status === "error" ? <p className="notice error-notice" role="alert">{state.mutation.message}</p> : null}
-
-        {editor ? (
-          <form className="assignment-editor" onSubmit={saveAssignment} aria-labelledby="assignment-editor-title">
-            <div>
-              <p className="eyebrow">{editor.assignmentId ? "Edit meal" : "New meal"}</p>
-              <h3 id="assignment-editor-title">{dayLabel(editor.date)} · {editor.slot === "lunch" ? "Lunch" : "Dinner"}</h3>
-            </div>
-            {!editor.assignmentId ? (
-              <fieldset className="assignment-kind">
-                <legend>Meal type</legend>
-                <label><input type="radio" checked={editor.kind === "recipe"} onChange={() => dispatch({ type: "editor/kindChanged", payload: "recipe" })} /> Public recipe</label>
-                <label><input type="radio" checked={editor.kind === "free_text"} onChange={() => dispatch({ type: "editor/kindChanged", payload: "free_text" })} /> Free text</label>
-              </fieldset>
-            ) : null}
-            {editor.kind === "recipe" ? (
-              <div className="recipe-choice">
-                <p>{state.selectedRecipe ? <>Selected recipe: <strong>{state.selectedRecipe.title}</strong></> : "Search below, then choose a public recipe."}</p>
-                <p className="field-hint">{editor.assignmentId ? "You can replace this recipe with another public recipe." : "Choose from the public search results below."}</p>
-              </div>
-            ) : (
-              <label className="free-text-field" htmlFor="meal-text">
-                Meal description
-                <input
-                  id="meal-text"
-                  value={editor.freeText}
-                  onChange={(event) => dispatch({ type: "editor/freeTextChanged", payload: event.target.value })}
-                  onBlur={(event) => dispatch({ type: "editor/freeTextChanged", payload: normalizeFreeText(event.target.value) })}
-                  placeholder="e.g. vegetable soup"
-                />
-              </label>
-            )}
-            <div className="editor-actions">
-              <button type="submit" disabled={isSaving}>{isSaving ? "Saving…" : editor.assignmentId ? "Save changes" : "Save meal"}</button>
-              <button type="button" className="secondary-button" onClick={() => dispatch({ type: "editor/close" })} disabled={isSaving}>Cancel</button>
-            </div>
-          </form>
-        ) : null}
-      </section>
-
-      <section className="recipe-panel" aria-labelledby="recipe-search-title">
-        <div>
-          <p className="eyebrow">Public catalogue</p>
-          <h2 id="recipe-search-title">Find a recipe</h2>
-          <p>Search public recipes, view their details, and choose one for the selected calendar cell.</p>
-        </div>
-        <form className="recipe-search" onSubmit={submitRecipeSearch}>
-          <label htmlFor="recipe-query">Recipe name</label>
-          <div className="search-controls">
-            <input id="recipe-query" type="search" value={state.recipeQuery} onChange={(event) => dispatch({ type: "recipes/queryChanged", payload: event.target.value })} placeholder="e.g. vegetable soup" />
-            <button type="submit" disabled={state.recipes.status === "loading"}>Search</button>
-          </div>
-        </form>
-
-        {state.recipes.status === "loading" ? <p className="loading-state" role="status">Searching recipes…</p> : null}
-        {state.recipes.status === "error" ? <p className="notice error-notice" role="alert">{state.recipes.error}</p> : null}
-        {state.recipes.status === "ready" && state.recipes.data?.recipes.length === 0 ? <p>No public recipes matched that search.</p> : null}
-        {state.recipes.data?.recipes.length ? (
-          <ul className="recipe-results" aria-label="Public recipe results">
-            {state.recipes.data.recipes.map((recipe) => (
-              <li key={recipe.id} className="recipe-result">
-                <img src={recipe.coverImageUrl} alt="" />
-                <span>{recipe.title}</span>
-                <div className="recipe-result-actions">
-                  <button type="button" onClick={() => dispatch({ type: "recipes/selected", payload: recipe })} disabled={!canChooseRecipe}>Choose</button>
-                  <Link to={`/recipes/${recipe.id}`}>View details</Link>
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        {state.selectedRecipe ? <p className="selected-recipe" role="status">Selected public recipe: <strong>{state.selectedRecipe.title}</strong></p> : null}
-      </section>
-    </main>
-  );
+  async function removeAssignment(assignment: CalendarAssignment) { if (state.mutation.status === "loading") return; const title = assignment.kind === "recipe" ? assignment.recipe?.title : assignment.text ?? "esta comida"; if (!window.confirm(`¿Eliminar ${title}?`)) return; dispatch({ type: "mutation/loading", payload: { type: "delete", assignmentId: assignment.id } }); try { await deleteAssignment(assignment.id); dispatch({ type: "week/assignmentDeleted", payload: assignment.id }); dispatch({ type: "mutation/success", payload: "La comida se eliminó." }); if (state.editor?.assignmentId === assignment.id) dispatch({ type: "editor/close" }); } catch (error) { dispatch({ type: "mutation/error", payload: errorMessage(error) }); } }
+  const assignments = state.week.data?.assignments ?? []; const days = activeWeekStart ? weekDays(activeWeekStart) : []; const editor = state.editor; const isSaving = state.mutation.status === "loading" && (state.mutation.type === "create" || state.mutation.type === "update"); const canChooseRecipe = !editor || editor.kind === "recipe";
+  return <main className="app-shell">
+    <header className="page-hero calendar-hero"><div><p className="eyebrow">Planificación compartida</p><h1>Tu menú semanal</h1><p>Organiza las comidas de la semana y encuentra inspiración en el recetario público.</p></div>{state.context.data?.guestMode ? <p className="guest-banner" role="status">Modo invitado activo: este calendario se comparte con todas las personas que lo visitan.</p> : null}</header>
+    <section className="calendar-section" aria-labelledby="calendar-title"><div className="section-heading"><div><h2 id="calendar-title">Semana del {activeWeekStart ? weekLabel(activeWeekStart) : "…"}</h2><p>Elige una casilla para añadir o editar una comida.</p></div><div className="week-controls" aria-label="Navegación por semanas"><button type="button" onClick={() => navigateWeek(-1)} disabled={!activeWeekStart} aria-label="Semana anterior">←</button><button type="button" onClick={openCurrentWeek} disabled={!state.context.data}>Esta semana</button><button type="button" onClick={() => navigateWeek(1)} disabled={!activeWeekStart} aria-label="Semana siguiente">→</button></div></div>
+      {state.context.status === "error" ? <div className="notice error-notice" role="alert"><p>{state.context.error}</p><button type="button" onClick={retryCalendar}>Reintentar</button></div> : null}{state.week.status === "error" ? <div className="notice error-notice" role="alert"><p>{state.week.error}</p><button type="button" onClick={retryCalendar}>Reintentar</button></div> : null}{state.context.status === "loading" || state.week.status === "loading" ? <p className="loading-state" role="status">Cargando calendario…</p> : null}
+      {activeWeekStart && state.week.status === "ready" ? <div className="calendar-scroll"><table className="calendar-grid"><thead><tr><th scope="col">Momento</th>{days.map((day) => <th scope="col" key={day}>{dayLabel(day)}</th>)}</tr></thead><tbody>{mealRows.map(({ slot, label, icon }) => <tr key={slot}><th scope="row"><span aria-hidden="true">{icon}</span> {label}</th>{days.map((day) => { const cellAssignments = assignments.filter((assignment) => assignment.date === day && assignment.slot === slot); const selected = editor?.date === day && editor.slot === slot; return <td className={selected ? "selected-calendar-cell" : undefined} key={`${day}-${slot}`}>{cellAssignments.length ? cellAssignments.map((assignment) => <AssignmentCard key={assignment.id} assignment={assignment} deleting={state.mutation.status === "loading" && state.mutation.type === "delete" && state.mutation.assignmentId === assignment.id} onEdit={() => dispatch({ type: "editor/openEdit", payload: assignment })} onDelete={() => void removeAssignment(assignment)} />) : <span className="empty-cell">Sin plan</span>}<button type="button" className="add-assignment" onClick={() => dispatch({ type: "editor/openCreate", payload: { date: day, slot } })}>+ Añadir</button></td>; })}</tr>)}</tbody></table></div> : null}
+      {state.mutation.status === "success" ? <p className="notice success-notice" role="status">{state.mutation.message}</p> : null}{state.mutation.status === "error" ? <p className="notice error-notice" role="alert">{state.mutation.message}</p> : null}
+      {editor ? <form className="assignment-editor" onSubmit={saveAssignment} aria-labelledby="assignment-editor-title"><div><p className="eyebrow">{editor.assignmentId ? "Editar comida" : "Nueva comida"}</p><h3 id="assignment-editor-title">{dayLabel(editor.date)} · {editor.slot === "lunch" ? "Comida" : "Cena"}</h3></div>{!editor.assignmentId ? <fieldset className="assignment-kind"><legend>Tipo de comida</legend><label><input type="radio" checked={editor.kind === "recipe"} onChange={() => dispatch({ type: "editor/kindChanged", payload: "recipe" })} />Receta pública</label><label><input type="radio" checked={editor.kind === "free_text"} onChange={() => dispatch({ type: "editor/kindChanged", payload: "free_text" })} />Texto libre</label></fieldset> : null}{editor.kind === "recipe" ? <div className="recipe-choice"><p>{state.selectedRecipe ? <>Receta seleccionada: <strong>{state.selectedRecipe.title}</strong></> : "Busca y elige una receta pública."}</p><p className="field-hint">Puedes elegir otra receta desde los resultados de abajo.</p></div> : <label className="free-text-field" htmlFor="meal-text">Descripción de la comida<input id="meal-text" value={editor.freeText} onChange={(event) => dispatch({ type: "editor/freeTextChanged", payload: event.target.value })} onBlur={(event) => dispatch({ type: "editor/freeTextChanged", payload: normalizeFreeText(event.target.value) })} placeholder="Por ejemplo, crema de verduras" /></label>}<div className="editor-actions"><button type="submit" disabled={isSaving}>{isSaving ? "Guardando…" : editor.assignmentId ? "Guardar cambios" : "Guardar comida"}</button><button type="button" className="secondary-button" onClick={() => dispatch({ type: "editor/close" })} disabled={isSaving}>Cancelar</button></div></form> : null}
+    </section>
+    <section className="recipe-panel" aria-labelledby="recipe-search-title"><div><p className="eyebrow">Recetario público</p><h2 id="recipe-search-title">Busca una receta para el calendario</h2><p>Consulta el detalle de cada receta antes de añadirla a la semana.</p></div><form className="recipe-search" onSubmit={submitRecipeSearch}><label htmlFor="recipe-query">Nombre de la receta</label><div className="search-controls"><input id="recipe-query" type="search" value={state.recipeQuery} onChange={(event) => dispatch({ type: "recipes/queryChanged", payload: event.target.value })} placeholder="Por ejemplo, sopa de verduras" /><button type="submit" disabled={state.recipes.status === "loading"}>Buscar</button></div></form>{state.recipes.status === "loading" ? <p className="loading-state" role="status">Buscando recetas…</p> : null}{state.recipes.status === "error" ? <p className="notice error-notice" role="alert">{state.recipes.error}</p> : null}{state.recipes.status === "ready" && state.recipes.data?.recipes.length === 0 ? <p>No se encontraron recetas públicas.</p> : null}{state.recipes.data?.recipes.length ? <ul className="recipe-results" aria-label="Resultados de recetas públicas">{state.recipes.data.recipes.map((recipe) => <li key={recipe.id} className="recipe-result">{recipe.coverImageUrl ? <img src={recipe.coverImageUrl} alt="" /> : <div className="recipe-thumb-placeholder" aria-hidden="true">🍲</div>}<span>{recipe.title}</span><div className="recipe-result-actions"><button type="button" onClick={() => dispatch({ type: "recipes/selected", payload: recipe })} disabled={!canChooseRecipe}>Elegir</button><Link to={`/recetas/${recipe.id}`}>Ver detalle</Link></div></li>)}</ul> : null}{state.selectedRecipe ? <p className="selected-recipe" role="status">Receta seleccionada: <strong>{state.selectedRecipe.title}</strong></p> : null}</section>
+  </main>;
 }
 
 export default function App() {
-  return (
-    <Routes>
-      <Route path="/" element={<CalendarPage />} />
-      <Route path="/weeks/:weekStart" element={<CalendarPage />} />
-      <Route path="/recipes/:recipeId" element={<RecipeDetailPage />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
+  const [session, setSession] = useState<SessionState>({ status: "loading", user: null });
+  useEffect(() => { const controller = new AbortController(); getCurrentUser(controller.signal).then((user) => setSession({ status: "ready", user })).catch(() => setSession({ status: "error", user: null })); return () => controller.abort(); }, []);
+  return <><SiteHeader session={session} /><Routes><Route path="/" element={<CalendarPage />} /><Route path="/semanas/:weekStart" element={<CalendarPage />} /><Route path="/recetas" element={<RecipeCataloguePage />} /><Route path="/recetas/:recipeId" element={<RecipeDetailPage session={session} />} /><Route path="/mis-recetas" element={<CollectionsPage session={session} />} /><Route path="/weeks/:weekStart" element={<CalendarPage />} /><Route path="/recipes/:recipeId" element={<Navigate to="/recetas" replace />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></>;
 }

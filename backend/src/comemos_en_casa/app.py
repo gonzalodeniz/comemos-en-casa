@@ -6,6 +6,7 @@ from typing import Any
 
 from fastapi import Depends, FastAPI
 
+from .auth.api import register_routes as register_auth_routes
 from .config import load_settings
 from .database import get_connection
 from .meal_calendar.api import register_routes
@@ -23,6 +24,7 @@ def create_app() -> FastAPI:
             cursor.execute("SELECT 1")
         return {"status": "ok"}
 
+    register_auth_routes(application)
     register_routes(application)
     return application
 

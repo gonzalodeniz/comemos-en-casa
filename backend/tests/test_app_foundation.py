@@ -44,6 +44,22 @@ def test_guest_user_access_defaults_to_enabled_and_accepts_explicit_disable() ->
     assert disabled_settings.enable_guest_user is False
 
 
+def test_google_oidc_credentials_are_all_or_nothing_and_never_have_source_defaults() -> None:
+    configured = load_settings(
+        {
+            "DATABASE_URL": "postgresql://user:pass@db/app",
+            "GOOGLE_CLIENT_ID": "client-id",
+            "GOOGLE_CLIENT_SECRET": "client-secret",
+            "GOOGLE_REDIRECT_URI": "https://example.test/api/v1/auth/callback",
+        }
+    )
+
+    assert configured.google_oidc is not None
+    assert configured.google_oidc.client_id == "client-id"
+    with pytest.raises(ConfigurationError, match="must be set together"):
+        load_settings({"DATABASE_URL": "postgresql://user:pass@db/app", "GOOGLE_CLIENT_ID": "client-id"})
+
+
 def test_app_import_requires_database_url(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("DATABASE_URL", raising=False)
     sys.modules.pop("comemos_en_casa.app", None)

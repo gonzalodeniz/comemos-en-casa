@@ -26,6 +26,10 @@ services:
     environment:
       DATABASE_URL: postgresql://comemos:comemos_dev_password@postgres:5432/comemos_en_casa
       ENABLE_GUEST_USER: "true"
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
     ports:
       - "8000:8000"
     depends_on:

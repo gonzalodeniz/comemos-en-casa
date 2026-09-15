@@ -63,6 +63,20 @@ DATABASE_URL="$DATABASE_URL" PYTHONPATH=backend/src .venv/bin/alembic -c alembic
 
 Las revisiones nuevas de Alembic se añadirán después del baseline. No se deben volver a ejecutar las migraciones históricas sobre una base que ya las aplicó.
 
+## Autenticación Google
+
+La autenticación usa Google OpenID Connect, sin permisos para leer Gmail. Configura las tres variables juntas:
+
+```bash
+export GOOGLE_CLIENT_ID='...'
+export GOOGLE_CLIENT_SECRET='...'
+export GOOGLE_REDIRECT_URI='http://localhost:8000/api/v1/auth/callback'
+```
+
+El flujo está disponible en `/api/v1/auth/login`. Las sesiones se almacenan de forma opaca en PostgreSQL, duran 30 días y se renuevan mientras la persona siga activa. `POST /api/v1/auth/logout` revoca la sesión y `GET /api/v1/auth/me` devuelve la identidad actual.
+
+En desarrollo, las cookies funcionan sobre HTTP local. En HTTPS se marcan como `Secure`. Las credenciales nunca deben guardarse en el repositorio.
+
 ## Frontend
 
 El frontend está en `frontend/` y usa React, TypeScript, Vite, React Router, CSS Modules y `useReducer`.

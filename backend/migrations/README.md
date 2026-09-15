@@ -6,6 +6,8 @@ The recipe catalogue owns `0002_recipe_catalogue_foundation.sql`, which creates 
 
 The calendar owns `0003_meal_calendar_recipe_fk.sql`. Apply all migrations in lexical order: `0001`, then `0002`, then `0003`. `0003` adds `meal_assignments.recipe_id REFERENCES recipes(id) ON DELETE SET NULL` only after the catalogue relation exists. It must not recreate or redefine `recipes`; future recipe-schema expansions remain catalogue-owned.
 
+`0004_authentication.sql` adds Google OpenID Connect identities and opaque server-side session storage. Apply it after `0003`. It creates independent `users` and `auth_sessions` relations; it does not change recipe visibility or any recipe table. Browser session and OAuth state values are stored only as SHA-256 hashes, while the OIDC nonce is retained only for the short-lived authorization callback validation.
+
 ## Local verification
 
 Start the PostgreSQL service before running the migration integration test:

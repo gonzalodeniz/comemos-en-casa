@@ -2,3 +2,4 @@ psycopg[binary]
 fastapi
 alembic
 uvicorn[standard]
+google-auth[requests]

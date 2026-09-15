@@ -2,7 +2,9 @@
 
 Files in `versions/` are ordered, expand-only SQL migrations. Apply each version once in lexical order. `0001_meal_calendar_foundation.sql` creates the shared-calendar foundation and deliberately has no destructive downgrade.
 
-The repository has no concrete `recipes(id)` table or recipe migration as of this migration. Therefore `0001` creates nullable `recipe_id` and the recipe tombstone-compatible check, but does **not** add a foreign key to an invented table. A later migration owned by the real recipe catalogue must add `REFERENCES recipes(id) ON DELETE SET NULL` after that concrete table exists.
+The recipe catalogue owns `0002_recipe_catalogue_foundation.sql`, which creates the canonical `recipes(id)` relation and its public foundation fields. It is independently applicable and must be applied before calendar integration; it does not depend on calendar tables.
+
+The calendar owns `0003_meal_calendar_recipe_fk.sql`. Apply all migrations in lexical order: `0001`, then `0002`, then `0003`. `0003` adds `meal_assignments.recipe_id REFERENCES recipes(id) ON DELETE SET NULL` only after the catalogue relation exists. It must not recreate or redefine `recipes`; future recipe-schema expansions remain catalogue-owned.
 
 ## Local verification
 

@@ -1,0 +1,209 @@
+from __future__ import annotations
+
+import importlib
+from datetime import date
+from pathlib import Path
+import sys
+from uuid import UUID
+
+import pytest
+from fastapi.testclient import TestClient
+
+sys.path.insert(0, str(Path(__file__).parents[2] / "src"))
+
+
+RECIPE_ID = UUID("00000000-0000-0000-0000-000000000100")
+ASSIGNMENT_ID = UUID("00000000-0000-0000-0000-000000000200")
+
+
+class FakeCursor:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, tuple[object, ...] | None]] = []
+        self._one: tuple[object, ...] | None = None
+        self._many: list[tuple[object, ...]] = []
+
+    def __enter__(self) -> "FakeCursor":
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+        return None
+
+    def execute(self, query: str, params: tuple[object, ...] | None = None) -> None:
+        self.calls.append((query, params))
+        if "FROM meal_assignments AS assignments" in query:
+            self._many = [
+                (
+                    ASSIGNMENT_ID,
+                    date(2025, 6, 2),
+                    "lunch",
+                    "recipe",
+                    RECIPE_ID,
+                    None,
+                    "Tortilla Española",
+                    "https://example.test/tortilla.jpg",
+                ),
+                (
+                    UUID("00000000-0000-0000-0000-000000000201"),
+                    date(2025, 6, 2),
+                    "lunch",
+                    "free_text",
+                    None,
+                    "  Sopa  ",
+                    None,
+                    None,
+                ),
+            ]
+        elif "SELECT id, title, image_url, detail" in query:
+            self._one = (RECIPE_ID, "Tortilla Española", "https://example.test/tortilla.jpg", "Current detail")
+        elif "SELECT id, title, image_url" in query:
+            self._many = [(RECIPE_ID, "Tortilla Española", "https://example.test/tortilla.jpg")]
+
+    def fetchone(self) -> tuple[object, ...] | None:
+        return self._one
+
+    def fetchall(self) -> list[tuple[object, ...]]:
+        return self._many
+
+
+class FakeConnection:
+    def __init__(self) -> None:
+        self.cursor_instance = FakeCursor()
+
+    def cursor(self) -> FakeCursor:
+        return self.cursor_instance
+
+
+@pytest.fixture
+def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@db/app")
+    sys.modules.pop("comemos_en_casa.app", None)
+    module = importlib.import_module("comemos_en_casa.app")
+    application = module.create_app()
+    application.dependency_overrides[module.get_connection] = FakeConnection
+    try:
+        yield TestClient(application)
+    finally:
+        application.dependency_overrides.clear()
+
+
+def test_calendar_context_and_week_reads_use_no_store_and_public_recipe_presentation(client: TestClient) -> None:
+    context = client.get("/api/v1/meal-calendar/context")
+    week = client.get("/api/v1/meal-calendar/weeks/2025-06-02")
+
+    assert context.status_code == 200
+    assert context.headers["cache-control"] == "no-store"
+    assert context.json()["timezone"] == "Europe/Canary"
+    assert context.json()["guestMode"] is True
+    assert week.status_code == 200
+    assert week.json() == {
+        "weekStart": "2025-06-02",
+        "weekEnd": "2025-06-08",
+        "timezone": "Europe/Canary",
+        "assignments": [
+            {
+                "id": "00000000-0000-0000-0000-000000000201",
+                "date": "2025-06-02",
+                "slot": "lunch",
+                "kind": "free_text",
+                "text": "  Sopa  ",
+            },
+            {
+                "id": str(ASSIGNMENT_ID),
+                "date": "2025-06-02",
+                "slot": "lunch",
+                "kind": "recipe",
+                "recipe": {
+                    "id": str(RECIPE_ID),
+                    "available": True,
+                    "title": "Tortilla Española",
+                    "coverImageUrl": "https://example.test/tortilla.jpg",
+                },
+            },
+        ],
+    }
+
+
+def test_calendar_rejects_non_monday_week_starts_with_the_stable_error_envelope(client: TestClient) -> None:
+    response = client.get("/api/v1/meal-calendar/weeks/2025-06-03")
+
+    assert response.status_code == 422
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["error"]["code"] == "invalid_week_start"
+    assert response.json()["error"]["fieldErrors"] == {"weekStart": "week start must be a Monday"}
+
+
+def test_public_recipe_search_and_detail_expose_only_current_catalogue_fields(client: TestClient) -> None:
+    search = client.get("/api/v1/meal-calendar/recipes", params={"q": "tortilla espanola", "limit": 1})
+    detail = client.get(f"/api/v1/meal-calendar/recipes/{RECIPE_ID}")
+
+    assert search.status_code == 200
+    assert search.headers["cache-control"] == "no-store"
+    assert search.json()["recipes"] == [
+        {"id": str(RECIPE_ID), "title": "Tortilla Española", "coverImageUrl": "https://example.test/tortilla.jpg"}
+    ]
+    assert search.json()["nextCursor"] is not None
+    assert detail.status_code == 200
+    assert detail.json() == {
+        "id": str(RECIPE_ID),
+        "title": "Tortilla Española",
+        "coverImageUrl": "https://example.test/tortilla.jpg",
+        "detail": "Current detail",
+    }
+
+
+def test_assignment_create_is_idempotent_for_the_same_uuid_and_payload(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from comemos_en_casa.meal_calendar import api
+    from comemos_en_casa.meal_calendar.repository import CalendarAssignment
+
+    class InMemoryRepository:
+        assignment: CalendarAssignment | None = None
+
+        def __init__(self, connection: object) -> None:
+            pass
+
+        def find_by_id(self, assignment_id: UUID) -> CalendarAssignment | None:
+            return self.assignment
+
+        def insert(self, assignment_id: UUID, draft: object) -> bool:
+            if self.assignment is not None:
+                return False
+            self.__class__.assignment = CalendarAssignment(
+                id=assignment_id,
+                meal_date=draft.meal_date,  # type: ignore[attr-defined]
+                slot=draft.slot,  # type: ignore[attr-defined]
+                kind=draft.kind,  # type: ignore[attr-defined]
+                recipe_id=draft.recipe_id,  # type: ignore[attr-defined]
+                free_text=draft.free_text,  # type: ignore[attr-defined]
+                recipe_title=None,
+                recipe_image_url=None,
+            )
+            return True
+
+    monkeypatch.setattr(api, "MealCalendarRepository", InMemoryRepository)
+    payload = {
+        "id": str(ASSIGNMENT_ID),
+        "date": "2025-06-02",
+        "slot": "dinner",
+        "kind": "free_text",
+        "text": "  Sopa  ",
+    }
+
+    created = client.post("/api/v1/meal-calendar/assignments", json=payload)
+    repeated = client.post("/api/v1/meal-calendar/assignments", json=payload)
+    conflict = client.post("/api/v1/meal-calendar/assignments", json={**payload, "text": "Ensalada"})
+
+    assert created.status_code == 201
+    assert created.headers["cache-control"] == "no-store"
+    assert created.json() == {
+        "id": str(ASSIGNMENT_ID),
+        "date": "2025-06-02",
+        "slot": "dinner",
+        "kind": "free_text",
+        "text": "Sopa",
+    }
+    assert repeated.status_code == 200
+    assert repeated.json() == created.json()
+    assert conflict.status_code == 409
+    assert conflict.json()["error"]["code"] == "idempotency_conflict"

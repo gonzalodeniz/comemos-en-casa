@@ -5,5 +5,7 @@ tmp/
 .venv/
 __pycache__/
 *.py[cod]
+node_modules/
+frontend/dist/
 # Local Pi runtime state
 .atl/

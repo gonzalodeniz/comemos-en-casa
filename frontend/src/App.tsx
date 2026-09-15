@@ -5,7 +5,9 @@ import {
   ApiError,
   createAssignment,
   createCollection,
+  createRecipe,
   deleteAssignment,
+  deleteRecipe,
   getCalendarContext,
   getCalendarWeek,
   getCollections,
@@ -13,12 +15,16 @@ import {
   getFavorites,
   getPublicRecipe,
   getRecipeCatalogue,
+  logout,
   searchPublicRecipes,
   setFavorite,
+  setRecipeStatus,
   updateAssignment,
+  updateRecipe,
+  uploadRecipeImage,
 } from "./api";
 import { calendarReducer, initialCalendarState } from "./calendarReducer";
-import type { AssignmentWritePayload, AuthenticatedUser, CalendarAssignment, MealSlot, RecipeCollection, RecipeDetail, RecipeSummary } from "./types";
+import type { AssignmentWritePayload, AuthenticatedUser, CalendarAssignment, MealSlot, RecipeCollection, RecipeDetail, RecipeIngredient, RecipeStatus, RecipeSummary, RecipeWritePayload } from "./types";
 
 const mealRows: Array<{ slot: MealSlot; label: string; icon: string }> = [
   { slot: "lunch", label: "Comida", icon: "☀" },
@@ -27,6 +33,15 @@ const mealRows: Array<{ slot: MealSlot; label: string; icon: string }> = [
 
 type SessionState = { status: "loading" | "ready" | "error"; user: AuthenticatedUser | null };
 type LoadState<T> = { status: "loading" | "ready" | "error"; data: T; error: string | null };
+type RecipeEditorForm = RecipeWritePayload & { recipeId: string | null; image: File | null };
+
+function emptyRecipeForm(): RecipeEditorForm {
+  return { recipeId: null, title: "", detail: "", ingredients: [{ name: "", quantity: null }], steps: [{ instruction: "" }], image: null };
+}
+
+function recipeToForm(recipe: RecipeDetail): RecipeEditorForm {
+  return { recipeId: recipe.id, title: recipe.title, detail: recipe.detail, ingredients: recipe.ingredients.length ? recipe.ingredients : [{ name: "", quantity: null }], steps: recipe.steps.length ? recipe.steps : [{ instruction: "" }], image: null };
+}
 
 function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
@@ -59,7 +74,7 @@ function weekLabel(weekStart: string): string {
 }
 function normalizeFreeText(value: string): string { return value.trim().replace(/\s+/g, " "); }
 
-function SiteHeader({ session }: { session: SessionState }) {
+function SiteHeader({ session, onLogout }: { session: SessionState; onLogout: () => void }) {
   const userLabel = session.user?.displayName ?? session.user?.email;
   return (
     <header className="site-header">
@@ -76,6 +91,7 @@ function SiteHeader({ session }: { session: SessionState }) {
         {session.status === "loading" ? <span className="session-status" role="status">Comprobando sesión…</span> : null}
         {userLabel ? <span className="user-name" title={session.user?.email}>{userLabel}</span> : null}
         {session.status === "ready" && !session.user ? <a className="login-link" href="/api/v1/auth/login">Iniciar sesión</a> : null}
+        {session.status === "ready" && session.user ? <button type="button" className="logout-button" onClick={onLogout}>Cerrar sesión</button> : null}
       </div>
     </header>
   );
@@ -255,6 +271,128 @@ function CollectionsPage({ session }: { session: SessionState }) {
   </main>;
 }
 
+function RecipeWorkspacePage({ session }: { session: SessionState }) {
+  const [saved, setSaved] = useState<LoadState<{ favorites: RecipeSummary[]; collections: RecipeCollection[] }>>({ status: "loading", data: { favorites: [], collections: [] }, error: null });
+  const [recipes, setRecipes] = useState<LoadState<RecipeSummary[]>>({ status: "loading", data: [], error: null });
+  const [collectionName, setCollectionName] = useState("");
+  const [collectionMessage, setCollectionMessage] = useState<string | null>(null);
+  const [editor, setEditor] = useState<RecipeEditorForm | null>(null);
+  const [openingId, setOpeningId] = useState<string | null>(null);
+  const [isSavingRecipe, setIsSavingRecipe] = useState(false);
+  const [recipeMessage, setRecipeMessage] = useState<{ kind: "error" | "success"; text: string } | null>(null);
+  const [reload, setReload] = useState(0);
+
+  useEffect(() => {
+    if (!session.user) return;
+    const controller = new AbortController();
+    setSaved((current) => ({ ...current, status: "loading", error: null }));
+    Promise.all([getFavorites(controller.signal), getCollections(controller.signal)])
+      .then(([favorites, collections]) => setSaved({ status: "ready", data: { favorites, collections }, error: null }))
+      .catch((error: unknown) => { if (!(error instanceof DOMException && error.name === "AbortError")) setSaved((current) => ({ ...current, status: "error", error: errorMessage(error) })); });
+    return () => controller.abort();
+  }, [session.user, reload]);
+
+  useEffect(() => {
+    if (!session.user) return;
+    const controller = new AbortController();
+    setRecipes((current) => ({ ...current, status: "loading", error: null }));
+    getRecipeCatalogue("", controller.signal)
+      .then((data) => setRecipes({ status: "ready", data, error: null }))
+      .catch((error: unknown) => { if (!(error instanceof DOMException && error.name === "AbortError")) setRecipes((current) => ({ ...current, status: "error", error: errorMessage(error) })); });
+    return () => controller.abort();
+  }, [session.user, reload]);
+
+  async function submitCollection(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const normalizedName = normalizeFreeText(collectionName);
+    if (!normalizedName) { setCollectionMessage("Escribe un nombre para la colección."); return; }
+    try {
+      const collection = await createCollection(normalizedName);
+      setSaved((current) => ({ ...current, data: { ...current.data, collections: [collection, ...current.data.collections] } }));
+      setCollectionName(""); setCollectionMessage("La colección se creó correctamente.");
+    } catch (error) { setCollectionMessage(errorMessage(error)); }
+  }
+
+  async function openRecipeEditor(recipeId: string) {
+    setOpeningId(recipeId); setRecipeMessage(null);
+    try { setEditor(recipeToForm(await getPublicRecipe(recipeId))); }
+    catch (error) { setRecipeMessage({ kind: "error", text: errorMessage(error) }); }
+    finally { setOpeningId(null); }
+  }
+
+  function updateIngredient(index: number, field: keyof RecipeIngredient, value: string) {
+    setEditor((current) => current ? { ...current, ingredients: current.ingredients.map((ingredient, itemIndex) => itemIndex === index ? { ...ingredient, [field]: field === "quantity" ? value || null : value } : ingredient) } : current);
+  }
+  function updateStep(index: number, value: string) {
+    setEditor((current) => current ? { ...current, steps: current.steps.map((step, itemIndex) => itemIndex === index ? { instruction: value } : step) } : current);
+  }
+  function removeIngredient(index: number) { setEditor((current) => current ? { ...current, ingredients: current.ingredients.filter((_, itemIndex) => itemIndex !== index) } : current); }
+  function removeStep(index: number) { setEditor((current) => current ? { ...current, steps: current.steps.filter((_, itemIndex) => itemIndex !== index) } : current); }
+
+  async function saveRecipe(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editor || isSavingRecipe) return;
+    const payload: RecipeWritePayload = {
+      title: normalizeFreeText(editor.title),
+      detail: editor.detail.trim(),
+      ingredients: editor.ingredients.map((ingredient) => ({ name: normalizeFreeText(ingredient.name), quantity: normalizeFreeText(ingredient.quantity ?? "") || null })).filter((ingredient) => ingredient.name),
+      steps: editor.steps.map((step) => ({ instruction: step.instruction.trim() })).filter((step) => step.instruction),
+    };
+    if (!payload.title || !payload.detail) { setRecipeMessage({ kind: "error", text: "El título y la descripción son obligatorios." }); return; }
+    if (editor.image && editor.image.size > 10 * 1024 * 1024) { setRecipeMessage({ kind: "error", text: "La imagen no puede superar 10 MB." }); return; }
+    setIsSavingRecipe(true); setRecipeMessage(null);
+    try {
+      let result = editor.recipeId ? await updateRecipe(editor.recipeId, payload) : await createRecipe(payload);
+      if (editor.image) result = await uploadRecipeImage(result.id, editor.image);
+      setEditor(recipeToForm(result));
+      setRecipes((current) => ({ ...current, data: current.data.some((recipe) => recipe.id === result.id) ? current.data.map((recipe) => recipe.id === result.id ? result : recipe) : [result, ...current.data] }));
+      setRecipeMessage({ kind: "success", text: editor.recipeId ? "Los cambios se guardaron correctamente." : "La receta se creó como borrador." });
+    } catch (error) { setRecipeMessage({ kind: "error", text: errorMessage(error) }); }
+    finally { setIsSavingRecipe(false); }
+  }
+
+  async function changeStatus(status: RecipeStatus) {
+    if (!editor?.recipeId || isSavingRecipe) return;
+    setIsSavingRecipe(true); setRecipeMessage(null);
+    try {
+      const result = await setRecipeStatus(editor.recipeId, status);
+      setEditor(recipeToForm(result));
+      setRecipes((current) => ({ ...current, data: current.data.map((recipe) => recipe.id === result.id ? result : recipe) }));
+      setRecipeMessage({ kind: "success", text: status === "published" ? "La receta se publicó." : "La receta volvió a borrador." });
+    } catch (error) { setRecipeMessage({ kind: "error", text: errorMessage(error) }); }
+    finally { setIsSavingRecipe(false); }
+  }
+
+  async function removeRecipe() {
+    if (!editor?.recipeId || isSavingRecipe || !window.confirm(`¿Eliminar la receta “${editor.title}”? Esta acción no se puede deshacer.`)) return;
+    setIsSavingRecipe(true); setRecipeMessage(null);
+    try {
+      await deleteRecipe(editor.recipeId);
+      setRecipes((current) => ({ ...current, data: current.data.filter((recipe) => recipe.id !== editor.recipeId) }));
+      setEditor(null); setRecipeMessage({ kind: "success", text: "La receta se eliminó." });
+    } catch (error) { setRecipeMessage({ kind: "error", text: errorMessage(error) }); }
+    finally { setIsSavingRecipe(false); }
+  }
+
+  if (session.status === "loading") return <main className="app-shell"><p className="loading-state" role="status">Comprobando tu sesión…</p></main>;
+  if (!session.user) return <main className="app-shell"><section className="empty-state"><h1>Mis recetas</h1><p>Inicia sesión para gestionar recetas, favoritos y colecciones.</p><a className="primary-link" href="/api/v1/auth/login">Iniciar sesión</a></section></main>;
+  const recipeStatus = editor?.recipeId ? recipes.data.find((recipe) => recipe.id === editor.recipeId)?.status : undefined;
+  return <main className="app-shell"><section className="page-hero" aria-labelledby="my-recipes-title"><div><p className="eyebrow">Espacio privado</p><h1 id="my-recipes-title">Mis recetas</h1><p>Crea, edita y publica recetas; conserva también tus favoritos y colecciones.</p></div><button type="button" onClick={() => { setEditor(emptyRecipeForm()); setRecipeMessage(null); }}>Nueva receta</button></section>
+    <section className="private-section recipe-management" aria-labelledby="recipe-management-title"><div className="section-heading"><div><h2 id="recipe-management-title">Gestionar recetas</h2><p>Las recetas se crean como borradores públicos. Guarda los cambios antes de publicar.</p></div></div>
+      {recipeMessage ? <p className={recipeMessage.kind === "error" ? "notice error-notice" : "notice success-notice"} role={recipeMessage.kind === "error" ? "alert" : "status"}>{recipeMessage.text}</p> : null}
+      {editor ? <form className="recipe-editor" onSubmit={saveRecipe} aria-labelledby="recipe-editor-title"><div className="editor-heading"><div><p className="eyebrow">{editor.recipeId ? "Editar receta" : "Nueva receta"}</p><h3 id="recipe-editor-title">{editor.recipeId ? "Contenido de la receta" : "Completa los datos iniciales"}</h3></div>{recipeStatus ? <span className="status-pill">{recipeStatus === "published" ? "Publicada" : "Borrador público"}</span> : null}</div>
+        <label>Título<input required maxLength={200} value={editor.title} onChange={(event) => setEditor({ ...editor, title: event.target.value })} /></label><label>Descripción<textarea required maxLength={10000} value={editor.detail} onChange={(event) => setEditor({ ...editor, detail: event.target.value })} /></label>
+        <fieldset><legend>Ingredientes</legend>{editor.ingredients.map((ingredient, index) => <div className="recipe-row" key={`ingredient-${index}`}><label>Ingrediente<input value={ingredient.name} maxLength={500} onChange={(event) => updateIngredient(index, "name", event.target.value)} /></label><label>Cantidad<input value={ingredient.quantity ?? ""} maxLength={100} onChange={(event) => updateIngredient(index, "quantity", event.target.value)} /></label><button type="button" className="text-button" onClick={() => removeIngredient(index)} aria-label={`Eliminar ingrediente ${index + 1}`}>Eliminar</button></div>)}<button type="button" className="secondary-button" onClick={() => setEditor({ ...editor, ingredients: [...editor.ingredients, { name: "", quantity: null }] })}>Añadir ingrediente</button></fieldset>
+        <fieldset><legend>Preparación</legend>{editor.steps.map((step, index) => <div className="recipe-row step-row" key={`step-${index}`}><label>Paso {index + 1}<textarea value={step.instruction} onChange={(event) => updateStep(index, event.target.value)} /></label><button type="button" className="text-button" onClick={() => removeStep(index)} aria-label={`Eliminar paso ${index + 1}`}>Eliminar</button></div>)}<button type="button" className="secondary-button" onClick={() => setEditor({ ...editor, steps: [...editor.steps, { instruction: "" }] })}>Añadir paso</button></fieldset>
+        <label>Imagen de la receta <span className="field-hint">JPEG, PNG o WebP; máximo 10 MB.</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setEditor({ ...editor, image: event.target.files?.[0] ?? null })} /></label>{editor.image ? <p className="field-hint">Imagen seleccionada: {editor.image.name}</p> : null}
+        <div className="editor-actions"><button type="submit" disabled={isSavingRecipe}>{isSavingRecipe ? "Guardando…" : "Guardar receta"}</button>{editor.recipeId ? <><button type="button" className="secondary-button" onClick={() => void changeStatus(recipeStatus === "published" ? "draft" : "published")} disabled={isSavingRecipe}>{recipeStatus === "published" ? "Pasar a borrador" : "Publicar receta"}</button><button type="button" className="danger-button" onClick={() => void removeRecipe()} disabled={isSavingRecipe}>Eliminar receta</button></> : null}<button type="button" className="text-button" onClick={() => setEditor(null)} disabled={isSavingRecipe}>Cerrar</button></div>
+      </form> : null}
+      {recipes.status === "loading" ? <p className="loading-state" role="status">Cargando recetas…</p> : null}{recipes.status === "error" ? <div className="notice error-notice" role="alert"><p>{recipes.error}</p><button type="button" onClick={() => setReload((value) => value + 1)}>Reintentar</button></div> : null}{recipes.status === "ready" && !recipes.data.length ? <p>Aún no hay recetas para gestionar.</p> : null}{recipes.data.length ? <div className="recipe-catalogue compact-catalogue" aria-label="Recetas disponibles">{recipes.data.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} action={<button type="button" className="secondary-button" onClick={() => void openRecipeEditor(recipe.id)} disabled={openingId === recipe.id}>{openingId === recipe.id ? "Abriendo…" : "Editar"}</button>} />)}</div> : null}
+    </section>
+    {saved.status === "loading" ? <p className="loading-state" role="status">Cargando favoritos y colecciones…</p> : null}{saved.status === "error" ? <div className="notice error-notice" role="alert"><p>{saved.error}</p><button type="button" onClick={() => setReload((value) => value + 1)}>Reintentar</button></div> : null}{saved.status === "ready" ? <><section className="private-section" aria-labelledby="favorites-title"><h2 id="favorites-title">Favoritos</h2>{saved.data.favorites.length ? <div className="recipe-catalogue compact-catalogue">{saved.data.favorites.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} />)}</div> : <p>Aún no tienes recetas favoritas.</p>}</section><section className="private-section" aria-labelledby="collections-title"><div className="section-heading"><div><h2 id="collections-title">Colecciones</h2><p>Estas colecciones solo son visibles para ti.</p></div></div><form className="create-collection" onSubmit={submitCollection}><label htmlFor="workspace-collection-name">Nueva colección</label><input id="workspace-collection-name" value={collectionName} onChange={(event) => setCollectionName(event.target.value)} placeholder="Por ejemplo, Cenas rápidas" /><button type="submit">Crear colección</button></form>{collectionMessage ? <p className="save-message" role="status">{collectionMessage}</p> : null}{saved.data.collections.length ? <div className="collection-grid">{saved.data.collections.map((collection) => <article className="collection-card" key={collection.id}><h3>{collection.name}</h3><p>{collection.recipes.length} {collection.recipes.length === 1 ? "receta" : "recetas"}</p>{collection.recipes.length ? <ul>{collection.recipes.slice(0, 4).map((recipe) => <li key={recipe.id}><Link to={`/recetas/${recipe.id}`}>{recipe.title}</Link></li>)}</ul> : <p className="muted">Todavía no hay recetas en esta colección.</p>}</article>)}</div> : <p>Aún no tienes colecciones.</p>}</section></> : null}
+  </main>;
+}
+
 function CalendarPage() {
   const { weekStart: weekStartFromPath } = useParams();
   const navigate = useNavigate();
@@ -292,5 +430,9 @@ function CalendarPage() {
 export default function App() {
   const [session, setSession] = useState<SessionState>({ status: "loading", user: null });
   useEffect(() => { const controller = new AbortController(); getCurrentUser(controller.signal).then((user) => setSession({ status: "ready", user })).catch(() => setSession({ status: "error", user: null })); return () => controller.abort(); }, []);
-  return <><SiteHeader session={session} /><Routes><Route path="/" element={<CalendarPage />} /><Route path="/semanas/:weekStart" element={<CalendarPage />} /><Route path="/recetas" element={<RecipeCataloguePage />} /><Route path="/recetas/:recipeId" element={<RecipeDetailPage session={session} />} /><Route path="/mis-recetas" element={<CollectionsPage session={session} />} /><Route path="/weeks/:weekStart" element={<CalendarPage />} /><Route path="/recipes/:recipeId" element={<Navigate to="/recetas" replace />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></>;
+  async function handleLogout() {
+    try { await logout(); setSession({ status: "ready", user: null }); }
+    catch { setSession({ status: "error", user: null }); }
+  }
+  return <><SiteHeader session={session} onLogout={() => void handleLogout()} /><Routes><Route path="/" element={<CalendarPage />} /><Route path="/semanas/:weekStart" element={<CalendarPage />} /><Route path="/recetas" element={<RecipeCataloguePage />} /><Route path="/recetas/:recipeId" element={<RecipeDetailPage session={session} />} /><Route path="/mis-recetas" element={<RecipeWorkspacePage session={session} />} /><Route path="/weeks/:weekStart" element={<CalendarPage />} /><Route path="/recipes/:recipeId" element={<Navigate to="/recetas" replace />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></>;
 }

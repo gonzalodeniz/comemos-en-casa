@@ -10,6 +10,7 @@ import type {
   RecipeSearchResult,
   RecipeStatus,
   RecipeSummary,
+  RecipeWritePayload,
 } from "./types";
 
 const CALENDAR_API_ROOT = "/api/v1/meal-calendar";
@@ -97,6 +98,24 @@ function toRecipeSummary(recipe: ApiRecipe): RecipeSummary {
   return { id: recipe.id, title: recipe.titulo, coverImageUrl: recipe.imagenUrl, status: recipe.estado };
 }
 
+function toRecipeDetail(recipe: ApiRecipeDetail): RecipeDetail {
+  return {
+    ...toRecipeSummary(recipe),
+    detail: recipe.detalle,
+    ingredients: recipe.ingredientes.map((ingredient) => ({ name: ingredient.nombre, quantity: ingredient.cantidad ?? null })),
+    steps: recipe.pasos.map((step) => ({ instruction: step.instruccion })),
+  };
+}
+
+function toRecipeWriteBody(recipe: RecipeWritePayload) {
+  return {
+    titulo: recipe.title,
+    detalle: recipe.detail,
+    ingredientes: recipe.ingredients.map((ingredient) => ({ nombre: ingredient.name, cantidad: ingredient.quantity || undefined })),
+    pasos: recipe.steps.map((step) => ({ instruccion: step.instruction })),
+  };
+}
+
 function toCollection(collection: ApiCollection): RecipeCollection {
   return { id: collection.id, name: collection.nombre, recipes: collection.recetas.map(toRecipeSummary) };
 }
@@ -121,13 +140,48 @@ export async function getRecipeCatalogue(query = "", signal?: AbortSignal): Prom
 }
 
 export async function getPublicRecipe(recipeId: string, signal?: AbortSignal): Promise<RecipeDetail> {
-  const recipe = await apiRequest<ApiRecipeDetail>(`/recipes/${encodeURIComponent(recipeId)}`, { signal });
-  return {
-    ...toRecipeSummary(recipe),
-    detail: recipe.detalle,
-    ingredients: recipe.ingredientes.map((ingredient) => ({ name: ingredient.nombre, quantity: ingredient.cantidad ?? null })),
-    steps: recipe.pasos.map((step) => ({ instruction: step.instruccion })),
-  };
+  return toRecipeDetail(await apiRequest<ApiRecipeDetail>(`/recipes/${encodeURIComponent(recipeId)}`, { signal }));
+}
+
+export async function createRecipe(recipe: RecipeWritePayload): Promise<RecipeDetail> {
+  return toRecipeDetail(await apiRequest<ApiRecipeDetail>("/recipes", { method: "POST", body: toRecipeWriteBody(recipe) }));
+}
+
+export async function updateRecipe(recipeId: string, recipe: RecipeWritePayload): Promise<RecipeDetail> {
+  return toRecipeDetail(await apiRequest<ApiRecipeDetail>(`/recipes/${encodeURIComponent(recipeId)}`, { method: "PATCH", body: toRecipeWriteBody(recipe) }));
+}
+
+export async function setRecipeStatus(recipeId: string, status: RecipeStatus): Promise<RecipeDetail> {
+  return toRecipeDetail(await apiRequest<ApiRecipeDetail>(`/recipes/${encodeURIComponent(recipeId)}/${status === "published" ? "publish" : "draft"}`, { method: "POST" }));
+}
+
+export async function deleteRecipe(recipeId: string): Promise<void> {
+  await apiRequest<void>(`/recipes/${encodeURIComponent(recipeId)}`, { method: "DELETE" });
+}
+
+export async function uploadRecipeImage(recipeId: string, file: File): Promise<RecipeDetail> {
+  const form = new FormData();
+  form.append("file", file);
+  const response = await fetch(`${API_ROOT}/recipes/${encodeURIComponent(recipeId)}/image`, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { Accept: "application/json" },
+    body: form,
+  });
+  if (!response.ok) {
+    let payload: ErrorPayload | undefined;
+    try { payload = (await response.json()) as ErrorPayload; } catch { /* Non-JSON error response. */ }
+    throw new ApiError(response.status, {
+      code: payload?.error?.code ?? "request_failed",
+      message: payload?.error?.message ?? `La solicitud no se pudo completar (estado ${response.status}).`,
+      retryable: payload?.error?.retryable ?? response.status >= 500,
+    });
+  }
+  return toRecipeDetail((await response.json()) as ApiRecipeDetail);
+}
+
+export async function logout(): Promise<void> {
+  await apiRequest<void>("/auth/logout", { method: "POST" });
 }
 
 export async function getCurrentUser(signal?: AbortSignal): Promise<AuthenticatedUser | null> {

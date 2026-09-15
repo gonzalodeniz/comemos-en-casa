@@ -30,6 +30,13 @@ export interface RecipeDetail extends RecipeSummary {
   steps: RecipeStep[];
 }
 
+export interface RecipeWritePayload {
+  title: string;
+  detail: string;
+  ingredients: RecipeIngredient[];
+  steps: RecipeStep[];
+}
+
 export interface RecipeReference {
   id: string | null;
   available: boolean;

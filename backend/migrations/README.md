@@ -8,6 +8,8 @@ The calendar owns `0003_meal_calendar_recipe_fk.sql`. Apply all migrations in le
 
 `0004_authentication.sql` adds Google OpenID Connect identities and opaque server-side session storage. Apply it after `0003`. It creates independent `users` and `auth_sessions` relations; it does not change recipe visibility or any recipe table. Browser session and OAuth state values are stored only as SHA-256 hashes, while the OIDC nonce is retained only for the short-lived authorization callback validation.
 
+`0005_recipe_management.sql` expands the catalogue after authentication. It adds the explicitly public `draft`/`published` status, allows recipes without an image until a local upload is attached, and adds normalized ordered `recipe_ingredients` and `recipe_preparation_steps` relations. It leaves `meal_assignments.recipe_id` intact, so the existing `ON DELETE SET NULL` behavior remains in force when a recipe is deleted.
+
 ## Local verification
 
 Start the PostgreSQL service before running the migration integration test:

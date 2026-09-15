@@ -1,5 +1,21 @@
-"""Public recipe catalogue foundation."""
+"""Public recipe catalogue and management domain."""
 
-from .schemas import Recipe, RecipeListItem, RecipeValidationError
+from .schemas import (
+    Ingredient,
+    ManagedRecipe,
+    ManagedRecipeListItem,
+    PreparationStep,
+    Recipe,
+    RecipeListItem,
+    RecipeValidationError,
+)
 
-__all__ = ["Recipe", "RecipeListItem", "RecipeValidationError"]
+__all__ = [
+    "Ingredient",
+    "ManagedRecipe",
+    "ManagedRecipeListItem",
+    "PreparationStep",
+    "Recipe",
+    "RecipeListItem",
+    "RecipeValidationError",
+]

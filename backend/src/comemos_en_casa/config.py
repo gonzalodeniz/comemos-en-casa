@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 
 
 class ConfigurationError(ValueError):
@@ -27,6 +28,7 @@ class Settings:
     database_url: str
     enable_guest_user: bool
     frontend_url: str
+    media_root: Path
     google_oidc: GoogleOidcSettings | None
 
 
@@ -72,5 +74,6 @@ def load_settings(environment: Mapping[str, str] | None = None) -> Settings:
         # Shared calendar access remains usable before an auth integration exists.
         enable_guest_user=_load_boolean(values, "ENABLE_GUEST_USER", default=True),
         frontend_url=values.get("FRONTEND_URL", "http://localhost:5173").strip().rstrip("/"),
+        media_root=Path(values.get("MEDIA_ROOT", "/app/media")).resolve(),
         google_oidc=_load_google_oidc(values),
     )

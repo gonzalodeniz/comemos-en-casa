@@ -5,11 +5,13 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import Depends, FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from .auth.api import register_routes as register_auth_routes
 from .config import load_settings
 from .database import get_connection
 from .meal_calendar.api import register_routes
+from .recipes.api import register_routes as register_recipe_routes
 
 
 def create_app() -> FastAPI:
@@ -24,8 +26,10 @@ def create_app() -> FastAPI:
             cursor.execute("SELECT 1")
         return {"status": "ok"}
 
+    application.mount("/media", StaticFiles(directory=application.state.settings.media_root, check_dir=False), name="media")
     register_auth_routes(application)
     register_routes(application)
+    register_recipe_routes(application)
     return application
 
 

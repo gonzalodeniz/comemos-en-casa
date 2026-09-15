@@ -100,9 +100,10 @@ def test_health_checks_the_database_with_a_request_scoped_connection(
     assert calls == ["SELECT 1"]
 
 
-def test_calendar_and_recipe_routes_are_deferred(monkeypatch: pytest.MonkeyPatch) -> None:
-    paths = {route.path for route in _import_app(monkeypatch).create_app().routes}
+def test_calendar_and_recipe_routes_are_registered(monkeypatch: pytest.MonkeyPatch) -> None:
+    app = _import_app(monkeypatch).create_app()
+    paths = set(app.openapi()["paths"])
 
-    assert "/health" in paths
-    assert "/calendar" not in paths
-    assert "/recipes" not in paths
+    assert "/health" in {route.path for route in app.routes if hasattr(route, "path")}
+    assert any(path.startswith("/api/v1/meal-calendar") for path in paths)
+    assert any(path.startswith("/api/v1/recipes") for path in paths)

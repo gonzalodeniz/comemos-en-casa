@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from dataclasses import dataclass
+import re
 from unicodedata import category, normalize
 from urllib.parse import urlsplit
 from uuid import UUID, uuid4
@@ -9,10 +10,12 @@ from uuid import UUID, uuid4
 
 TITLE_MIN_CODE_POINTS = 1
 TITLE_MAX_CODE_POINTS = 200
-IMAGE_URL_MIN_CHARACTERS = 1
 IMAGE_URL_MAX_CHARACTERS = 2048
 DETAIL_MIN_CODE_POINTS = 1
 DETAIL_MAX_CODE_POINTS = 10_000
+INGREDIENT_NAME_MAX_CODE_POINTS = 500
+INGREDIENT_QUANTITY_MAX_CODE_POINTS = 100
+LOCAL_MEDIA_IMAGE_URL_RE = re.compile(r"^/media/recipes/[0-9a-f-]+\.(?:jpg|png|webp)$")
 
 
 class RecipeValidationError(ValueError):
@@ -38,31 +41,24 @@ def _validate_length(value: str, *, minimum: int, maximum: int, field: str) -> s
 def normalize_title(value: str) -> str:
     """Return a NFC, trimmed, single-space title within the catalogue bounds."""
     title = _normalize_whitespace(_require_string(value, "title"))
-    return _validate_length(
-        title,
-        minimum=TITLE_MIN_CODE_POINTS,
-        maximum=TITLE_MAX_CODE_POINTS,
-        field="title",
-    )
+    return _validate_length(title, minimum=TITLE_MIN_CODE_POINTS, maximum=TITLE_MAX_CODE_POINTS, field="title")
 
 
 def normalize_image_url(value: str) -> str:
-    """Return a trimmed absolute HTTP(S) URL without internal whitespace."""
+    """Accept a legacy remote image URL, a local media URL, or no image yet."""
     image_url = _require_string(value, "image URL").strip()
-    _validate_length(
-        image_url,
-        minimum=IMAGE_URL_MIN_CHARACTERS,
-        maximum=IMAGE_URL_MAX_CHARACTERS,
-        field="image URL",
-    )
+    if not image_url:
+        return ""
+    _validate_length(image_url, minimum=1, maximum=IMAGE_URL_MAX_CHARACTERS, field="image URL")
     if any(character.isspace() for character in image_url):
         raise RecipeValidationError("image URL must not contain whitespace")
+    if LOCAL_MEDIA_IMAGE_URL_RE.fullmatch(image_url):
+        return image_url
 
     try:
         parsed = urlsplit(image_url)
     except ValueError as error:
         raise RecipeValidationError("image URL must be an absolute HTTP(S) URL") from error
-
     if parsed.scheme.casefold() not in {"http", "https"} or not parsed.hostname:
         raise RecipeValidationError("image URL must be an absolute HTTP(S) URL")
     return image_url
@@ -71,12 +67,7 @@ def normalize_image_url(value: str) -> str:
 def normalize_detail(value: str) -> str:
     """Return a NFC detail with LF line endings and no surrounding whitespace."""
     detail = _require_string(value, "detail").replace("\r\n", "\n").replace("\r", "\n").strip()
-    return _validate_length(
-        detail,
-        minimum=DETAIL_MIN_CODE_POINTS,
-        maximum=DETAIL_MAX_CODE_POINTS,
-        field="detail",
-    )
+    return _validate_length(detail, minimum=DETAIL_MIN_CODE_POINTS, maximum=DETAIL_MAX_CODE_POINTS, field="detail")
 
 
 def normalize_title_search(value: str) -> str:
@@ -94,6 +85,32 @@ def _validated_id(value: UUID) -> UUID:
 
 
 @dataclass(frozen=True)
+class Ingredient:
+    """One ordered, normalized recipe ingredient."""
+
+    name: str
+    quantity: str | None = None
+
+    def __post_init__(self) -> None:
+        name = _normalize_whitespace(_require_string(self.name, "ingredient name"))
+        object.__setattr__(self, "name", _validate_length(name, minimum=1, maximum=INGREDIENT_NAME_MAX_CODE_POINTS, field="ingredient name"))
+        if self.quantity is not None:
+            quantity = _normalize_whitespace(_require_string(self.quantity, "ingredient quantity"))
+            object.__setattr__(self, "quantity", _validate_length(quantity, minimum=1, maximum=INGREDIENT_QUANTITY_MAX_CODE_POINTS, field="ingredient quantity"))
+
+
+@dataclass(frozen=True)
+class PreparationStep:
+    """One ordered preparation instruction."""
+
+    instruction: str
+
+    def __post_init__(self) -> None:
+        instruction = normalize_detail(self.instruction)
+        object.__setattr__(self, "instruction", instruction)
+
+
+@dataclass(frozen=True)
 class Recipe:
     """A current public recipe foundation value ready for persistence or detail reads."""
 
@@ -103,7 +120,6 @@ class Recipe:
     detail: str
 
     def __post_init__(self) -> None:
-        """Normalize and validate every public construction path."""
         object.__setattr__(self, "id", _validated_id(self.id))
         object.__setattr__(self, "title", normalize_title(self.title))
         object.__setattr__(self, "image_url", normalize_image_url(self.image_url))
@@ -111,40 +127,28 @@ class Recipe:
 
     @classmethod
     def create(
-        cls,
-        *,
-        title: str,
-        image_url: str,
-        detail: str,
-        uuid_factory: Callable[[], UUID] = uuid4,
+        cls, *, title: str, image_url: str, detail: str, uuid_factory: Callable[[], UUID] = uuid4
     ) -> "Recipe":
-        return cls.restore(
-            id=_validated_id(uuid_factory()),
-            title=title,
-            image_url=image_url,
-            detail=detail,
-        )
+        return cls.restore(id=_validated_id(uuid_factory()), title=title, image_url=image_url, detail=detail)
 
     @classmethod
     def restore(cls, *, id: UUID, title: str, image_url: str, detail: str) -> "Recipe":
-        return cls(
-            id=_validated_id(id),
-            title=normalize_title(title),
-            image_url=normalize_image_url(image_url),
-            detail=normalize_detail(detail),
-        )
+        return cls(id=_validated_id(id), title=normalize_title(title), image_url=normalize_image_url(image_url), detail=normalize_detail(detail))
 
     @classmethod
-    def update_foundation(
-        cls,
-        *,
-        id: UUID,
-        title: str,
-        image_url: str,
-        detail: str,
-    ) -> "Recipe":
+    def update_foundation(cls, *, id: UUID, title: str, image_url: str, detail: str) -> "Recipe":
         """Build a replacement foundation value while preserving its supplied identity."""
         return cls.restore(id=id, title=title, image_url=image_url, detail=detail)
+
+
+@dataclass(frozen=True)
+class ManagedRecipe:
+    """A publicly readable recipe with its lifecycle state and normalized content."""
+
+    recipe: Recipe
+    status: str
+    ingredients: tuple[Ingredient, ...]
+    steps: tuple[PreparationStep, ...]
 
 
 @dataclass(frozen=True)
@@ -154,3 +158,10 @@ class RecipeListItem:
     id: UUID
     title: str
     image_url: str
+
+
+@dataclass(frozen=True)
+class ManagedRecipeListItem(RecipeListItem):
+    """A public list row including the explicitly public draft/published state."""
+
+    status: str

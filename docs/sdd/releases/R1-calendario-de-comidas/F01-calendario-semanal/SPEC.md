@@ -1,6 +1,6 @@
 # F01 — Calendario semanal
 
-**Estado:** APPROVED · **Versión:** 0.1 · **Fuente:** `specs/calendario-semanal/spec.md`, `proposal.md`, `design.md` de `openspec/changes/calendario-de-comidas/`.
+**Estado:** APPROVED · **Versión:** 0.1 · **Procedencia histórica:** cambio `calendario-de-comidas`, preservado en el historial Git.
 
 ## Contexto
 

@@ -1,6 +1,6 @@
 # F03 — Persistencia y resiliencia
 
-**Estado:** APPROVED · **Versión:** 0.1 · **Fuente:** `specs/persistencia-y-resiliencia/spec.md`, `proposal.md`, `design.md` de `openspec/changes/calendario-de-comidas/`.
+**Estado:** APPROVED · **Versión:** 0.1 · **Procedencia histórica:** cambio `calendario-de-comidas`, preservado en el historial Git.
 
 ## Contexto
 

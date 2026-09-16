@@ -30,7 +30,7 @@ F04 aplica autorización y límites antes de las rutas. Se registrarán de forma
 
 ## Pruebas
 
-Con `pytest` y TDD estricto ya configurados en OpenSpec, las entregas seguirán RED → GREEN → TRIANGULATE → REFACTOR. Se cubrirán medianoche canaria, cambio de año, DST, lunes inválido, desplazamientos por días y refresco de `Hoy`. Las pruebas de contrato verificarán el contexto y la semana. Las pruebas de UI de navegación quedan pendientes de seleccionar runner frontend, sin bloquear las pruebas Python.
+Con `pytest`, las pruebas cubrirán medianoche canaria, cambio de año, DST, lunes inválido, desplazamientos por días y refresco de `Hoy`. Las pruebas de contrato verificarán el contexto y la semana. Las pruebas de UI de navegación quedan pendientes de seleccionar runner frontend, sin bloquear las pruebas Python.
 
 ## Despliegue y riesgos
 

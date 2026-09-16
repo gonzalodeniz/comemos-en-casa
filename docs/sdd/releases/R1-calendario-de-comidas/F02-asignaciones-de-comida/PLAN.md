@@ -32,7 +32,7 @@ La autorización y cuota se aplican por F04; nunca se confía en validación de 
 
 ## Pruebas
 
-Con `pytest` y TDD estricto ya configurados en OpenSpec: pruebas unitarias de NFC, puntos de código, saneado, normalización de búsqueda/orden y validación de `kind`; integración PostgreSQL de duplicados, FK/tombstone, lecturas actuales e idempotencia; contrato de errores y paginación. Tras seleccionar runner frontend, probar modal sin acciones de mutación, retorno de scroll/foco y tooltip por puntero, foco y táctil.
+Con `pytest`: pruebas unitarias de NFC, puntos de código, saneado, normalización de búsqueda/orden y validación de `kind`; integración PostgreSQL de duplicados, FK/tombstone, lecturas actuales e idempotencia; contrato de errores y paginación. Tras seleccionar runner frontend, probar modal sin acciones de mutación, retorno de scroll/foco y tooltip por puntero, foco y táctil.
 
 ## Despliegue y riesgos
 

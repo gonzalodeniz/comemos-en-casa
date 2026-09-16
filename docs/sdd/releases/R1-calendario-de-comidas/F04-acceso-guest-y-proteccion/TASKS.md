@@ -2,7 +2,7 @@
 
 **Estado:** DRAFT · **Versión:** 0.1  
 **Bases aprobadas:** [`SPEC.md`](SPEC.md) v0.1 (`APPROVED`, aprobada 2026-09-16) y [`PLAN.md`](PLAN.md) v0.1 (`APPROVED`, aprobado por la persona usuaria 2026-09-16).  
-**Entrega:** PR 3; requiere estrategia de PR encadenadas antes de implementar. **Pruebas:** TDD estricto con `pytest`: RED → GREEN → TRIANGULATE → REFACTOR; pytest ya está configurado.
+**Entrega:** PR 3; requiere estrategia de PR encadenadas antes de implementar. **Pruebas:** usar `pytest`, ya configurado; ejecutar las comprobaciones específicas de cada tarea.
 
 ## Secuencia y checklist
 

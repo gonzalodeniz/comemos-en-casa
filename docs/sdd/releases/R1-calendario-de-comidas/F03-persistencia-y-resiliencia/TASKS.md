@@ -2,7 +2,7 @@
 
 **Estado:** DRAFT · **Versión:** 0.1  
 **Bases aprobadas:** [`SPEC.md`](SPEC.md) v0.1 (`APPROVED`, aprobada 2026-09-16) y [`PLAN.md`](PLAN.md) v0.1 (`APPROVED`, aprobado por la persona usuaria 2026-09-16).  
-**Entrega:** PR 1 y PR 2A; requiere definir estrategia de PR encadenadas antes de implementar. **Pruebas:** TDD estricto con `pytest`: RED → GREEN → TRIANGULATE → REFACTOR; no crear setup de pytest.
+**Entrega:** PR 1 y PR 2A; requiere definir estrategia de PR encadenadas antes de implementar. **Pruebas:** usar `pytest`, ya configurado; ejecutar las comprobaciones específicas de cada tarea.
 
 ## Secuencia y checklist
 
@@ -17,7 +17,7 @@
 **Pasos realizados:** RED de validación temporal/texto y esquema; GREEN de frontera y migración; TRIANGULATE de formas inválidas, duplicados e índices; REFACTOR de constantes/validadores.  
 **Pruebas esperadas:** cálculo Canary, lunes, Unicode y checks de esquema; duplicados de celda coexistentes.  
 **DoD:** los contratos de fundación y migración expandible quedan cubiertos sin rollback destructivo.  
-**Evidencia:** registrada en `openspec/changes/calendario-de-comidas/apply-progress.md`: `.venv/bin/pytest -q` 16 passed y pruebas focalizadas.
+**Evidencia histórica:** `.venv/bin/pytest -q` devolvió `16 passed` y se ejecutaron pruebas focalizadas; el registro original permanece en el historial Git.
 **Estimación:** 1 jornada (histórica; completada).
 
 ## PER-T02 — Repositorio PostgreSQL y catálogo de lectura

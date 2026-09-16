@@ -2,7 +2,7 @@
 
 **Estado:** DRAFT · **Versión:** 0.1  
 **Bases aprobadas:** [`SPEC.md`](SPEC.md) v0.1 (`APPROVED`, aprobada 2026-09-16) y [`PLAN.md`](PLAN.md) v0.1 (`APPROVED`, aprobado por la persona usuaria 2026-09-16).  
-**Entrega:** PR 4 y PR 5; requiere estrategia de PR encadenadas antes de implementar. **Pruebas:** TDD estricto con `pytest`: RED → GREEN → TRIANGULATE → REFACTOR; las pruebas frontend requieren runner aún no seleccionado, no una tarea de setup duplicada.
+**Entrega:** PR 4 y PR 5; requiere estrategia de PR encadenadas antes de implementar. **Pruebas:** usar `pytest`, ya configurado; las pruebas frontend requieren un runner aún no seleccionado.
 
 ## Secuencia y checklist
 

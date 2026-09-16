@@ -1,6 +1,6 @@
 # F04 — Acceso guest y protección
 
-**Estado:** APPROVED · **Versión:** 0.1 · **Fuente:** `specs/acceso-guest-y-proteccion/spec.md`, `proposal.md`, `design.md` de `openspec/changes/calendario-de-comidas/`.
+**Estado:** APPROVED · **Versión:** 0.1 · **Procedencia histórica:** cambio `calendario-de-comidas`, preservado en el historial Git.
 
 ## Contexto
 

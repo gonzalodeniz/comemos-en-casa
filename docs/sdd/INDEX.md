@@ -9,6 +9,7 @@
 | Release | Estado | Alcance |
 | --- | --- | --- |
 | [R1 Calendario de comidas](releases/R1-calendario-de-comidas/README.md) | DRAFT | Planificación semanal compartida, asignaciones, persistencia, acceso e interfaz. |
+| [R2 Recetas](releases/R2-recetas/README.md) | DRAFT | Fundación del catálogo público de recetas para sus consumidores. |
 
 ## Convención
 

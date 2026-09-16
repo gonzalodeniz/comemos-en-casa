@@ -31,7 +31,7 @@ La interfaz no decide acceso ni valida de forma autoritativa. Evitar inyectar HT
 
 ## Pruebas
 
-Tras seleccionar runner frontend, aplicar TDD estricto donde corresponda y probar: navegación con respuestas obsoletas y guardados en curso; revisiones durante guardado y temporizador; skeleton/inert; teclado, live regions, errores, toast, modal y tooltip; grid denso y scroll en móvil/escritorio; banner guest. Complementar automatización con revisión manual táctil y lector. Validar documentación contra los contratos de F01–F04 y OpenAPI contra sus respuestas/errores.
+Tras seleccionar runner frontend, probar: navegación con respuestas obsoletas y guardados en curso; revisiones durante guardado y temporizador; skeleton/inert; teclado, live regions, errores, toast, modal y tooltip; grid denso y scroll en móvil/escritorio; banner guest. Complementar automatización con revisión manual táctil y lector. Validar documentación contra los contratos de F01–F04 y OpenAPI contra sus respuestas/errores.
 
 ## Despliegue y riesgos
 

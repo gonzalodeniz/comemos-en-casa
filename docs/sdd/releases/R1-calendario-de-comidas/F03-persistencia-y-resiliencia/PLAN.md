@@ -33,7 +33,7 @@ PostgreSQL es obligatorio y compartido entre réplicas; no se admite contador de
 
 ## Pruebas
 
-`pytest` y TDD estricto ya están configurados conforme a OpenSpec: no son trabajo pendiente de configuración. Ejecutar RED → GREEN → TRIANGULATE → REFACTOR para cada comportamiento. Pruebas unitarias: clasificación y calendario de reintentos. Integración con PostgreSQL efímero: migración/checks, duplicados, `ON DELETE SET NULL`, idempotencia, cuatro intentos, concurrencia, borrado y buckets atómicos. Contrato: estados, cuerpos, cabeceras y errores. El estado frontend se probará cuando se seleccione su runner.
+Pruebas unitarias: clasificación y calendario de reintentos. Integración con PostgreSQL efímero: migración/checks, duplicados, `ON DELETE SET NULL`, idempotencia, cuatro intentos, concurrencia, borrado y buckets atómicos. Contrato: estados, cuerpos, cabeceras y errores. El estado frontend se probará cuando se seleccione su runner.
 
 ## Despliegue y riesgos
 

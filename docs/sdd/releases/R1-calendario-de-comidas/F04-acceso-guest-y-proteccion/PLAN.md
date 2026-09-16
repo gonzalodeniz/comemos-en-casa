@@ -33,7 +33,7 @@ No aceptar cabeceras de proxy salvo configuración explícita de proxy confiable
 
 ## Pruebas
 
-Con `pytest` y TDD estricto ya configurados en OpenSpec: parsing de valores, ausencia, espacios y abortos; acceso guest/no guest; dependencia de #6 y `401`; clasificación de rutas; límites separados 60/30, reset UTC, headers, atomicidad, reintentos internos y fallo cerrado. Tras elegir runner frontend, verificar banner en carga inicial, ausencia con guest inactivo y toast alcanzable por teclado.
+Con `pytest`: parsing de valores, ausencia, espacios y abortos; acceso guest/no guest; dependencia de #6 y `401`; clasificación de rutas; límites separados 60/30, reset UTC, headers, atomicidad, reintentos internos y fallo cerrado. Tras elegir runner frontend, verificar banner en carga inicial, ausencia con guest inactivo y toast alcanzable por teclado.
 
 ## Despliegue y riesgos
 

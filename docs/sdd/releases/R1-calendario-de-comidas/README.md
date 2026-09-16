@@ -2,7 +2,7 @@
 
 **Estado:** DRAFT  
 **Versión:** 0.1  
-**Fuente:** [`openspec/changes/calendario-de-comidas/`](../../../../openspec/changes/calendario-de-comidas/), en especial sus cinco SPEC, `proposal.md` y `design.md`.
+**Procedencia histórica:** cambio `calendario-de-comidas`; los requisitos vigentes se canonizan en las SPEC de este release. El contenido original permanece en el historial Git.
 
 ## Propósito
 

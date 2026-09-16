@@ -1,6 +1,6 @@
 # F04 — Acceso guest y protección
 
-**Estado:** DRAFT · **Versión:** 0.1 · **Fuente:** `specs/acceso-guest-y-proteccion/spec.md`, `proposal.md`, `design.md` de `openspec/changes/calendario-de-comidas/`.
+**Estado:** APPROVED · **Versión:** 0.1 · **Fuente:** `specs/acceso-guest-y-proteccion/spec.md`, `proposal.md`, `design.md` de `openspec/changes/calendario-de-comidas/`.
 
 ## Contexto
 
@@ -78,4 +78,4 @@ Los límites deben ser coherentes entre réplicas mediante almacenamiento atómi
 
 | Versión | Fecha | Cambio |
 | --- | --- | --- |
-| 0.1 | 2026-09-16 | SPEC migrada desde OpenSpec. |
+| 0.1 | 2026-09-16 | SPEC aprobada por la persona usuaria. |

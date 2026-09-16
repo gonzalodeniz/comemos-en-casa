@@ -1,6 +1,6 @@
 # F01 — Calendario semanal
 
-**Estado:** DRAFT · **Versión:** 0.1 · **Fuente:** `specs/calendario-semanal/spec.md`, `proposal.md`, `design.md` de `openspec/changes/calendario-de-comidas/`.
+**Estado:** APPROVED · **Versión:** 0.1 · **Fuente:** `specs/calendario-semanal/spec.md`, `proposal.md`, `design.md` de `openspec/changes/calendario-de-comidas/`.
 
 ## Contexto
 
@@ -70,4 +70,4 @@ El cálculo temporal se realiza en backend con zona canaria y debe ser comprobab
 
 | Versión | Fecha | Cambio |
 | --- | --- | --- |
-| 0.1 | 2026-09-16 | SPEC migrada desde OpenSpec. |
+| 0.1 | 2026-09-16 | SPEC aprobada por la persona usuaria. |

@@ -1,6 +1,6 @@
 # F05 — Interfaz y documentación
 
-**Estado:** DRAFT · **Versión:** 0.1 · **Fuente:** `specs/interfaz-y-documentacion/spec.md`, `proposal.md`, `design.md` de `openspec/changes/calendario-de-comidas/`.
+**Estado:** APPROVED · **Versión:** 0.1 · **Fuente:** `specs/interfaz-y-documentacion/spec.md`, `proposal.md`, `design.md` de `openspec/changes/calendario-de-comidas/`.
 
 ## Contexto
 
@@ -72,4 +72,4 @@ Se usa orden DOM lógico, encabezados asociados a celdas y objetivos táctiles r
 
 | Versión | Fecha | Cambio |
 | --- | --- | --- |
-| 0.1 | 2026-09-16 | SPEC migrada desde OpenSpec. |
+| 0.1 | 2026-09-16 | SPEC aprobada por la persona usuaria. |

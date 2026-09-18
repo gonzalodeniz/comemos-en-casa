@@ -35,6 +35,22 @@ type SessionState = { status: "loading" | "ready" | "error"; user: Authenticated
 type LoadState<T> = { status: "loading" | "ready" | "error"; data: T; error: string | null };
 type RecipeEditorForm = RecipeWritePayload & { recipeId: string | null; image: File | null };
 
+function useMediaQuery(query: string) {
+  const getMatches = () => typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia(query).matches;
+  const [matches, setMatches] = useState(getMatches);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mediaQuery = window.matchMedia(query);
+    const updateMatches = () => setMatches(mediaQuery.matches);
+    updateMatches();
+    mediaQuery.addEventListener("change", updateMatches);
+    return () => mediaQuery.removeEventListener("change", updateMatches);
+  }, [query]);
+
+  return matches;
+}
+
 function emptyRecipeForm(): RecipeEditorForm {
   return { recipeId: null, title: "", detail: "", ingredients: [{ name: "", quantity: null }], steps: [{ instruction: "" }], image: null };
 }
@@ -82,6 +98,11 @@ function SiteHeader({ session, onLogout }: { session: SessionState; onLogout: ()
         <span className="brand-mark" aria-hidden="true">⌂</span>
         <span><strong>Comemos en casa</strong><small>Planifica. Cocina. Disfruta.</small></span>
       </Link>
+      <form className="site-search" role="search" onSubmit={(event) => event.preventDefault()}>
+        <label className="visually-hidden" htmlFor="site-search-input">Buscar recetas</label>
+        <span aria-hidden="true">⌕</span>
+        <input id="site-search-input" type="search" placeholder="Buscar recetas, ingredientes…" />
+      </form>
       <nav className="primary-nav" aria-label="Navegación principal">
         <Link to="/">Calendario</Link>
         <Link to="/recetas">Recetas</Link>
@@ -97,19 +118,51 @@ function SiteHeader({ session, onLogout }: { session: SessionState; onLogout: ()
   );
 }
 
+function CalendarSidebar() {
+  return <aside className="calendar-sidebar">
+    <nav aria-label="Secciones del espacio de planificación">
+      <p className="calendar-sidebar-label">Organización</p>
+      <ul className="calendar-sidebar-nav">
+        <li><span className="is-active" aria-current="page"><span aria-hidden="true">▦</span> Calendario</span></li>
+        <li><Link to="/recetas"><span aria-hidden="true">▤</span> Recetas</Link></li>
+        <li><span><span aria-hidden="true">☷</span> Lista de la compra</span></li>
+        <li><span><span aria-hidden="true">✦</span> Trucos</span></li>
+        <li><span><span aria-hidden="true">⌂</span> Mi familia</span></li>
+        <li><span><span aria-hidden="true">◉</span> Perfil</span></li>
+      </ul>
+    </nav>
+    <aside className="calendar-sidebar-note" aria-label="Consejo de planificación">
+      <span aria-hidden="true">♨</span>
+      <p>Planifica con calma y disfruta más de cada comida.</p>
+    </aside>
+  </aside>;
+}
+
+function CalendarDayHeader({ day }: { day: string }) {
+  const date = toDate(day);
+  const weekday = new Intl.DateTimeFormat("es", { weekday: "long" }).format(date);
+  const dayNumber = new Intl.DateTimeFormat("es", { day: "numeric" }).format(date);
+  return <><span className="calendar-day-name">{weekday}</span><span className="calendar-day-number">{dayNumber}</span></>;
+}
+
 function AssignmentCard({ assignment, deleting, onEdit, onDelete }: { assignment: CalendarAssignment; deleting: boolean; onEdit: () => void; onDelete: () => void }) {
   const title = assignment.kind === "recipe" ? assignment.recipe?.title : assignment.text;
   const imageUrl = assignment.kind === "recipe" ? assignment.recipe?.coverImageUrl : null;
   const recipeId = assignment.kind === "recipe" && assignment.recipe?.available ? assignment.recipe.id : null;
+  const accessibleTitle = title ?? "Comida no disponible";
+  const slotLabel = assignment.slot === "lunch" ? "comida" : "cena";
+  const assignmentLabel = `${accessibleTitle}, ${slotLabel} del ${dayLabel(assignment.date)}`;
   return (
-    <article className="assignment-card">
-      {imageUrl ? <img className="assignment-image" src={imageUrl} alt="" /> : null}
-      <span>{title ?? "Comida no disponible"}</span>
+    <article className="assignment-card" aria-label={assignmentLabel}>
+      {imageUrl
+        ? <img className="assignment-image" src={imageUrl} alt={`Portada de ${accessibleTitle}`} />
+        : <span className="assignment-image-placeholder" aria-hidden="true">🍲</span>}
+      <h3>{accessibleTitle}</h3>
       {assignment.kind === "recipe" && !assignment.recipe?.available ? <small>Receta no disponible</small> : null}
       <div className="assignment-actions">
         {recipeId ? <Link to={`/recetas/${recipeId}`}>Ver receta</Link> : null}
-        <button type="button" className="text-button" onClick={onEdit} disabled={deleting}>Editar</button>
-        <button type="button" className="danger-button" onClick={onDelete} disabled={deleting}>{deleting ? "Eliminando…" : "Eliminar"}</button>
+        <button type="button" className="text-button" onClick={onEdit} disabled={deleting} aria-label={`Editar ${accessibleTitle}`}>Editar</button>
+        <button type="button" className="danger-button" onClick={onDelete} disabled={deleting} aria-label={`${deleting ? "Eliminando" : "Eliminar"} ${accessibleTitle}`}>{deleting ? "Eliminando…" : "Eliminar"}</button>
       </div>
     </article>
   );
@@ -398,12 +451,16 @@ function CalendarPage() {
   const navigate = useNavigate();
   const [state, dispatch] = useReducer(calendarReducer, initialCalendarState);
   const [reloadVersion, setReloadVersion] = useState(0);
+  const isMobile = useMediaQuery("(max-width: 760px)");
   const activeWeekStart = weekStartFromPath ?? state.context.data?.currentWeekStart;
   useEffect(() => { const controller = new AbortController(); dispatch({ type: "context/loading" }); getCalendarContext(controller.signal).then((context) => dispatch({ type: "context/success", payload: context })).catch((error: unknown) => { if (!(error instanceof DOMException && error.name === "AbortError")) dispatch({ type: "context/error", payload: errorMessage(error) }); }); return () => controller.abort(); }, [reloadVersion]);
   useEffect(() => { if (!activeWeekStart) return; const controller = new AbortController(); dispatch({ type: "week/loading" }); getCalendarWeek(activeWeekStart, controller.signal).then((week) => dispatch({ type: "week/success", payload: week })).catch((error: unknown) => { if (!(error instanceof DOMException && error.name === "AbortError")) dispatch({ type: "week/error", payload: errorMessage(error) }); }); return () => controller.abort(); }, [activeWeekStart, reloadVersion]);
   function retryCalendar() { setReloadVersion((version) => version + 1); }
   function navigateWeek(amount: number) { if (activeWeekStart) navigate(`/semanas/${shiftWeek(activeWeekStart, amount)}`); }
   function openCurrentWeek() { if (state.context.data) navigate(`/semanas/${state.context.data.currentWeekStart}`); }
+  function openNewMeal() {
+    if (activeWeekStart) dispatch({ type: "editor/openCreate", payload: { date: activeWeekStart, slot: "lunch" } });
+  }
   async function submitRecipeSearch(event: FormEvent<HTMLFormElement>) { event.preventDefault(); dispatch({ type: "recipes/loading" }); try { dispatch({ type: "recipes/success", payload: await searchPublicRecipes(state.recipeQuery) }); } catch (error) { dispatch({ type: "recipes/error", payload: errorMessage(error) }); } }
   async function saveAssignment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); const editor = state.editor; if (!editor || state.mutation.status === "loading") return;
@@ -415,15 +472,39 @@ function CalendarPage() {
   }
   async function removeAssignment(assignment: CalendarAssignment) { if (state.mutation.status === "loading") return; const title = assignment.kind === "recipe" ? assignment.recipe?.title : assignment.text ?? "esta comida"; if (!window.confirm(`¿Eliminar ${title}?`)) return; dispatch({ type: "mutation/loading", payload: { type: "delete", assignmentId: assignment.id } }); try { await deleteAssignment(assignment.id); dispatch({ type: "week/assignmentDeleted", payload: assignment.id }); dispatch({ type: "mutation/success", payload: "La comida se eliminó." }); if (state.editor?.assignmentId === assignment.id) dispatch({ type: "editor/close" }); } catch (error) { dispatch({ type: "mutation/error", payload: errorMessage(error) }); } }
   const assignments = state.week.data?.assignments ?? []; const days = activeWeekStart ? weekDays(activeWeekStart) : []; const editor = state.editor; const isSaving = state.mutation.status === "loading" && (state.mutation.type === "create" || state.mutation.type === "update"); const canChooseRecipe = !editor || editor.kind === "recipe";
-  return <main className="app-shell">
-    <header className="page-hero calendar-hero"><div><p className="eyebrow">Planificación compartida</p><h1>Tu menú semanal</h1><p>Organiza las comidas de la semana y encuentra inspiración en el recetario público.</p></div>{state.context.data?.guestMode ? <p className="guest-banner" role="status">Modo invitado activo: este calendario se comparte con todas las personas que lo visitan.</p> : null}</header>
-    <section className="calendar-section" aria-labelledby="calendar-title"><div className="section-heading"><div><h2 id="calendar-title">Semana del {activeWeekStart ? weekLabel(activeWeekStart) : "…"}</h2><p>Elige una casilla para añadir o editar una comida.</p></div><div className="week-controls" aria-label="Navegación por semanas"><button type="button" onClick={() => navigateWeek(-1)} disabled={!activeWeekStart} aria-label="Semana anterior">←</button><button type="button" onClick={openCurrentWeek} disabled={!state.context.data}>Esta semana</button><button type="button" onClick={() => navigateWeek(1)} disabled={!activeWeekStart} aria-label="Semana siguiente">→</button></div></div>
+  const calendarCellContent = (day: string, slot: MealSlot, label: string) => {
+    const cellAssignments = assignments.filter((assignment) => assignment.date === day && assignment.slot === slot);
+    const dayDescription = dayLabel(day);
+    const slotLabel = label.toLowerCase();
+    const addActionText = `Añadir ${slotLabel}`;
+
+    return <>{cellAssignments.length ? cellAssignments.map((assignment) => <AssignmentCard key={assignment.id} assignment={assignment} deleting={state.mutation.status === "loading" && state.mutation.type === "delete" && state.mutation.assignmentId === assignment.id} onEdit={() => dispatch({ type: "editor/openEdit", payload: assignment })} onDelete={() => void removeAssignment(assignment)} />) : <span className="empty-cell">Sin plan</span>}<button type="button" className="add-assignment" onClick={() => dispatch({ type: "editor/openCreate", payload: { date: day, slot } })} aria-label={`${addActionText} el ${dayDescription}`}>+ {addActionText}</button></>;
+  };
+  return <main className="app-shell calendar-workspace">
+    <div className="calendar-frame"><CalendarSidebar /><div className="calendar-content">
+    <header className="page-hero calendar-hero"><div><p className="eyebrow">Planificación compartida</p><h1>Tu menú semanal</h1><p>Organiza las comidas de la semana y encuentra inspiración en el recetario público.</p></div><button type="button" className="calendar-primary-action" onClick={openNewMeal} disabled={!activeWeekStart}>+ Añadir comida</button>{state.context.data?.guestMode ? <p className="guest-banner" role="status">Modo invitado activo: este calendario se comparte con todas las personas que lo visitan.</p> : null}</header>
+    <section className="calendar-section" aria-labelledby="calendar-title" aria-busy={state.context.status === "loading" || state.week.status === "loading"}><div className="section-heading"><div><p className="eyebrow">Vista semanal</p><h2 id="calendar-title">Semana del {activeWeekStart ? weekLabel(activeWeekStart) : "…"}</h2><p>Elige una casilla para añadir o editar una comida.</p></div><div className="week-controls" aria-label="Navegación por semanas"><button type="button" onClick={() => navigateWeek(-1)} disabled={!activeWeekStart} aria-label="Semana anterior">←</button><button type="button" onClick={openCurrentWeek} disabled={!state.context.data}>Hoy</button><button type="button" onClick={() => navigateWeek(1)} disabled={!activeWeekStart} aria-label="Semana siguiente">→</button></div></div>
       {state.context.status === "error" ? <div className="notice error-notice" role="alert"><p>{state.context.error}</p><button type="button" onClick={retryCalendar}>Reintentar</button></div> : null}{state.week.status === "error" ? <div className="notice error-notice" role="alert"><p>{state.week.error}</p><button type="button" onClick={retryCalendar}>Reintentar</button></div> : null}{state.context.status === "loading" || state.week.status === "loading" ? <p className="loading-state" role="status">Cargando calendario…</p> : null}
-      {activeWeekStart && state.week.status === "ready" ? <div className="calendar-scroll"><table className="calendar-grid"><thead><tr><th scope="col">Momento</th>{days.map((day) => <th scope="col" key={day}>{dayLabel(day)}</th>)}</tr></thead><tbody>{mealRows.map(({ slot, label, icon }) => <tr key={slot}><th scope="row"><span aria-hidden="true">{icon}</span> {label}</th>{days.map((day) => { const cellAssignments = assignments.filter((assignment) => assignment.date === day && assignment.slot === slot); const selected = editor?.date === day && editor.slot === slot; return <td className={selected ? "selected-calendar-cell" : undefined} key={`${day}-${slot}`}>{cellAssignments.length ? cellAssignments.map((assignment) => <AssignmentCard key={assignment.id} assignment={assignment} deleting={state.mutation.status === "loading" && state.mutation.type === "delete" && state.mutation.assignmentId === assignment.id} onEdit={() => dispatch({ type: "editor/openEdit", payload: assignment })} onDelete={() => void removeAssignment(assignment)} />) : <span className="empty-cell">Sin plan</span>}<button type="button" className="add-assignment" onClick={() => dispatch({ type: "editor/openCreate", payload: { date: day, slot } })}>+ Añadir</button></td>; })}</tr>)}</tbody></table></div> : null}
+      {activeWeekStart && state.week.status === "ready" ? isMobile ? <div className="calendar-mobile-list" aria-label="Calendario semanal por día">
+        {days.map((day) => <section className="calendar-mobile-day" key={day} aria-labelledby={`calendar-mobile-day-${day}`}>
+          <h3 id={`calendar-mobile-day-${day}`}><CalendarDayHeader day={day} /></h3>
+          {mealRows.map(({ slot, label, icon }) => <section className={`calendar-mobile-slot${editor?.date === day && editor.slot === slot ? " selected-calendar-cell" : ""}`} key={slot} aria-labelledby={`calendar-mobile-${day}-${slot}`}>
+            <h4 id={`calendar-mobile-${day}-${slot}`}><span aria-hidden="true">{icon}</span> {label}</h4>
+            {calendarCellContent(day, slot, label)}
+          </section>)}
+        </section>)}
+      </div> : <><p id="calendar-scroll-instructions" className="visually-hidden">La tabla contiene los siete días de la semana. Desplázate horizontalmente para consultar todos los días y usa los encabezados para mantener el contexto.</p><div id="tabla_calendario" className="calendar-scroll" tabIndex={0} role="region" aria-label="Calendario semanal desplazable horizontalmente" aria-describedby="calendar-scroll-instructions">
+        <table className="calendar-grid">
+          <thead><tr><th scope="col">Momento</th>{days.map((day) => <th id={`calendar-day-${day}`} scope="col" key={day}><CalendarDayHeader day={day} /></th>)}</tr></thead>
+          <tbody>{mealRows.map(({ slot, label, icon }) => <tr key={slot}><th id={`calendar-slot-${slot}`} scope="row"><span aria-hidden="true">{icon}</span> {label}</th>{days.map((day) => <td className={editor?.date === day && editor.slot === slot ? "selected-calendar-cell" : undefined} headers={`calendar-slot-${slot} calendar-day-${day}`} key={`${day}-${slot}`}>{calendarCellContent(day, slot, label)}</td>)}</tr>)}</tbody>
+        </table>
+      </div></> : null}
       {state.mutation.status === "success" ? <p className="notice success-notice" role="status">{state.mutation.message}</p> : null}{state.mutation.status === "error" ? <p className="notice error-notice" role="alert">{state.mutation.message}</p> : null}
       {editor ? <form className="assignment-editor" onSubmit={saveAssignment} aria-labelledby="assignment-editor-title"><div><p className="eyebrow">{editor.assignmentId ? "Editar comida" : "Nueva comida"}</p><h3 id="assignment-editor-title">{dayLabel(editor.date)} · {editor.slot === "lunch" ? "Comida" : "Cena"}</h3></div>{!editor.assignmentId ? <fieldset className="assignment-kind"><legend>Tipo de comida</legend><label><input type="radio" checked={editor.kind === "recipe"} onChange={() => dispatch({ type: "editor/kindChanged", payload: "recipe" })} />Receta pública</label><label><input type="radio" checked={editor.kind === "free_text"} onChange={() => dispatch({ type: "editor/kindChanged", payload: "free_text" })} />Texto libre</label></fieldset> : null}{editor.kind === "recipe" ? <div className="recipe-choice"><p>{state.selectedRecipe ? <>Receta seleccionada: <strong>{state.selectedRecipe.title}</strong></> : "Busca y elige una receta pública."}</p><p className="field-hint">Puedes elegir otra receta desde los resultados de abajo.</p></div> : <label className="free-text-field" htmlFor="meal-text">Descripción de la comida<input id="meal-text" value={editor.freeText} onChange={(event) => dispatch({ type: "editor/freeTextChanged", payload: event.target.value })} onBlur={(event) => dispatch({ type: "editor/freeTextChanged", payload: normalizeFreeText(event.target.value) })} placeholder="Por ejemplo, crema de verduras" /></label>}<div className="editor-actions"><button type="submit" disabled={isSaving}>{isSaving ? "Guardando…" : editor.assignmentId ? "Guardar cambios" : "Guardar comida"}</button><button type="button" className="secondary-button" onClick={() => dispatch({ type: "editor/close" })} disabled={isSaving}>Cancelar</button></div></form> : null}
     </section>
     <section className="recipe-panel" aria-labelledby="recipe-search-title"><div><p className="eyebrow">Recetario público</p><h2 id="recipe-search-title">Busca una receta para el calendario</h2><p>Consulta el detalle de cada receta antes de añadirla a la semana.</p></div><form className="recipe-search" onSubmit={submitRecipeSearch}><label htmlFor="recipe-query">Nombre de la receta</label><div className="search-controls"><input id="recipe-query" type="search" value={state.recipeQuery} onChange={(event) => dispatch({ type: "recipes/queryChanged", payload: event.target.value })} placeholder="Por ejemplo, sopa de verduras" /><button type="submit" disabled={state.recipes.status === "loading"}>Buscar</button></div></form>{state.recipes.status === "loading" ? <p className="loading-state" role="status">Buscando recetas…</p> : null}{state.recipes.status === "error" ? <p className="notice error-notice" role="alert">{state.recipes.error}</p> : null}{state.recipes.status === "ready" && state.recipes.data?.recipes.length === 0 ? <p>No se encontraron recetas públicas.</p> : null}{state.recipes.data?.recipes.length ? <ul className="recipe-results" aria-label="Resultados de recetas públicas">{state.recipes.data.recipes.map((recipe) => <li key={recipe.id} className="recipe-result">{recipe.coverImageUrl ? <img src={recipe.coverImageUrl} alt="" /> : <div className="recipe-thumb-placeholder" aria-hidden="true">🍲</div>}<span>{recipe.title}</span><div className="recipe-result-actions"><button type="button" onClick={() => dispatch({ type: "recipes/selected", payload: recipe })} disabled={!canChooseRecipe}>Elegir</button><Link to={`/recetas/${recipe.id}`}>Ver detalle</Link></div></li>)}</ul> : null}{state.selectedRecipe ? <p className="selected-recipe" role="status">Receta seleccionada: <strong>{state.selectedRecipe.title}</strong></p> : null}</section>
+    <footer className="calendar-planning-footer"><span aria-hidden="true">✦</span><p>Planifica, cocina y disfruta de la semana a tu ritmo.</p></footer>
+    </div></div>
   </main>;
 }
 

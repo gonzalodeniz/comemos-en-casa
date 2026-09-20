@@ -7,11 +7,11 @@
 
 ## Secuencia y checklist
 
-- [ ] GUI-CAL-T01 — Configurar el runner de pruebas frontend.
-- [ ] GUI-CAL-T02 — Componer el marco y la cuadrícula semanal.
-- [ ] GUI-CAL-T03 — Representar tarjetas, huecos y acciones existentes.
-- [ ] GUI-CAL-T04 — Adaptar la vista a móvil y reforzar su accesibilidad.
-- [ ] GUI-CAL-T05 — Completar regresión, revisión visual y documentación de entrega.
+- [~] GUI-CAL-T01 — Configurar el runner de pruebas frontend (bloqueada en `make test`).
+- [~] GUI-CAL-T02 — Componer el marco y la cuadrícula semanal (implementación realizada; verificación focalizada pendiente).
+- [x] GUI-CAL-T03 — Representar tarjetas, huecos y acciones existentes.
+- [~] GUI-CAL-T04 — Adaptar la vista a móvil y reforzar su accesibilidad (revisión manual pendiente).
+- [~] GUI-CAL-T05 — Completar regresión, revisión visual y documentación de entrega (parcial: bloqueos externos y revisión manual pendientes).
 
 ## Dependencias de ejecución
 
@@ -21,7 +21,7 @@
 
 ## GUI-CAL-T01 — Configurar el runner de pruebas frontend
 
-**Estado:** pendiente. **Estimación:** hasta 1 jornada.
+**Estado:** bloqueada en verificación de repositorio. **Estimación:** hasta 1 jornada.
 **Trazabilidad:** PLAN §Stack y convenciones verificadas, §Pruebas y calidad, §Dependencias y decisiones pendientes; H3; SPEC US-GUI-CAL-001, US-GUI-CAL-002, US-GUI-CAL-005; CA-GUI-CAL-003, CA-GUI-CAL-005–009 y CA-GUI-CAL-017–019; RD-GUI-CAL-001 y RD-GUI-CAL-004.
 
 ### Preparación
@@ -56,11 +56,19 @@
 
 Registrar versión de Node y paquetes elegidos, scripts configurados, salida resumida del runner, `npm --prefix frontend run typecheck`, `npm --prefix frontend run build`, `make test`, y cualquier incidencia previa separada de los resultados de esta tarea.
 
+### Evidencia de ejecución parcial (2026-09-16)
+
+- Se verificó que el frontend no tenía runner ni utilidades de pruebas instalados. Se configuró `test: vitest run` con Vitest 3.2.7, jsdom 26.1.0 y Testing Library React 16.3.3 sobre Node v22.23.2; la combinación ejecuta pruebas de componentes aisladas de la red y Vitest declara compatibilidad con Vite 6.
+- `npm --prefix frontend run test`: correcto, 1 archivo y 1 prueba de humo superados. La prueba renderiza `App` con dobles de `getCurrentUser`, `getCalendarContext` y `getCalendarWeek`, y comprueba que no se invoca `fetch`.
+- `npm --prefix frontend run typecheck`: correcto (`tsc --noEmit`).
+- `npm --prefix frontend run build`: correcto (`tsc --noEmit && vite build`, Vite 6.4.3).
+- `make test`: iniciado; la prueba smoke del repositorio superó, pero la ejecución quedó detenida en `backend/tests/auth/test_auth_api.py::test_login_callback_me_and_logout_preserve_the_cookie_and_route_contracts` y se canceló tras más de cinco minutos sin salida. El diagnóstico con `timeout 90s env PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=backend/src .venv/bin/pytest -vv --maxfail=1` confirmó el mismo bloqueo y terminó con código 124. La comprobación completa queda pendiente; no se inicia GUI-CAL-T02 hasta resolverla.
+
 ---
 
 ## GUI-CAL-T02 — Componer el marco y la cuadrícula semanal
 
-**Estado:** pendiente. **Estimación:** hasta 1 jornada.
+**Estado:** en verificación. **Estimación:** hasta 1 jornada.
 **Trazabilidad:** PLAN §Arquitectura de la interfaz/ Límites de responsabilidad, §Accesibilidad y responsive, H1 y §Pruebas y calidad; SPEC US-GUI-CAL-001, US-GUI-CAL-002 y US-GUI-CAL-003; CA-GUI-CAL-001–005 y CA-GUI-CAL-009–012; RD-GUI-CAL-001, RD-GUI-CAL-002 y RD-GUI-CAL-005; RNF-GUI-CAL-001–002.
 
 ### Preparación
@@ -96,11 +104,18 @@ Registrar versión de Node y paquetes elegidos, scripts configurados, salida res
 
 Registrar nombres y resultados de pruebas focalizadas, resultado de typecheck/build, captura o revisión de escritorio indicando viewport/navegador/estado de datos y confirmación de que no se modificaron `api.ts`, reducer ni tipos de contrato.
 
+### Evidencia de implementación (2026-09-16)
+
+- Se añadió el marco visual del calendario con navegación contextual, búsqueda visual, acción global, banda final y cuadrícula semanal con encabezados de día/fecha.
+- Se conservaron la tabla semántica, los callbacks existentes y los contratos de `api.ts`, reducer y tipos.
+- La prueba de composición quedó corregida para esperar la carga asíncrona de la tabla y para usar el formato localizado real de fechas.
+- La verificación final de T02 queda pendiente porque el runtime no expuso la superficie completa de agentes requerida para ejecutar comandos delegados.
+
 ---
 
 ## GUI-CAL-T03 — Representar tarjetas, huecos y acciones existentes
 
-**Estado:** pendiente. **Estimación:** hasta 1 jornada.
+**Estado:** verificada. **Estimación:** hasta 1 jornada.
 **Trazabilidad:** PLAN §Arquitectura de la interfaz/ Límites de responsabilidad y Datos e interfaces, H1 y H3, §Pruebas y calidad; SPEC US-GUI-CAL-002; CA-GUI-CAL-006–009; RD-GUI-CAL-001–003; RNF-GUI-CAL-001, RNF-GUI-CAL-002 y RNF-GUI-CAL-005.
 
 ### Preparación
@@ -137,11 +152,19 @@ Registrar nombres y resultados de pruebas focalizadas, resultado de typecheck/bu
 
 Registrar archivos afectados, resultados de las cinco pruebas, salida del comando del runner, typecheck/build, y referencia a la comprobación de diff que confirme la ausencia de cambios en contratos API y reducer.
 
+### Evidencia de ejecución (2026-09-17)
+
+- `frontend/src/App.tsx` representa tarjetas con portada informativa o reserva decorativa, conserva títulos cortos/largos y recetas no disponibles, y etiqueta las acciones existentes de edición/eliminación.
+- Las celdas sin asignación conservan el flujo de creación existente, muestran “Añadir comida” o “Añadir cena” y exponen nombre accesible con turno y fecha; no se añadieron llamadas API.
+- `frontend/src/App.test.tsx` cubre tarjeta con imagen, reserva sin imagen, receta no disponible, títulos heterogéneos, alta contextual y acciones existentes de edición/eliminación con dobles de API.
+- `npm --prefix frontend run test`: correcto, 8 pruebas. `npm --prefix frontend run typecheck`: correcto. `npm --prefix frontend run build`: correcto.
+- La comprobación de diff de `frontend/src/api.ts`, `frontend/src/calendarReducer.ts` y `frontend/src/types.ts` no muestra cambios; `git diff --check` termina correctamente.
+
 ---
 
 ## GUI-CAL-T04 — Adaptar la vista a móvil y reforzar su accesibilidad
 
-**Estado:** pendiente. **Estimación:** hasta 1 jornada.
+**Estado:** en verificación. **Estimación:** hasta 1 jornada.
 **Trazabilidad:** PLAN §Accesibilidad y responsive, H2 y §Pruebas y calidad; SPEC US-GUI-CAL-004, US-GUI-CAL-005; CA-GUI-CAL-013–020; RD-GUI-CAL-004; RNF-GUI-CAL-003–005.
 
 ### Preparación
@@ -178,11 +201,18 @@ Registrar archivos afectados, resultados de las cinco pruebas, salida del comand
 
 Registrar resultados del runner, typecheck/build, matriz manual con viewport, navegador, zoom, teclado y lector de pantalla usado, más mediciones de objetivos táctiles y capturas de escritorio/móvil sin datos sensibles.
 
+### Evidencia parcial de ejecución (2026-09-17)
+
+- La región semanal comunica carga mediante `aria-busy`; los errores existentes se mantienen como alertas. El contenedor de la tabla conserva scroll horizontal, es enfocable y mantiene la columna de turnos fija.
+- Los botones contextuales miden al menos 44 CSS px; los controles nativos conservan foco visible. Las tarjetas incluyen alternativa útil para una portada y ocultan la reserva decorativa.
+- La prueba automatizada cubre `aria-busy`, el foco del contenedor desplazable, los nombres accesibles de alta y la visibilidad del error existente. El runner, typecheck y build terminan correctamente (ver informe de aceptación).
+- Sigue pendiente la matriz manual de escritorio/móvil, zoom, teclado y lector de pantalla porque el entorno de ejecución no dispone de navegador interactivo ni lector de pantalla. No se declara cerrada esta tarea hasta registrarla.
+
 ---
 
 ## GUI-CAL-T05 — Completar regresión, revisión visual y documentación de entrega
 
-**Estado:** pendiente. **Estimación:** hasta 1 jornada.
+**Estado:** en verificación. **Estimación:** hasta 1 jornada.
 **Trazabilidad:** PLAN H3, §Pruebas y calidad, §Observabilidad y operaciones, §Despliegue e infraestructura, §Riesgos y mitigaciones y §Trazabilidad; SPEC CA-GUI-CAL-001–020; RD-GUI-CAL-001–005; RNF-GUI-CAL-001–005.
 
 ### Preparación
@@ -218,9 +248,15 @@ Registrar resultados del runner, typecheck/build, matriz manual con viewport, na
 
 Registrar commit o revisión inspeccionada, salidas resumidas de suite/typecheck/build/make test/make build, versión de Node y navegador, matriz de viewports/estados, capturas referenciadas, resultado de `git diff --check` y lista explícita de comprobaciones pendientes o no ejecutables.
 
+### Evidencia parcial de ejecución (2026-09-17)
+
+Se creó [`EVIDENCIA-ACEPTACION.md`](EVIDENCIA-ACEPTACION.md) con los comandos, resultados, límites de entorno y comprobaciones pendientes. La tarea permanece en verificación: `make test` conserva el bloqueo conocido de autenticación y la revisión visual/manual no es ejecutable en este entorno.
+
 ## Historial
 
 | Versión | Fecha | Cambio |
 | --- | --- | --- |
 | 0.1 | 2026-09-16 | TASKS DRAFT creada a partir de SPEC y PLAN 0.1 APPROVED; desglosa configuración de pruebas, composición, tarjetas, accesibilidad responsive y validación final. |
 | 0.2 | 2026-09-16 | TASKS aprobadas para iniciar la implementación de F01. |
+| 0.3 | 2026-09-16 | GUI-CAL-T01 configura el runner y prueba de humo; queda bloqueada hasta completar `make test`, detenido en una prueba de autenticación del backend. |
+| 0.4 | 2026-09-17 | GUI-CAL-T03 implementa y verifica tarjetas, huecos y acciones existentes; GUI-CAL-T04 y T05 quedan en verificación manual por limitaciones de entorno y bloqueos de repositorio documentados. |

@@ -94,7 +94,7 @@ function SiteHeader({ session, onLogout }: { session: SessionState; onLogout: ()
   const userLabel = session.user?.displayName ?? session.user?.email;
   return (
     <header className="site-header">
-      <Link className="brand" to="/" aria-label="Comemos en casa, ir al calendario">
+      <Link className="brand" to="/calendario" aria-label="Comemos en casa, ir al calendario">
         <span className="brand-mark" aria-hidden="true">⌂</span>
         <span><strong>Comemos en casa</strong><small>Planifica. Cocina. Disfruta.</small></span>
       </Link>
@@ -104,7 +104,7 @@ function SiteHeader({ session, onLogout }: { session: SessionState; onLogout: ()
         <input id="site-search-input" type="search" placeholder="Buscar recetas, ingredientes…" />
       </form>
       <nav className="primary-nav" aria-label="Navegación principal">
-        <Link to="/">Calendario</Link>
+        <Link to="/calendario">Calendario</Link>
         <Link to="/recetas">Recetas</Link>
         {session.user ? <Link to="/mis-recetas">Mis recetas</Link> : null}
       </nav>
@@ -123,7 +123,7 @@ function CalendarSidebar() {
     <nav aria-label="Secciones del espacio de planificación">
       <p className="calendar-sidebar-label">Organización</p>
       <ul className="calendar-sidebar-nav">
-        <li><span className="is-active" aria-current="page"><span aria-hidden="true">▦</span> Calendario</span></li>
+        <li><Link className="is-active" to="/calendario" aria-current="page"><span aria-hidden="true">▦</span> Calendario</Link></li>
         <li><Link to="/recetas"><span aria-hidden="true">▤</span> Recetas</Link></li>
         <li><span><span aria-hidden="true">☷</span> Lista de la compra</span></li>
         <li><span><span aria-hidden="true">✦</span> Trucos</span></li>
@@ -198,7 +198,7 @@ function RecipeCataloguePage() {
   return <main className="app-shell">
     <section className="page-hero" aria-labelledby="catalogue-title">
       <div><p className="eyebrow">Recetario público</p><h1 id="catalogue-title">Recetas para cada día</h1><p>Explora recetas públicas, incluidos los borradores, y guárdalas en tus listas al iniciar sesión.</p></div>
-      <Link className="primary-link" to="/">Ver calendario</Link>
+      <Link className="primary-link" to="/calendario">Ver calendario</Link>
     </section>
     <form className="catalogue-search" role="search" onSubmit={(event) => event.preventDefault()}>
       <label htmlFor="catalogue-query">Buscar recetas</label>
@@ -515,5 +515,5 @@ export default function App() {
     try { await logout(); setSession({ status: "ready", user: null }); }
     catch { setSession({ status: "error", user: null }); }
   }
-  return <><SiteHeader session={session} onLogout={() => void handleLogout()} /><Routes><Route path="/" element={<CalendarPage />} /><Route path="/semanas/:weekStart" element={<CalendarPage />} /><Route path="/recetas" element={<RecipeCataloguePage />} /><Route path="/recetas/:recipeId" element={<RecipeDetailPage session={session} />} /><Route path="/mis-recetas" element={<RecipeWorkspacePage session={session} />} /><Route path="/weeks/:weekStart" element={<CalendarPage />} /><Route path="/recipes/:recipeId" element={<Navigate to="/recetas" replace />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></>;
+  return <><SiteHeader session={session} onLogout={() => void handleLogout()} /><Routes><Route path="/" element={<Navigate to="/calendario" replace />} /><Route path="/calendario" element={<CalendarPage />} /><Route path="/semanas/:weekStart" element={<CalendarPage />} /><Route path="/recetas" element={<RecipeCataloguePage />} /><Route path="/recetas/:recipeId" element={<RecipeDetailPage session={session} />} /><Route path="/mis-recetas" element={<RecipeWorkspacePage session={session} />} /><Route path="/weeks/:weekStart" element={<CalendarPage />} /><Route path="/recipes/:recipeId" element={<Navigate to="/recetas" replace />} /><Route path="*" element={<Navigate to="/" replace />} /></Routes></>;
 }

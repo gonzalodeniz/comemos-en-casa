@@ -72,10 +72,16 @@ test("composes the weekly planning frame with seven days and both meal rows", as
   render(<MemoryRouter initialEntries={["/"]}><App /></MemoryRouter>);
 
   expect(await screen.findByRole("heading", { name: /Semana del 14 de septiembre – 20 de septiembre/ })).toBeTruthy();
+  const brand = screen.getByRole("link", { name: /Como en casa/ });
+  expect(brand.textContent).toContain("Como en casa");
+  const primaryNav = screen.getByRole("navigation", { name: "Navegación principal" });
+  expect(within(primaryNav).queryByRole("link", { name: "Calendario" })).toBeNull();
+  expect(within(primaryNav).queryByRole("link", { name: "Recetas" })).toBeNull();
   expect(screen.getByRole("searchbox", { name: "Buscar recetas" })).toBeTruthy();
   const calendarSidebar = screen.getByRole("navigation", { name: "Secciones del espacio de planificación" });
   expect(calendarSidebar.textContent).toContain("Calendario");
   expect(within(calendarSidebar).getByRole("link", { name: "Calendario" }).getAttribute("href")).toBe("/calendario");
+  expect(screen.getByRole("complementary", { name: "Consejo de planificación" }).textContent).toContain("Buena comida, mejores momentos");
   const weekControls = document.querySelector(".week-controls");
   expect(weekControls).not.toBeNull();
   expect(within(weekControls as HTMLElement).getByRole("button", { name: "+ Añadir comida" })).toBeTruthy();

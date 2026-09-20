@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useReducer, useState } from "react";
-import { Link, Navigate, Route, Routes, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   addRecipeToCollection,
   ApiError,
@@ -90,13 +90,24 @@ function weekLabel(weekStart: string): string {
 }
 function normalizeFreeText(value: string): string { return value.trim().replace(/\s+/g, " "); }
 
+function isCalendarRoute(pathname: string): boolean {
+  return pathname === "/calendario" || /^\/(?:semanas|weeks)(?:\/|$)/.test(pathname);
+}
+
+function userInitials(label: string): string {
+  const words = label.trim().split(/\s+/).filter(Boolean);
+  return (words.length > 1 ? `${words[0][0]}${words[words.length - 1][0]}` : label.slice(0, 2)).toUpperCase();
+}
+
 function SiteHeader({ session, onLogout }: { session: SessionState; onLogout: () => void }) {
+  const location = useLocation();
+  const calendarRoute = isCalendarRoute(location.pathname);
   const userLabel = session.user?.displayName ?? session.user?.email;
   return (
     <header className="site-header">
-      <Link className="brand" to="/calendario" aria-label="Comemos en casa, ir al calendario">
+      <Link className="brand" to="/calendario" aria-label="Como en casa, ir al calendario">
         <span className="brand-mark" aria-hidden="true">⌂</span>
-        <span><strong>Comemos en casa</strong><small>Planifica. Cocina. Disfruta.</small></span>
+        <span><strong>Como en casa</strong><small>Planifica. Cocina. Disfruta.</small></span>
       </Link>
       <form className="site-search" role="search" onSubmit={(event) => event.preventDefault()}>
         <label className="visually-hidden" htmlFor="site-search-input">Buscar recetas</label>
@@ -104,15 +115,18 @@ function SiteHeader({ session, onLogout }: { session: SessionState; onLogout: ()
         <input id="site-search-input" type="search" placeholder="Buscar recetas, ingredientes…" />
       </form>
       <nav className="primary-nav" aria-label="Navegación principal">
-        <Link to="/calendario">Calendario</Link>
-        <Link to="/recetas">Recetas</Link>
+        {!calendarRoute ? <><Link to="/calendario">Calendario</Link><Link to="/recetas">Recetas</Link></> : null}
         {session.user ? <Link to="/mis-recetas">Mis recetas</Link> : null}
       </nav>
       <div className="session-entry">
         {session.status === "loading" ? <span className="session-status" role="status">Comprobando sesión…</span> : null}
-        {userLabel ? <span className="user-name" title={session.user?.email}>{userLabel}</span> : null}
-        {session.status === "ready" && !session.user ? <a className="login-link" href="/api/v1/auth/login">Iniciar sesión</a> : null}
-        {session.status === "ready" && session.user ? <button type="button" className="logout-button" onClick={onLogout}>Cerrar sesión</button> : null}
+        {userLabel && !calendarRoute ? <span className="user-name" title={session.user?.email}>{userLabel}</span> : null}
+        {session.status === "ready" && !session.user ? calendarRoute
+          ? <a className="login-avatar" href="/api/v1/auth/login" aria-label="Iniciar sesión" title="Iniciar sesión"><span aria-hidden="true">◯</span></a>
+          : <a className="login-link" href="/api/v1/auth/login">Iniciar sesión</a> : null}
+        {session.status === "ready" && session.user ? calendarRoute
+          ? <button type="button" className="session-avatar" onClick={onLogout} aria-label={`Cerrar sesión de ${userLabel}`} title={`${userLabel} · Cerrar sesión`}><span aria-hidden="true">{userInitials(userLabel ?? "")}</span></button>
+          : <button type="button" className="logout-button" onClick={onLogout}>Cerrar sesión</button> : null}
       </div>
     </header>
   );
@@ -123,17 +137,17 @@ function CalendarSidebar() {
     <nav aria-label="Secciones del espacio de planificación">
       <p className="calendar-sidebar-label">Organización</p>
       <ul className="calendar-sidebar-nav">
-        <li><Link className="is-active" to="/calendario" aria-current="page"><span aria-hidden="true">▦</span> Calendario</Link></li>
-        <li><Link to="/recetas"><span aria-hidden="true">▤</span> Recetas</Link></li>
-        <li><span><span aria-hidden="true">☷</span> Lista de la compra</span></li>
-        <li><span><span aria-hidden="true">✦</span> Trucos</span></li>
-        <li><span><span aria-hidden="true">⌂</span> Mi familia</span></li>
-        <li><span><span aria-hidden="true">◉</span> Perfil</span></li>
+        <li><Link className="is-active" to="/calendario" aria-current="page"><span className="sidebar-icon" aria-hidden="true">▦</span> Calendario</Link></li>
+        <li><Link to="/recetas"><span className="sidebar-icon" aria-hidden="true">♜</span> Recetas</Link></li>
+        <li><span><span className="sidebar-icon" aria-hidden="true">☷</span> Lista de la compra</span></li>
+        <li><span><span className="sidebar-icon" aria-hidden="true">♧</span> Trucos</span></li>
+        <li><span><span className="sidebar-icon" aria-hidden="true">♧</span> Mi familia</span></li>
+        <li><span><span className="sidebar-icon" aria-hidden="true">♙</span> Perfil</span></li>
       </ul>
     </nav>
     <aside className="calendar-sidebar-note" aria-label="Consejo de planificación">
-      <span aria-hidden="true">♨</span>
-      <p>Planifica con calma y disfruta más de cada comida.</p>
+      <span className="calendar-sidebar-pot" aria-hidden="true">🍲</span>
+      <p>Buena comida, mejores momentos <span aria-hidden="true">❤️</span></p>
     </aside>
   </aside>;
 }
@@ -482,7 +496,7 @@ function CalendarPage() {
   };
   return <main className="app-shell calendar-workspace">
     <div className="calendar-frame"><CalendarSidebar /><div className="calendar-content">
-    <section className="calendar-section" aria-labelledby="calendar-title" aria-busy={state.context.status === "loading" || state.week.status === "loading"}><div className="section-heading"><div><p className="eyebrow">Vista semanal</p><h2 id="calendar-title">Semana del {activeWeekStart ? weekLabel(activeWeekStart) : "…"}</h2><p>Elige una casilla para añadir o editar una comida.</p></div><div className="week-controls" aria-label="Navegación por semanas"><button type="button" onClick={() => navigateWeek(-1)} disabled={!activeWeekStart} aria-label="Semana anterior">←</button><button type="button" onClick={openCurrentWeek} disabled={!state.context.data}>Hoy</button><button type="button" onClick={() => navigateWeek(1)} disabled={!activeWeekStart} aria-label="Semana siguiente">→</button><button type="button" className="calendar-primary-action" onClick={openNewMeal} disabled={!activeWeekStart}>+ Añadir comida</button></div></div>
+    <section className="calendar-section" aria-labelledby="calendar-title" aria-busy={state.context.status === "loading" || state.week.status === "loading"}><div className="section-heading"><div className="calendar-heading-copy"><p className="eyebrow">Vista semanal</p><h2 id="calendar-title">Semana del {activeWeekStart ? weekLabel(activeWeekStart) : "…"}</h2><p>Elige una casilla para añadir o editar una comida.</p></div><div className="week-controls" aria-label="Navegación por semanas"><button type="button" onClick={() => navigateWeek(-1)} disabled={!activeWeekStart} aria-label="Semana anterior">←</button><button type="button" onClick={() => navigateWeek(1)} disabled={!activeWeekStart} aria-label="Semana siguiente">→</button><button type="button" onClick={openCurrentWeek} disabled={!state.context.data}>Hoy</button><button type="button" className="calendar-primary-action" onClick={openNewMeal} disabled={!activeWeekStart}>+ Añadir comida</button></div></div>
       {state.context.status === "error" ? <div className="notice error-notice" role="alert"><p>{state.context.error}</p><button type="button" onClick={retryCalendar}>Reintentar</button></div> : null}{state.week.status === "error" ? <div className="notice error-notice" role="alert"><p>{state.week.error}</p><button type="button" onClick={retryCalendar}>Reintentar</button></div> : null}{state.context.status === "loading" || state.week.status === "loading" ? <p className="loading-state" role="status">Cargando calendario…</p> : null}
       {activeWeekStart && state.week.status === "ready" ? isMobile ? <div className="calendar-mobile-list" aria-label="Calendario semanal por día">
         {days.map((day) => <section className="calendar-mobile-day" key={day} aria-labelledby={`calendar-mobile-day-${day}`}>
@@ -502,7 +516,7 @@ function CalendarPage() {
       {editor ? <form className="assignment-editor" onSubmit={saveAssignment} aria-labelledby="assignment-editor-title"><div><p className="eyebrow">{editor.assignmentId ? "Editar comida" : "Nueva comida"}</p><h3 id="assignment-editor-title">{dayLabel(editor.date)} · {editor.slot === "lunch" ? "Comida" : "Cena"}</h3></div>{!editor.assignmentId ? <fieldset className="assignment-kind"><legend>Tipo de comida</legend><label><input type="radio" checked={editor.kind === "recipe"} onChange={() => dispatch({ type: "editor/kindChanged", payload: "recipe" })} />Receta pública</label><label><input type="radio" checked={editor.kind === "free_text"} onChange={() => dispatch({ type: "editor/kindChanged", payload: "free_text" })} />Texto libre</label></fieldset> : null}{editor.kind === "recipe" ? <div className="recipe-choice"><p>{state.selectedRecipe ? <>Receta seleccionada: <strong>{state.selectedRecipe.title}</strong></> : "Busca y elige una receta pública."}</p><p className="field-hint">Puedes elegir otra receta desde los resultados de abajo.</p></div> : <label className="free-text-field" htmlFor="meal-text">Descripción de la comida<input id="meal-text" value={editor.freeText} onChange={(event) => dispatch({ type: "editor/freeTextChanged", payload: event.target.value })} onBlur={(event) => dispatch({ type: "editor/freeTextChanged", payload: normalizeFreeText(event.target.value) })} placeholder="Por ejemplo, crema de verduras" /></label>}<div className="editor-actions"><button type="submit" disabled={isSaving}>{isSaving ? "Guardando…" : editor.assignmentId ? "Guardar cambios" : "Guardar comida"}</button><button type="button" className="secondary-button" onClick={() => dispatch({ type: "editor/close" })} disabled={isSaving}>Cancelar</button></div></form> : null}
     </section>
     <section className="recipe-panel" aria-labelledby="recipe-search-title"><div><p className="eyebrow">Recetario público</p><h2 id="recipe-search-title">Busca una receta para el calendario</h2><p>Consulta el detalle de cada receta antes de añadirla a la semana.</p></div><form className="recipe-search" onSubmit={submitRecipeSearch}><label htmlFor="recipe-query">Nombre de la receta</label><div className="search-controls"><input id="recipe-query" type="search" value={state.recipeQuery} onChange={(event) => dispatch({ type: "recipes/queryChanged", payload: event.target.value })} placeholder="Por ejemplo, sopa de verduras" /><button type="submit" disabled={state.recipes.status === "loading"}>Buscar</button></div></form>{state.recipes.status === "loading" ? <p className="loading-state" role="status">Buscando recetas…</p> : null}{state.recipes.status === "error" ? <p className="notice error-notice" role="alert">{state.recipes.error}</p> : null}{state.recipes.status === "ready" && state.recipes.data?.recipes.length === 0 ? <p>No se encontraron recetas públicas.</p> : null}{state.recipes.data?.recipes.length ? <ul className="recipe-results" aria-label="Resultados de recetas públicas">{state.recipes.data.recipes.map((recipe) => <li key={recipe.id} className="recipe-result">{recipe.coverImageUrl ? <img src={recipe.coverImageUrl} alt="" /> : <div className="recipe-thumb-placeholder" aria-hidden="true">🍲</div>}<span>{recipe.title}</span><div className="recipe-result-actions"><button type="button" onClick={() => dispatch({ type: "recipes/selected", payload: recipe })} disabled={!canChooseRecipe}>Elegir</button><Link to={`/recetas/${recipe.id}`}>Ver detalle</Link></div></li>)}</ul> : null}{state.selectedRecipe ? <p className="selected-recipe" role="status">Receta seleccionada: <strong>{state.selectedRecipe.title}</strong></p> : null}</section>
-    <footer className="calendar-planning-footer"><span aria-hidden="true">✦</span><p>Planifica, cocina y disfruta de la semana a tu ritmo.</p></footer>
+    <footer className="calendar-planning-footer"><span aria-hidden="true">🌿</span><p>“La planificación de hoy es el sabor de un mañana más tranquilo.”</p><strong>Planifica · Cocina · Disfruta. <span aria-hidden="true">❤️</span></strong></footer>
     </div></div>
   </main>;
 }

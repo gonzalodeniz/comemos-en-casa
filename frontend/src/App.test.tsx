@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, expect, test, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import App from "./App";
-import { deleteAssignment, getCalendarContext, getCalendarWeek, getCurrentUser, updateAssignment } from "./api";
+import { createAssignment, deleteAssignment, getCalendarContext, getCalendarWeek, getCurrentUser, updateAssignment } from "./api";
 import type { CalendarAssignment } from "./types";
 
 vi.mock("./api", () => ({
@@ -189,6 +189,39 @@ test("opens the existing contextual creation flow with the selected day and meal
   fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
   fireEvent.click(screen.getByRole("button", { name: "Añadir cena el dom, 20 sept" }));
   expect(await screen.findByRole("heading", { name: /Cena/ })).toBeTruthy();
+});
+
+test("creates a free-text meal when crypto.randomUUID is unavailable", async () => {
+  const getRandomValues = vi.fn((values: Uint8Array) => {
+    values.fill(0);
+    return values;
+  });
+  vi.stubGlobal("crypto", { getRandomValues });
+  const assignment: CalendarAssignment = {
+    id: "00000000-0000-4000-8000-000000000000",
+    date: "2026-09-14",
+    slot: "lunch",
+    kind: "free_text",
+    text: "lentejas",
+  };
+  mockCalendar();
+  vi.mocked(createAssignment).mockResolvedValue(assignment);
+
+  render(<MemoryRouter initialEntries={["/"]}><App /></MemoryRouter>);
+
+  fireEvent.click(await screen.findByRole("button", { name: "Añadir comida el lun, 14 sept" }));
+  fireEvent.change(await screen.findByLabelText("Descripción de la comida"), { target: { value: " lentejas " } });
+  fireEvent.click(screen.getByRole("button", { name: "Guardar comida" }));
+
+  await waitFor(() => expect(createAssignment).toHaveBeenCalledWith({
+    id: "00000000-0000-4000-8000-000000000000",
+    date: "2026-09-14",
+    slot: "lunch",
+    kind: "free_text",
+    text: "lentejas",
+  }));
+  expect((await screen.findByRole("status")).textContent).toContain("La comida se guardó.");
+  expect(screen.queryByRole("alert")).toBeNull();
 });
 
 test("keeps existing card edit and delete actions reachable", async () => {

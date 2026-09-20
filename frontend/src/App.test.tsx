@@ -58,7 +58,8 @@ test("renders the calendar without network access", async () => {
 
   render(<MemoryRouter initialEntries={["/"]}><App /></MemoryRouter>);
 
-  expect(await screen.findByRole("heading", { name: "Tu menú semanal" })).toBeTruthy();
+  expect(await screen.findByRole("heading", { name: /Semana del 14 de septiembre – 20 de septiembre/ })).toBeTruthy();
+  expect(document.querySelector("main.calendar-workspace header")).toBeNull();
   expect(await screen.findByRole("table")).toBeTruthy();
   expect(getCalendarContext).toHaveBeenCalledOnce();
   expect(getCalendarWeek).toHaveBeenCalledWith("2026-09-14", expect.any(AbortSignal));
@@ -70,12 +71,14 @@ test("composes the weekly planning frame with seven days and both meal rows", as
 
   render(<MemoryRouter initialEntries={["/"]}><App /></MemoryRouter>);
 
-  expect(await screen.findByRole("heading", { name: "Tu menú semanal" })).toBeTruthy();
+  expect(await screen.findByRole("heading", { name: /Semana del 14 de septiembre – 20 de septiembre/ })).toBeTruthy();
   expect(screen.getByRole("searchbox", { name: "Buscar recetas" })).toBeTruthy();
   const calendarSidebar = screen.getByRole("navigation", { name: "Secciones del espacio de planificación" });
   expect(calendarSidebar.textContent).toContain("Calendario");
   expect(within(calendarSidebar).getByRole("link", { name: "Calendario" }).getAttribute("href")).toBe("/calendario");
-  expect(screen.getByRole("button", { name: "+ Añadir comida" })).toBeTruthy();
+  const weekControls = document.querySelector(".week-controls");
+  expect(weekControls).not.toBeNull();
+  expect(within(weekControls as HTMLElement).getByRole("button", { name: "+ Añadir comida" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Semana anterior" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Hoy" })).toBeTruthy();
   expect(screen.getByRole("button", { name: "Semana siguiente" })).toBeTruthy();

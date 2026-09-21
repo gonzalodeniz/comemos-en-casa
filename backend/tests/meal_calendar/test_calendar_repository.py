@@ -164,6 +164,22 @@ def test_recurrence_rule_writes_are_idempotent_and_do_not_materialize_occurrence
     assert any(query.startswith("DELETE FROM meal_recurrence_rules") for query in queries)
 
 
+def test_week_read_includes_only_the_matching_boundary_occurrence() -> None:
+    cursor = RecurrenceRecordingCursor(
+        assignment_rows=[],
+        rule_rows=[(SERIES_ID, date(2026, 9, 20), "dinner", "Domingo", 2)],
+    )
+    repository = MealCalendarRepository(RecordingConnection(cursor))
+
+    final_boundary = repository.list_week(date(2026, 9, 14), date(2026, 9, 20))
+    following_week = repository.list_week(date(2026, 9, 21), date(2026, 9, 27))
+
+    assert [(entry.meal_date, entry.slot, entry.free_text) for entry in final_boundary] == [
+        (date(2026, 9, 20), "dinner", "Domingo")
+    ]
+    assert following_week == []
+
+
 def test_assignment_writes_are_parameterized_and_leave_transaction_to_the_caller() -> None:
     cursor = RecordingCursor(row=(ASSIGNMENT_ID,))
     connection = RecordingConnection(cursor)

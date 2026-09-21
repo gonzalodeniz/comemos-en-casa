@@ -85,6 +85,18 @@ BEGIN
     END;
 END
 $$;
+DO $$
+BEGIN
+    BEGIN
+        INSERT INTO meal_recurrence_rules
+            (id, calendar_key, initial_date, meal_slot, free_text, interval_weeks)
+        VALUES ('00000000-0000-0000-0000-000000000007', 'private', '2026-09-16', 'lunch', 'Sopa', 1);
+        RAISE EXCEPTION 'accepted a non-shared calendar key';
+    EXCEPTION WHEN foreign_key_violation THEN
+        NULL;
+    END;
+END
+$$;
 SELECT count(*) FROM meal_recurrence_rules;
 SELECT count(*) FROM pg_indexes
     WHERE schemaname = 'meal_calendar_recurrence_test'

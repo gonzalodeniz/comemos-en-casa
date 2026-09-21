@@ -71,10 +71,17 @@ class FakeCursor:
 
 class FakeTransaction:
     def __enter__(self) -> "FakeTransaction":
+        state = StatefulCalendarRepository.state
+        self._assignments = dict(state.assignments)
+        self._rules = dict(state.rules)
         return self
 
-    def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
-        return None
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> bool:
+        if exc_type is not None:
+            state = StatefulCalendarRepository.state
+            state.assignments = self._assignments
+            state.rules = self._rules
+        return False
 
 
 class FakeConnection:
@@ -415,6 +422,17 @@ def test_series_create_retry_is_idempotent_and_conflicting_payload_is_rejected(c
     }
     assert created.status_code == 201
     assert created.json() == expected
+    repeated_read = client.get("/api/v1/meal-calendar/weeks/2025-06-02")
+    second_read = client.get("/api/v1/meal-calendar/weeks/2025-06-02")
+    assert repeated_read.status_code == 200
+    assert second_read.status_code == 200
+    recurring_from_first_read = next(
+        item for item in repeated_read.json()["assignments"] if item["entryType"] == "recurring_occurrence"
+    )
+    recurring_from_second_read = next(
+        item for item in second_read.json()["assignments"] if item["entryType"] == "recurring_occurrence"
+    )
+    assert recurring_from_first_read == recurring_from_second_read
     assert repeated.status_code == 200
     assert repeated.json() == expected
     assert conflict.status_code == 409
@@ -451,10 +469,15 @@ def test_series_patch_requires_anchor_confirmation_and_keeps_slot_immutable(clie
     body = {"initialDate": "2025-06-06", "text": "Crema", "recurrenceWeeks": 2}
 
     unconfirmed = client.patch(path, json=body)
+    assert unconfirmed.status_code == 422
+    unchanged = StatefulCalendarRepository.state.rules[series_id]
+    assert unchanged.initial_date == date(2025, 6, 2)
+    assert unchanged.free_text == "Sopa"
+    assert unchanged.interval_weeks == 1
+
     confirmed = client.patch(path, json={**body, "confirmAnchorChange": True})
     slot_change = client.patch(path, json={**body, "slot": "dinner", "confirmAnchorChange": True})
 
-    assert unconfirmed.status_code == 422
     assert confirmed.status_code == 200
     assert confirmed.json() == {
         "seriesId": str(series_id),
@@ -481,6 +504,8 @@ def test_series_delete_requires_confirmation_is_destructive_and_idempotent(clien
     assert declined.status_code == 422
     assert deleted.status_code == 204
     assert repeated.status_code == 204
+    assert series_id not in StatefulCalendarRepository.state.rules
+    assert ASSIGNMENT_ID in StatefulCalendarRepository.state.assignments
 
 
 def test_invalid_recurrence_requests_are_non_mutating_and_no_repeat_is_not_a_patch_mode(
@@ -544,3 +569,55 @@ def test_legacy_recipe_response_remains_distinct_from_recurring_free_text(client
     assert "seriesId" not in recipe
     assert free_text["entryType"] == "assignment"
     assert "recipe" not in free_text
+
+
+def test_unavailable_legacy_recipe_remains_readable_after_recurrence_reads(client: TestClient) -> None:
+    existing = StatefulCalendarRepository.state.assignments[ASSIGNMENT_ID]
+    StatefulCalendarRepository.state.assignments[ASSIGNMENT_ID] = CalendarAssignment(
+        id=existing.id,
+        meal_date=existing.meal_date,
+        slot=existing.slot,
+        kind=existing.kind,
+        recipe_id=existing.recipe_id,
+        free_text=existing.free_text,
+        recipe_title=None,
+        recipe_image_url=None,
+    )
+
+    response = client.get("/api/v1/meal-calendar/weeks/2025-06-02")
+
+    recipe = next(item for item in response.json()["assignments"] if item["kind"] == "recipe")
+    assert recipe["recipe"] == {
+        "available": False,
+        "title": "Receta no disponible",
+    }
+    assert "seriesId" not in recipe
+
+
+def test_conversion_failure_restores_the_original_assignment(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    assignment_id = UUID("00000000-0000-0000-0000-000000000305")
+    seed_free_text_assignment(assignment_id)
+    from comemos_en_casa.meal_calendar import api
+
+    class FailingConversionRepository(StatefulCalendarRepository):
+        def insert_rule(self, series_id: UUID, draft: RecurrenceRuleDraft) -> bool:
+            super().insert_rule(series_id, draft)
+            raise RuntimeError("simulated recurrence insert failure")
+
+    monkeypatch.setattr(api, "MealCalendarRepository", FailingConversionRepository)
+
+    with pytest.raises(RuntimeError, match="simulated recurrence insert failure"):
+        client.patch(
+            f"/api/v1/meal-calendar/assignments/{assignment_id}",
+            json={
+                "date": "2025-06-02",
+                "slot": "lunch",
+                "kind": "free_text",
+                "text": "Sopa",
+                "recurrenceWeeks": 2,
+            },
+        )
+
+    assert assignment_id in StatefulCalendarRepository.state.assignments
+    assert StatefulCalendarRepository.state.assignments[assignment_id].free_text == "Sopa"
+    assert assignment_id not in StatefulCalendarRepository.state.rules

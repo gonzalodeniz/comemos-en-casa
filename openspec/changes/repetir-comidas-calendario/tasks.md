@@ -64,7 +64,7 @@ La secuencia estricta es **RED → GREEN → TRIANGULATE → REFACTOR**. Las tar
 
 ### 7. TRIANGULATE: comprobar límites, compatibilidad y transacciones backend
 
-- [ ] Ejecutar y ajustar únicamente las pruebas backend necesarias en `backend/tests/meal_calendar/test_time_text.py`, `test_calendar_repository.py`, `test_api_contract.py` y `test_recurrence_migration.py` para triangular errores de límites de semana, retries, fallos simulados de inserción, reanclaje no confirmado, borrado repetido, coexistencia, calendario compartido y recetas históricas; verificar con `pytest` y después `make test-backend`. <!-- sdd-owner: implementation -->
+- [x] Ejecutar y ajustar únicamente las pruebas backend necesarias en `backend/tests/meal_calendar/test_time_text.py`, `test_calendar_repository.py`, `test_api_contract.py` y `test_recurrence_migration.py` para triangular errores de límites de semana, retries, fallos simulados de inserción, reanclaje no confirmado, borrado repetido, coexistencia, calendario compartido y recetas históricas; verificar con `pytest` y después `make test-backend`. <!-- sdd-owner: implementation -->
 
 **Aceptación/evidencia:** queda demostrada la matriz de escenarios de `spec.md`, incluida la conservación de datos ante conversión fallida, sin ampliar el alcance. **Rollback:** revertir solo correcciones de pruebas o adaptadores introducidas durante esta triangulación.
 

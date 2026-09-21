@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 import sys
 from uuid import UUID
@@ -244,3 +244,13 @@ def test_occurrence_in_week_handles_all_intervals_month_year_crossings_and_futur
         )
         for interval in range(1, 5)
     ] == [datetime(2026, 2, 2).date(), datetime(2026, 2, 2).date(), None, datetime(2026, 2, 2).date()]
+
+
+def test_occurrence_in_week_rejects_non_inclusive_monday_to_sunday_ranges() -> None:
+    monday = date(2026, 9, 14)
+    rule = _rule(initial_date="2026-09-16", interval_weeks=1)
+
+    with pytest.raises(MealCalendarValidationError, match="Monday"):
+        occurrence_in_week(rule, date(2026, 9, 15), date(2026, 9, 21))
+    with pytest.raises(MealCalendarValidationError, match="Sunday"):
+        occurrence_in_week(rule, monday, date(2026, 9, 19))

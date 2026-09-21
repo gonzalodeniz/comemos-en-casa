@@ -166,3 +166,29 @@ Return `sdd-verify` for parent review of this bounded slice. The next apply slic
 - `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=backend/src .venv/bin/pytest -q backend/tests/meal_calendar/test_calendar_repository.py backend/tests/meal_calendar/test_recurrence_migration.py backend/tests/meal_calendar/test_time_text.py` — `22 passed`.
 - `.venv/bin/python -m compileall -q backend/src/comemos_en_casa/meal_calendar/api.py backend/tests/meal_calendar/test_api_contract.py` — passed.
 - `git diff --check` — passed.
+
+## Slice 5 — Task 7 TRIANGULATE progress
+
+- [x] Task 7: triangulated the completed Tasks 1–6 backend recurrence contract and checked the persisted Task 7 checkbox in `tasks.md`.
+- Strengthened only the allowed recurrence tests and the stateful API test adapter. Added explicit invalid week-range coverage, inclusive boundary read coverage, stable occurrence identity across repeated weekly reads, rollback-preserving conversion failure coverage, post-decline reanchor state assertions, repeated-delete state assertions, unavailable legacy recipe presentation, and shared-calendar migration enforcement.
+- The simulated conversion failure mutates the fake repository before raising; the transaction adapter now snapshots and restores assignments/rules on exception, proving the original assignment survives and no partial rule remains. No production behavior required a fix.
+- Files changed in this triangulation: `backend/tests/meal_calendar/test_time_text.py`, `backend/tests/meal_calendar/test_calendar_repository.py`, `backend/tests/meal_calendar/test_api_contract.py`, `backend/tests/meal_calendar/test_recurrence_migration.py`, `openspec/changes/repetir-comidas-calendario/tasks.md`, `openspec/changes/repetir-comidas-calendario/apply-progress.md`, and `openspec/changes/repetir-comidas-calendario/verify-report.md`.
+
+### TDD Cycle Evidence — Task 7 TRIANGULATE
+
+| Task | Test files | Layer | Safety net | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|---|---|---|
+| 7. Backend recurrence triangulation | `test_time_text.py`, `test_calendar_repository.py`, `test_api_contract.py`, `test_recurrence_migration.py` | Unit, repository adapter, FastAPI contract, PostgreSQL migration integration | Focused baseline `32 passed`; backend baseline `117 passed` | Added new boundary, rollback, unavailable-recipe, and state-preservation assertions; initial run exposed one missing import, response omission semantics, and the intentionally incomplete rollback adapter | Focused suite `36 passed`; `make test-backend` `121 passed`, 2 warnings | Covered week boundary rejection and inclusion/exclusion, retries and stable IDs, simulated insert failure atomicity, unconfirmed reanchor, repeated delete, coexistence, shared calendar FK, and legacy unavailable recipe history | Test-only adapter snapshot/restore generalizes transaction failure simulation without changing application code; focused suite remained `36 passed` |
+
+### Verification commands — Task 7
+
+- `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=backend/src .venv/bin/pytest -q backend/tests/meal_calendar/test_time_text.py backend/tests/meal_calendar/test_calendar_repository.py backend/tests/meal_calendar/test_api_contract.py backend/tests/meal_calendar/test_recurrence_migration.py` — `36 passed, 2 warnings`.
+- `make test-backend` — `121 passed, 2 warnings`.
+- `git diff --check` — passed.
+
+### Deviations and remaining tasks
+
+- No production files were changed; no proven recurrence defect was found during triangulation.
+- Workload / PR boundary: Task 7 remains the bounded backend triangulation slice in the accepted stacked-to-main delivery path; no frontend or unrelated backend scope was added. The authored change remains within the user-approved size exception for this backend slice.
+- Structured status consumed: native `ready`, `nextRecommended: apply`, authoritative OpenSpec store, repo-local workspace `/opt/apps/comemos-en-casa`, allowed edit root `/opt/apps/comemos-en-casa`, and no action-context warnings or blockers. The workload decision was resolved by the parent as a backend slice with accepted size exception.
+- Remaining exact unchecked implementation tasks are Task 8 RED, Task 9 GREEN, Task 10 GREEN, Task 11 TRIANGULATE, and Task 12 REFACTOR in `tasks.md`; Task 7 is visibly checked there before return.

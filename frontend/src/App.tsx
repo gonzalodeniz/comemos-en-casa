@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useReducer, useState } from "react";
+import { FormEvent, useEffect, useReducer, useRef, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   addRecipeToCollection,
@@ -169,27 +169,71 @@ function CalendarDayHeader({ day }: { day: string }) {
   return <><span className="calendar-day-name">{weekday}</span><span className="calendar-day-number">{dayNumber}</span></>;
 }
 
-function AssignmentCard({ assignment, deleting, onEdit, onDelete }: { assignment: CalendarAssignment; deleting: boolean; onEdit: () => void; onDelete: () => void }) {
+function AssignmentCard({ assignment, deleting, onEdit }: { assignment: CalendarAssignment; deleting: boolean; onEdit: () => void }) {
   const title = assignment.kind === "recipe" ? assignment.recipe?.title : assignment.text;
   const imageUrl = assignment.kind === "recipe" ? assignment.recipe?.coverImageUrl : null;
   const recipeId = assignment.kind === "recipe" && assignment.recipe?.available ? assignment.recipe.id : null;
   const accessibleTitle = title ?? "Comida no disponible";
   const slotLabel = assignment.slot === "lunch" ? "comida" : "cena";
   const assignmentLabel = `${accessibleTitle}, ${slotLabel} del ${dayLabel(assignment.date)}`;
+  const editLabel = `Editar ${accessibleTitle}`;
   return (
     <article className="assignment-card" aria-label={assignmentLabel}>
-      {imageUrl
-        ? <img className="assignment-image" src={imageUrl} alt={`Portada de ${accessibleTitle}`} />
-        : <span className="assignment-image-placeholder" aria-hidden="true">🍲</span>}
-      <h3>{accessibleTitle}</h3>
+      <button type="button" className="assignment-card-open" onClick={onEdit} disabled={deleting} aria-label={editLabel}>
+        {imageUrl
+          ? <img className="assignment-image" src={imageUrl} alt={`Portada de ${accessibleTitle}`} />
+          : <span className="assignment-image-placeholder" aria-hidden="true">🍲</span>}
+      </button>
+      <h3><button type="button" className="assignment-card-title" onClick={onEdit} disabled={deleting}>{accessibleTitle}</button></h3>
       {assignment.kind === "recipe" && !assignment.recipe?.available ? <small>Receta no disponible</small> : null}
       <div className="assignment-actions">
         {recipeId ? <Link to={`/recetas/${recipeId}`}>Ver receta</Link> : null}
-        <button type="button" className="text-button" onClick={onEdit} disabled={deleting} aria-label={`Editar ${accessibleTitle}`}>Editar</button>
-        <button type="button" className="danger-button" onClick={onDelete} disabled={deleting} aria-label={`${deleting ? "Eliminando" : "Eliminar"} ${accessibleTitle}`}>{deleting ? "Eliminando…" : "Eliminar"}</button>
       </div>
     </article>
   );
+}
+
+function AssignmentModal({ heading, children, onClose, closeDisabled = false }: { heading: string; children: React.ReactNode; onClose: () => void; closeDisabled?: boolean }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const previousActiveElement = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeButtonRef.current?.focus();
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      previousActiveElement?.focus();
+    };
+  }, []);
+  function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape" && !closeDisabled) {
+      event.preventDefault();
+      onClose();
+      return;
+    }
+    if (event.key !== "Tab" || !dialogRef.current) return;
+    const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href]"));
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+  return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !closeDisabled) onClose(); }}>
+    <div ref={dialogRef} className="assignment-modal" role="dialog" aria-modal="true" aria-labelledby="assignment-dialog-title" tabIndex={-1} onKeyDown={handleKeyDown}>
+      <div className="assignment-modal-heading">
+        <h2 id="assignment-dialog-title">{heading}</h2>
+        <button ref={closeButtonRef} type="button" className="assignment-modal-close" onClick={onClose} disabled={closeDisabled} aria-label="Cerrar">×</button>
+      </div>
+      {children}
+    </div>
+  </div>;
 }
 
 function RecipeCard({ recipe, action }: { recipe: RecipeSummary; action?: React.ReactNode }) {
@@ -475,6 +519,7 @@ function CalendarPage() {
   const navigate = useNavigate();
   const [state, dispatch] = useReducer(calendarReducer, initialCalendarState);
   const [reloadVersion, setReloadVersion] = useState(0);
+  const [assignmentModal, setAssignmentModal] = useState<{ type: "edit"; assignment: CalendarAssignment } | null>(null);
   const isMobile = useMediaQuery("(max-width: 760px)");
   const activeWeekStart = weekStartFromPath ?? state.context.data?.currentWeekStart;
   useEffect(() => { const controller = new AbortController(); dispatch({ type: "context/loading" }); getCalendarContext(controller.signal).then((context) => dispatch({ type: "context/success", payload: context })).catch((error: unknown) => { if (!(error instanceof DOMException && error.name === "AbortError")) dispatch({ type: "context/error", payload: errorMessage(error) }); }); return () => controller.abort(); }, [reloadVersion]);
@@ -491,17 +536,40 @@ function CalendarPage() {
     if (editor.kind === "recipe") { if (!state.selectedRecipe) { dispatch({ type: "mutation/error", payload: "Elige una receta pública antes de guardar." }); return; } payload = { date: editor.date, slot: editor.slot, kind: "recipe", recipeId: state.selectedRecipe.id }; }
     else { const text = normalizeFreeText(editor.freeText); if (!text) { dispatch({ type: "mutation/error", payload: "Escribe una descripción para la comida." }); return; } dispatch({ type: "editor/freeTextChanged", payload: text }); payload = { date: editor.date, slot: editor.slot, kind: "free_text", text }; }
     const assignmentId = editor.assignmentId; const isEditing = assignmentId !== null; dispatch({ type: "mutation/loading", payload: { type: isEditing ? "update" : "create", assignmentId } });
-    try { const assignment = assignmentId ? await updateAssignment(assignmentId, payload) : await createAssignment({ ...payload, id: generateAssignmentId() }); dispatch({ type: "week/assignmentSaved", payload: assignment }); dispatch({ type: "mutation/success", payload: isEditing ? "La comida se actualizó." : "La comida se guardó." }); dispatch({ type: "editor/close" }); } catch (error) { dispatch({ type: "mutation/error", payload: errorMessage(error) }); }
+    try { const assignment = assignmentId ? await updateAssignment(assignmentId, payload) : await createAssignment({ ...payload, id: generateAssignmentId() }); dispatch({ type: "week/assignmentSaved", payload: assignment }); dispatch({ type: "mutation/success", payload: isEditing ? "La comida se actualizó." : "La comida se guardó." }); dispatch({ type: "editor/close" }); if (isEditing) setAssignmentModal(null); } catch (error) { dispatch({ type: "mutation/error", payload: errorMessage(error) }); }
   }
-  async function removeAssignment(assignment: CalendarAssignment) { if (state.mutation.status === "loading") return; const title = assignment.kind === "recipe" ? assignment.recipe?.title : assignment.text ?? "esta comida"; if (!window.confirm(`¿Eliminar ${title}?`)) return; dispatch({ type: "mutation/loading", payload: { type: "delete", assignmentId: assignment.id } }); try { await deleteAssignment(assignment.id); dispatch({ type: "week/assignmentDeleted", payload: assignment.id }); dispatch({ type: "mutation/success", payload: "La comida se eliminó." }); if (state.editor?.assignmentId === assignment.id) dispatch({ type: "editor/close" }); } catch (error) { dispatch({ type: "mutation/error", payload: errorMessage(error) }); } }
+  async function removeAssignment(assignment: CalendarAssignment) {
+    const title = assignment.kind === "recipe" ? assignment.recipe?.title : assignment.text ?? "esta comida";
+    if (state.mutation.status === "loading" || !window.confirm(`¿Eliminar ${title}?`)) return;
+    dispatch({ type: "mutation/loading", payload: { type: "delete", assignmentId: assignment.id } });
+    try {
+      await deleteAssignment(assignment.id);
+      dispatch({ type: "week/assignmentDeleted", payload: assignment.id });
+      dispatch({ type: "mutation/success", payload: "La comida se eliminó." });
+      setAssignmentModal(null);
+      if (state.editor?.assignmentId === assignment.id) dispatch({ type: "editor/close" });
+    } catch (error) { dispatch({ type: "mutation/error", payload: errorMessage(error) }); }
+  }
+  function openEditAssignment(assignment: CalendarAssignment) {
+    dispatch({ type: "editor/openEdit", payload: assignment });
+    setAssignmentModal({ type: "edit", assignment });
+  }
+  function closeAssignmentModal() {
+    if (state.mutation.status === "loading") return;
+    if (assignmentModal?.type === "edit") dispatch({ type: "editor/close" });
+    setAssignmentModal(null);
+  }
   const assignments = state.week.data?.assignments ?? []; const days = activeWeekStart ? weekDays(activeWeekStart) : []; const editor = state.editor; const isSaving = state.mutation.status === "loading" && (state.mutation.type === "create" || state.mutation.type === "update");
+  const isDeleting = state.mutation.status === "loading" && state.mutation.type === "delete";
+  const editingAssignment = editor?.assignmentId ? assignments.find((assignment) => assignment.id === editor.assignmentId) : null;
+  const assignmentEditor = editor ? <form className="assignment-editor" onSubmit={saveAssignment} aria-labelledby="assignment-editor-title"><div><p className="eyebrow">{editor.assignmentId ? "Editar comida" : "Nueva comida"}</p><h3 id="assignment-editor-title">{dayLabel(editor.date)} · {editor.slot === "lunch" ? "Comida" : "Cena"}</h3></div>{!editor.assignmentId ? <fieldset className="assignment-kind"><legend>Tipo de comida</legend><label><input type="radio" checked={editor.kind === "recipe"} onChange={() => dispatch({ type: "editor/kindChanged", payload: "recipe" })} />Receta pública</label><label><input type="radio" checked={editor.kind === "free_text"} onChange={() => dispatch({ type: "editor/kindChanged", payload: "free_text" })} />Texto libre</label></fieldset> : null}{editor.kind === "recipe" ? <div className="recipe-choice"><p>{state.selectedRecipe ? <>Receta seleccionada: <strong>{state.selectedRecipe.title}</strong></> : "Busca y elige una receta pública."}</p><p className="field-hint">Puedes elegir otra receta desde los resultados de abajo.</p></div> : <label className="free-text-field" htmlFor="meal-text">Descripción de la comida<input id="meal-text" value={editor.freeText} onChange={(event) => dispatch({ type: "editor/freeTextChanged", payload: event.target.value })} onBlur={(event) => dispatch({ type: "editor/freeTextChanged", payload: normalizeFreeText(event.target.value) })} placeholder="Por ejemplo, crema de verduras" /></label>}<div className="editor-actions"><button type="submit" disabled={isSaving || isDeleting}>{isSaving ? "Guardando…" : editor.assignmentId ? "Guardar cambios" : "Guardar comida"}</button>{editingAssignment ? <button type="button" className="danger-button" onClick={() => void removeAssignment(editingAssignment)} disabled={isSaving || isDeleting}>{isDeleting ? "Eliminando…" : "Eliminar"}</button> : null}<button type="button" className="secondary-button" onClick={editor.assignmentId ? closeAssignmentModal : () => dispatch({ type: "editor/close" })} disabled={isSaving || isDeleting}>Cancelar</button></div></form> : null;
   const calendarCellContent = (day: string, slot: MealSlot, label: string) => {
     const cellAssignments = assignments.filter((assignment) => assignment.date === day && assignment.slot === slot);
     const dayDescription = dayLabel(day);
     const slotLabel = label.toLowerCase();
     const addActionText = `Añadir ${slotLabel}`;
 
-    return <>{cellAssignments.length ? cellAssignments.map((assignment) => <AssignmentCard key={assignment.id} assignment={assignment} deleting={state.mutation.status === "loading" && state.mutation.type === "delete" && state.mutation.assignmentId === assignment.id} onEdit={() => dispatch({ type: "editor/openEdit", payload: assignment })} onDelete={() => void removeAssignment(assignment)} />) : <span className="empty-cell">Sin plan</span>}<button type="button" className="add-assignment" onClick={() => dispatch({ type: "editor/openCreate", payload: { date: day, slot } })} aria-label={`${addActionText} el ${dayDescription}`}>+ {addActionText}</button></>;
+    return <>{cellAssignments.length ? cellAssignments.map((assignment) => <AssignmentCard key={assignment.id} assignment={assignment} deleting={state.mutation.status === "loading" && state.mutation.type === "delete" && state.mutation.assignmentId === assignment.id} onEdit={() => openEditAssignment(assignment)} />) : <span className="empty-cell">Sin plan</span>}<button type="button" className="add-assignment" onClick={() => dispatch({ type: "editor/openCreate", payload: { date: day, slot } })} aria-label={`${addActionText} el ${dayDescription}`}>+ {addActionText}</button></>;
   };
   return <main className="app-shell calendar-workspace">
     <div className="calendar-frame"><CalendarSidebar /><div className="calendar-content">
@@ -521,8 +589,9 @@ function CalendarPage() {
           <tbody>{mealRows.map(({ slot, label, icon }) => <tr key={slot}><th id={`calendar-slot-${slot}`} scope="row"><span aria-hidden="true">{icon}</span> {label}</th>{days.map((day) => <td className={editor?.date === day && editor.slot === slot ? "selected-calendar-cell" : undefined} headers={`calendar-slot-${slot} calendar-day-${day}`} key={`${day}-${slot}`}>{calendarCellContent(day, slot, label)}</td>)}</tr>)}</tbody>
         </table>
       </div></> : null}
-      {state.mutation.status === "success" ? <p className="notice success-notice" role="status">{state.mutation.message}</p> : null}{state.mutation.status === "error" ? <p className="notice error-notice" role="alert">{state.mutation.message}</p> : null}
-      {editor ? <form className="assignment-editor" onSubmit={saveAssignment} aria-labelledby="assignment-editor-title"><div><p className="eyebrow">{editor.assignmentId ? "Editar comida" : "Nueva comida"}</p><h3 id="assignment-editor-title">{dayLabel(editor.date)} · {editor.slot === "lunch" ? "Comida" : "Cena"}</h3></div>{!editor.assignmentId ? <fieldset className="assignment-kind"><legend>Tipo de comida</legend><label><input type="radio" checked={editor.kind === "recipe"} onChange={() => dispatch({ type: "editor/kindChanged", payload: "recipe" })} />Receta pública</label><label><input type="radio" checked={editor.kind === "free_text"} onChange={() => dispatch({ type: "editor/kindChanged", payload: "free_text" })} />Texto libre</label></fieldset> : null}{editor.kind === "recipe" ? <div className="recipe-choice"><p>{state.selectedRecipe ? <>Receta seleccionada: <strong>{state.selectedRecipe.title}</strong></> : "Busca y elige una receta pública."}</p><p className="field-hint">Puedes elegir otra receta desde los resultados de abajo.</p></div> : <label className="free-text-field" htmlFor="meal-text">Descripción de la comida<input id="meal-text" value={editor.freeText} onChange={(event) => dispatch({ type: "editor/freeTextChanged", payload: event.target.value })} onBlur={(event) => dispatch({ type: "editor/freeTextChanged", payload: normalizeFreeText(event.target.value) })} placeholder="Por ejemplo, crema de verduras" /></label>}<div className="editor-actions"><button type="submit" disabled={isSaving}>{isSaving ? "Guardando…" : editor.assignmentId ? "Guardar cambios" : "Guardar comida"}</button><button type="button" className="secondary-button" onClick={() => dispatch({ type: "editor/close" })} disabled={isSaving}>Cancelar</button></div></form> : null}
+      {state.mutation.status === "success" ? <p className="notice success-notice" role="status">{state.mutation.message}</p> : null}{state.mutation.status === "error" && !assignmentModal ? <p className="notice error-notice" role="alert">{state.mutation.message}</p> : null}
+      {editor && !editor.assignmentId ? assignmentEditor : null}
+      {assignmentModal?.type === "edit" && editor?.assignmentId ? <AssignmentModal heading="Editar comida" onClose={closeAssignmentModal} closeDisabled={isSaving || isDeleting}>{state.mutation.status === "error" ? <p className="notice error-notice" role="alert">{state.mutation.message}</p> : null}{assignmentEditor}</AssignmentModal> : null}
     </section>
     <footer className="calendar-planning-footer"><span aria-hidden="true">🌿</span><p>“La planificación de hoy es el sabor de un mañana más tranquilo.”</p><strong>Planifica · Cocina · Disfruta. <span aria-hidden="true">❤️</span></strong></footer>
     </div></div>

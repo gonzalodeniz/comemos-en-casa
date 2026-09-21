@@ -224,7 +224,42 @@ test("creates a free-text meal when crypto.randomUUID is unavailable", async () 
   expect(screen.queryByRole("alert")).toBeNull();
 });
 
-test("keeps existing card edit and delete actions reachable", async () => {
+test("opens edit directly from a meal name, image, and placeholder without an action menu", async () => {
+  const assignments: CalendarAssignment[] = [
+    {
+      id: "recipe-assignment",
+      date: "2026-09-14",
+      slot: "lunch",
+      kind: "recipe",
+      recipe: { id: "recipe-1", available: true, title: "Arroz al horno", coverImageUrl: "https://example.test/arroz.jpg" },
+    },
+    {
+      id: "free-text-assignment",
+      date: "2026-09-14",
+      slot: "dinner",
+      kind: "free_text",
+      text: "Guiso de verduras",
+    },
+  ];
+  mockCalendar("2026-09-14", assignments);
+
+  render(<MemoryRouter initialEntries={["/"]}><App /></MemoryRouter>);
+
+  await screen.findByRole("article", { name: /Arroz al horno, comida del lun, 14 sept/ });
+  expect(screen.queryByRole("button", { name: /Más acciones/ })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Arroz al horno" }));
+  expect(await screen.findByRole("dialog", { name: "Editar comida" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Cerrar" }));
+
+  fireEvent.click(screen.getByRole("button", { name: "Editar Arroz al horno" }));
+  expect(await screen.findByRole("dialog", { name: "Editar comida" })).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Cerrar" }));
+
+  fireEvent.click(screen.getByRole("button", { name: "Editar Guiso de verduras" }));
+  expect(await screen.findByRole("dialog", { name: "Editar comida" })).toBeTruthy();
+});
+
+test("keeps the update contract when editing directly from a meal name", async () => {
   const assignment: CalendarAssignment = {
     id: "free-text-assignment",
     date: "2026-09-14",
@@ -234,23 +269,48 @@ test("keeps existing card edit and delete actions reachable", async () => {
   };
   mockCalendar("2026-09-14", [assignment]);
   vi.mocked(updateAssignment).mockResolvedValue(assignment);
-  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
 
   render(<MemoryRouter initialEntries={["/"]}><App /></MemoryRouter>);
 
   await screen.findByRole("article", { name: /Guiso de verduras, cena del lun, 14 sept/ });
-  fireEvent.click(screen.getByRole("button", { name: "Editar Guiso de verduras" }));
-  expect(await screen.findByText("Editar comida")).toBeTruthy();
-  fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+  fireEvent.click(screen.getByRole("button", { name: "Guiso de verduras" }));
+  const dialog = await screen.findByRole("dialog", { name: "Editar comida" });
+  expect(within(dialog).getByLabelText("Descripción de la comida")).toBeTruthy();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Guardar cambios" }));
   await waitFor(() => expect(updateAssignment).toHaveBeenCalledWith("free-text-assignment", {
     date: "2026-09-14",
     slot: "dinner",
     kind: "free_text",
     text: "Guiso de verduras",
   }));
-  fireEvent.click(screen.getByRole("button", { name: "Eliminar Guiso de verduras" }));
+  expect(screen.queryByRole("dialog", { name: "Editar comida" })).toBeNull();
+});
+
+test("keeps delete confirmation and contract from the edit modal", async () => {
+  const assignment: CalendarAssignment = {
+    id: "free-text-assignment",
+    date: "2026-09-14",
+    slot: "dinner",
+    kind: "free_text",
+    text: "Guiso de verduras",
+  };
+  mockCalendar("2026-09-14", [assignment]);
+  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+
+  render(<MemoryRouter initialEntries={["/"]}><App /></MemoryRouter>);
+
+  await screen.findByRole("article", { name: /Guiso de verduras, cena del lun, 14 sept/ });
+  fireEvent.click(screen.getByRole("button", { name: "Guiso de verduras" }));
+  const dialog = await screen.findByRole("dialog", { name: "Editar comida" });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Eliminar" }));
+  expect(confirmSpy).toHaveBeenCalledWith("¿Eliminar Guiso de verduras?");
+  expect(deleteAssignment).not.toHaveBeenCalled();
+  expect(screen.getByRole("dialog", { name: "Editar comida" })).toBeTruthy();
+
+  confirmSpy.mockReturnValue(true);
+  fireEvent.click(within(screen.getByRole("dialog", { name: "Editar comida" })).getByRole("button", { name: "Eliminar" }));
   await waitFor(() => expect(deleteAssignment).toHaveBeenCalledWith("free-text-assignment"));
-  expect(confirmSpy).toHaveBeenCalledOnce();
+  expect(screen.getByRole("status").textContent).toContain("La comida se eliminó.");
 });
 
 test("marks the calendar region as busy while the weekly data is loading", async () => {

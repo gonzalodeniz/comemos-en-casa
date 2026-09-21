@@ -102,6 +102,7 @@ def test_calendar_context_and_week_reads_use_no_store_and_public_recipe_presenta
         "assignments": [
             {
                 "id": "00000000-0000-0000-0000-000000000201",
+                "entryType": "assignment",
                 "date": "2025-06-02",
                 "slot": "lunch",
                 "kind": "free_text",
@@ -109,6 +110,7 @@ def test_calendar_context_and_week_reads_use_no_store_and_public_recipe_presenta
             },
             {
                 "id": str(ASSIGNMENT_ID),
+                "entryType": "assignment",
                 "date": "2025-06-02",
                 "slot": "lunch",
                 "kind": "recipe",
@@ -207,3 +209,162 @@ def test_assignment_create_is_idempotent_for_the_same_uuid_and_payload(
     assert repeated.json() == created.json()
     assert conflict.status_code == 409
     assert conflict.json()["error"]["code"] == "idempotency_conflict"
+
+
+def test_series_create_retry_is_idempotent_and_conflicting_payload_is_rejected(client: TestClient) -> None:
+    series_id = UUID("00000000-0000-0000-0000-000000000300")
+    payload = {
+        "id": str(series_id),
+        "date": "2025-06-02",
+        "slot": "lunch",
+        "kind": "free_text",
+        "text": "  Sopa  ",
+        "recurrenceWeeks": 1,
+    }
+
+    created = client.post("/api/v1/meal-calendar/assignments", json=payload)
+    repeated = client.post("/api/v1/meal-calendar/assignments", json=payload)
+    conflict = client.post(
+        "/api/v1/meal-calendar/assignments", json={**payload, "text": "Ensalada"}
+    )
+
+    expected = {
+        "id": f"series:{series_id}:2025-06-02",
+        "entryType": "recurring_occurrence",
+        "date": "2025-06-02",
+        "slot": "lunch",
+        "kind": "free_text",
+        "text": "Sopa",
+        "seriesId": str(series_id),
+        "occurrenceDate": "2025-06-02",
+        "initialDate": "2025-06-02",
+        "recurrenceWeeks": 1,
+    }
+    assert created.status_code == 201
+    assert created.json() == expected
+    assert repeated.status_code == 200
+    assert repeated.json() == expected
+    assert conflict.status_code == 409
+    assert conflict.json()["error"]["code"] == "idempotency_conflict"
+
+
+def test_ordinary_free_text_conversion_is_atomic_and_returns_one_series_occurrence(
+    client: TestClient,
+) -> None:
+    assignment_id = UUID("00000000-0000-0000-0000-000000000301")
+
+    response = client.patch(
+        f"/api/v1/meal-calendar/assignments/{assignment_id}",
+        json={
+            "date": "2025-06-02",
+            "slot": "lunch",
+            "kind": "free_text",
+            "text": "Sopa",
+            "recurrenceWeeks": 2,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["entryType"] == "recurring_occurrence"
+    assert response.json()["seriesId"] == str(assignment_id)
+    assert response.json()["id"] == f"series:{assignment_id}:2025-06-02"
+
+
+def test_series_patch_requires_anchor_confirmation_and_keeps_slot_immutable(client: TestClient) -> None:
+    series_id = UUID("00000000-0000-0000-0000-000000000302")
+    path = f"/api/v1/meal-calendar/series/{series_id}"
+    body = {"initialDate": "2025-06-06", "text": "Crema", "recurrenceWeeks": 2}
+
+    unconfirmed = client.patch(path, json=body)
+    confirmed = client.patch(path, json={**body, "confirmAnchorChange": True})
+    slot_change = client.patch(path, json={**body, "slot": "dinner", "confirmAnchorChange": True})
+
+    assert unconfirmed.status_code == 422
+    assert confirmed.status_code == 200
+    assert confirmed.json() == {
+        "seriesId": str(series_id),
+        "initialDate": "2025-06-06",
+        "slot": "lunch",
+        "text": "Crema",
+        "recurrenceWeeks": 2,
+    }
+    assert slot_change.status_code == 422
+    assert slot_change.json()["error"]["code"] == "validation_failed"
+
+
+def test_series_delete_requires_confirmation_is_destructive_and_idempotent(client: TestClient) -> None:
+    series_id = UUID("00000000-0000-0000-0000-000000000303")
+    path = f"/api/v1/meal-calendar/series/{series_id}"
+
+    missing_confirmation = client.delete(path)
+    declined = client.delete(path, params={"confirmed": "false"})
+    deleted = client.delete(path, params={"confirmed": "true"})
+    repeated = client.delete(path, params={"confirmed": "true"})
+
+    assert missing_confirmation.status_code == 422
+    assert declined.status_code == 422
+    assert deleted.status_code == 204
+    assert repeated.status_code == 204
+
+
+def test_invalid_recurrence_requests_are_non_mutating_and_no_repeat_is_not_a_patch_mode(
+    client: TestClient,
+) -> None:
+    series_id = UUID("00000000-0000-0000-0000-000000000304")
+    invalid_payloads = [
+        {
+            "id": str(series_id),
+            "date": "2025-06-02",
+            "slot": "lunch",
+            "kind": "recipe",
+            "recipeId": str(RECIPE_ID),
+            "recurrenceWeeks": 1,
+        },
+        {
+            "id": str(series_id),
+            "date": "2025-06-02",
+            "slot": "lunch",
+            "kind": "free_text",
+            "text": "Sopa",
+            "recurrenceWeeks": 5,
+        },
+        {
+            "id": str(series_id),
+            "date": "2025-06-02",
+            "slot": "lunch",
+            "kind": "free_text",
+            "text": "   ",
+            "recurrenceWeeks": 1,
+        },
+    ]
+
+    before = client.get("/api/v1/meal-calendar/weeks/2025-06-02").json()
+    responses = [client.post("/api/v1/meal-calendar/assignments", json=payload) for payload in invalid_payloads]
+    occurrence_only = client.patch(
+        "/api/v1/meal-calendar/assignments/series:00000000-0000-0000-0000-000000000304:2025-06-02",
+        json={"text": "Otra", "recurrenceWeeks": 1},
+    )
+    no_repeat_patch = client.patch(
+        f"/api/v1/meal-calendar/series/{series_id}",
+        json={"initialDate": "2025-06-02", "text": "Sopa", "recurrenceWeeks": 0},
+    )
+
+    after = client.get("/api/v1/meal-calendar/weeks/2025-06-02").json()
+
+    assert [response.status_code for response in responses] == [422, 422, 422]
+    assert occurrence_only.status_code in {404, 422}
+    assert no_repeat_patch.status_code == 422
+    assert after == before
+
+
+def test_legacy_recipe_response_remains_distinct_from_recurring_free_text(client: TestClient) -> None:
+    response = client.get("/api/v1/meal-calendar/weeks/2025-06-02")
+
+    recipe = next(item for item in response.json()["assignments"] if item["kind"] == "recipe")
+    free_text = next(item for item in response.json()["assignments"] if item["kind"] == "free_text")
+
+    assert recipe["entryType"] == "assignment"
+    assert recipe["recipe"]["available"] is True
+    assert "seriesId" not in recipe
+    assert free_text["entryType"] == "assignment"
+    assert "recipe" not in free_text

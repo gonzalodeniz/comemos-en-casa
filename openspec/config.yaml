@@ -1,0 +1,65 @@
+strict_tdd: true
+context: |
+  comemos-en-casa-frontend is a Node.js/TypeScript ESM, React, Python project.
+  Detected markers: frontend/package.json, frontend/tsconfig.json, frontend/npm package manager, pyproject.toml, requirements.txt, Makefile.
+  Package managers: npm.
+  Additional evidence: Test-like files detected (53); examples: .venv/lib/python3.12/site-packages/certifi/tests/__init__.py, .venv/lib/python3.12/site-packages/certifi/tests/test_certify.py, .venv/lib/python3.12/site-packages/greenlet/tests/__init__.py, .venv/lib/python3.12/site-packages/greenlet/tests/_test_extension.c, .venv/lib/python3.12/site-packages/greenlet/tests/_test_extension.cpython-312-x86_64-linux-gnu.so.
+  Primary test command: make test.
+  Unit tests: Vitest (cd frontend && npm test); pytest (pytest); pytest via Makefile (make test).
+  Integration tests: Testing Library (cd frontend && npm test).
+  E2E tests: none.
+rules:
+  proposal:
+    require_problem_statement: true
+  spec:
+    require_acceptance_criteria: true
+  design:
+    require_tradeoffs: true
+  tasks:
+    protect_review_workload: true
+  apply:
+    test_command: "make test"
+  verify:
+    test_command: "make test"
+testing:
+  detected: "2026-09-20"
+  runner:
+    command: "make test"
+    framework: "pytest via Makefile"
+  layers:
+    unit: "Vitest, pytest, pytest via Makefile"
+    integration: "Testing Library"
+    e2e: ""
+  commands:
+    unit:
+      - scope: "frontend"
+        command: "cd frontend && npm test"
+        framework: "Vitest"
+      - scope: "."
+        command: "pytest"
+        framework: "pytest"
+      - scope: "."
+        command: "make test"
+        framework: "pytest via Makefile"
+    integration:
+      - scope: "frontend"
+        command: "cd frontend && npm test"
+        framework: "Testing Library"
+    e2e:
+      []
+  coverage:
+    command: ""
+    commands:
+      []
+quality:
+  lint: ""
+  lint_commands:
+    []
+  typecheck: "cd frontend && npm run typecheck"
+  typecheck_commands:
+    - scope: "frontend"
+      command: "cd frontend && npm run typecheck"
+      framework: "type checker"
+  format: ""
+  format_commands:
+    []

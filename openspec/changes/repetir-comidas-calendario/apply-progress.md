@@ -81,3 +81,13 @@ Persisted task checkboxes for tasks 1–3 were updated to `[x]` in `openspec/cha
 ## Next step
 
 Return `sdd-verify` for parent review of this bounded slice. The next apply slice should begin with repository/API RED work; do not implement it in this commit.
+
+## Approved correction: migration foundation allowlist
+
+- Scope: corrected only `backend/tests/test_alembic_foundation.py` so the historical SQL migration allowlist includes intentional `0007_meal_calendar_recurrence.sql`; the test still asserts that the SQL migrations are not rewritten as Alembic revisions.
+- No application code, migration SQL, unrelated tests, or task checkboxes were changed.
+- TDD evidence: RED focused foundation run failed with `1 failed, 2 passed` because 0007 was absent from the expectation; GREEN rerun passed with `3 passed`; TRIANGULATE `make test` passed with `108 passed, 2 warnings`, frontend typecheck passed, and frontend build passed.
+- Files changed in this correction: `backend/tests/test_alembic_foundation.py`, `openspec/changes/repetir-comidas-calendario/apply-progress.md`.
+- Structured status consumed: native `ready`, recommended action `apply`, OpenSpec artifact store, repo-local action context with workspace-root edit authority; no action-context warning or blocker.
+- Delivery boundary: small correction to the already-approved slice, kept within the user-provided allowlist; no new implementation task was completed, so persisted implementation task checkboxes remain unchanged.
+- The exact unchecked implementation task lines above remain the remaining work; the next implementation slice is still repository/API RED work.

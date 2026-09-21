@@ -52,7 +52,7 @@ La secuencia estricta es **RED → GREEN → TRIANGULATE → REFACTOR**. Las tar
 
 ### 5. GREEN: persistir reglas y leer semanas combinadas
 
-- [ ] Extender `backend/src/comemos_en_casa/meal_calendar/repository.py` con `find_rule_by_id`, inserción idempotente, actualización, borrado y listado de candidatas `calendar_key = "shared"`; modificar `list_week` para combinar asignaciones existentes (incluido `LEFT JOIN recipes`) con ocurrencias virtuales, derivar el identificador estable y aplicar un único orden determinista. Verificar con `backend/tests/meal_calendar/test_calendar_repository.py` y los tests de compatibilidad de `backend/tests/meal_calendar/test_api_contract.py`. <!-- sdd-owner: implementation -->
+- [x] Extender `backend/src/comemos_en_casa/meal_calendar/repository.py` con `find_rule_by_id`, inserción idempotente, actualización, borrado y listado de candidatas `calendar_key = "shared"`; modificar `list_week` para combinar asignaciones existentes (incluido `LEFT JOIN recipes`) con ocurrencias virtuales, derivar el identificador estable y aplicar un único orden determinista. Verificar con `backend/tests/meal_calendar/test_calendar_repository.py` y los tests de compatibilidad de `backend/tests/meal_calendar/test_api_contract.py`. <!-- sdd-owner: implementation -->
 
 **Aceptación/evidencia:** no se crean filas en `meal_assignments` para ocurrencias, varias entradas de igual fecha/franja permanecen separadas y las recetas no disponibles siguen siendo legibles. **Rollback:** revertir solo los métodos de reglas y la combinación de `list_week` en `repository.py`.
 

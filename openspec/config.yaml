@@ -1,4 +1,4 @@
-strict_tdd: true
+strict_tdd: false
 context: |
   comemos-en-casa-frontend is a Node.js/TypeScript ESM, React, Python project.
   Detected markers: frontend/package.json, frontend/tsconfig.json, frontend/npm package manager, pyproject.toml, requirements.txt, Makefile.

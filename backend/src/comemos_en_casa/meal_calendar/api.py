@@ -19,7 +19,7 @@ from comemos_en_casa.recipes.schemas import Recipe
 from .catalog_adapter import CatalogueCursorError, MealCalendarCatalogueAdapter
 from .rate_limit import RateLimitExceeded, consume_rate_limit
 from .repository import CalendarAssignment, MealCalendarRepository
-from .schemas import AssignmentDraft, MealCalendarValidationError
+from .schemas import AssignmentDraft, MealCalendarValidationError, RecurrenceRule, RecurrenceRuleDraft
 from .service import current_week_start, validate_week_start, week_dates
 from .settings import CANARY_TIMEZONE_NAME
 
@@ -52,12 +52,17 @@ class RecipeReferenceResponse(_ApiModel):
 
 
 class AssignmentResponse(_ApiModel):
-    id: UUID
+    id: UUID | str
+    entry_type: Literal["assignment", "recurring_occurrence"] = Field(serialization_alias="entryType")
     date: date
     slot: Literal["lunch", "dinner"]
     kind: Literal["recipe", "free_text"]
     recipe: RecipeReferenceResponse | None = None
     text: str | None = None
+    series_id: UUID | None = Field(default=None, serialization_alias="seriesId")
+    occurrence_date: date | None = Field(default=None, serialization_alias="occurrenceDate")
+    initial_date: date | None = Field(default=None, serialization_alias="initialDate")
+    recurrence_weeks: int | None = Field(default=None, serialization_alias="recurrenceWeeks")
 
 
 class ContextResponse(_ApiModel):
@@ -85,6 +90,12 @@ class AssignmentWriteRequest(_ApiModel):
     kind: Literal["recipe", "free_text"]
     recipe_id: UUID | None = Field(default=None, validation_alias=AliasChoices("recipeId", "recipe_id"))
     free_text: str | None = Field(default=None, validation_alias=AliasChoices("text", "freeText", "free_text"))
+    recurrence_weeks: int = Field(
+        default=0,
+        ge=0,
+        le=4,
+        validation_alias=AliasChoices("recurrenceWeeks", "recurrence_weeks"),
+    )
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
@@ -96,6 +107,45 @@ class AssignmentWriteRequest(_ApiModel):
             recipe_id=self.recipe_id,
             free_text=self.free_text,
         )
+
+    def to_recurrence_draft(self) -> RecurrenceRuleDraft:
+        return RecurrenceRuleDraft.create(
+            initial_date=self.meal_date,
+            slot=self.slot,
+            free_text=self.free_text or "",
+            interval_weeks=self.recurrence_weeks,
+            kind=self.kind,
+            recipe_id=self.recipe_id,
+        )
+
+
+class SeriesPatchRequest(_ApiModel):
+    initial_date: date = Field(validation_alias=AliasChoices("initialDate", "initial_date"))
+    text: str
+    recurrence_weeks: int = Field(
+        validation_alias=AliasChoices("recurrenceWeeks", "recurrence_weeks"),
+        ge=0,
+        le=4,
+    )
+    confirm_anchor_change: bool = Field(default=False, validation_alias=AliasChoices("confirmAnchorChange", "confirm_anchor_change"))
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    def to_draft(self, *, slot: str) -> RecurrenceRuleDraft:
+        return RecurrenceRuleDraft.create(
+            initial_date=self.initial_date,
+            slot=slot,
+            free_text=self.text,
+            interval_weeks=self.recurrence_weeks,
+        )
+
+
+class SeriesResponse(_ApiModel):
+    series_id: UUID = Field(serialization_alias="seriesId")
+    initial_date: date = Field(serialization_alias="initialDate")
+    slot: Literal["lunch", "dinner"]
+    text: str
+    recurrence_weeks: int = Field(serialization_alias="recurrenceWeeks")
 
 
 def _error_response(
@@ -130,9 +180,24 @@ def _validation_response(error: Exception, *, field: str | None = None) -> JSONR
 
 
 def _assignment_response(assignment: CalendarAssignment) -> AssignmentResponse:
+    if assignment.entry_type == "recurring_occurrence":
+        return AssignmentResponse(
+            id=assignment.id,
+            entry_type="recurring_occurrence",
+            date=assignment.meal_date,
+            slot=assignment.slot,
+            kind="free_text",
+            text=assignment.free_text,
+            series_id=assignment.series_id,
+            occurrence_date=assignment.occurrence_date,
+            initial_date=assignment.initial_date,
+            recurrence_weeks=assignment.recurrence_weeks,
+        )
+
     if assignment.kind == "free_text":
         return AssignmentResponse(
             id=assignment.id,
+            entry_type="assignment",
             date=assignment.meal_date,
             slot=assignment.slot,
             kind="free_text",
@@ -142,6 +207,7 @@ def _assignment_response(assignment: CalendarAssignment) -> AssignmentResponse:
     available = assignment.recipe_id is not None and assignment.recipe_title is not None
     return AssignmentResponse(
         id=assignment.id,
+        entry_type="assignment",
         date=assignment.meal_date,
         slot=assignment.slot,
         kind="recipe",
@@ -151,6 +217,22 @@ def _assignment_response(assignment: CalendarAssignment) -> AssignmentResponse:
             title=assignment.recipe_title if available else "Receta no disponible",
             cover_image_url=assignment.recipe_image_url if available else None,
         ),
+    )
+
+
+def _occurrence_response(rule: RecurrenceRule) -> AssignmentResponse:
+    occurrence_date = rule.initial_date
+    return AssignmentResponse(
+        id=f"series:{rule.series_id}:{occurrence_date.isoformat()}",
+        entry_type="recurring_occurrence",
+        date=occurrence_date,
+        slot=rule.slot,
+        kind="free_text",
+        text=rule.free_text,
+        series_id=rule.series_id,
+        occurrence_date=occurrence_date,
+        initial_date=rule.initial_date,
+        recurrence_weeks=rule.interval_weeks,
     )
 
 
@@ -312,12 +394,57 @@ def register_routes(application: FastAPI) -> None:
     ) -> AssignmentResponse | JSONResponse:
         if request.id is None:
             return _validation_response(ValueError("id is required"), field="id")
+
+        repository = MealCalendarRepository(connection)
+        if request.recurrence_weeks:
+            try:
+                recurrence = request.to_recurrence_draft()
+            except MealCalendarValidationError as error:
+                return _validation_response(error)
+
+            existing_rule = repository.find_rule_by_id(request.id)
+            if existing_rule is not None:
+                if (
+                    existing_rule.initial_date == recurrence.initial_date
+                    and existing_rule.slot == recurrence.slot
+                    and existing_rule.free_text == recurrence.free_text
+                    and existing_rule.interval_weeks == recurrence.interval_weeks
+                ):
+                    response = _occurrence_response(existing_rule)
+                    return JSONResponse(
+                        status_code=200,
+                        headers={"Cache-Control": "no-store"},
+                        content=response.model_dump(mode="json", by_alias=True, exclude_none=True),
+                    )
+                return _error_response(409, "idempotency_conflict", "Series id is already used with a different payload")
+            if repository.find_by_id(request.id) is not None:
+                return _error_response(409, "idempotency_conflict", "Series id is already used with a different payload")
+
+            with connection.transaction():
+                if not repository.insert_rule(request.id, recurrence):
+                    existing_rule = repository.find_rule_by_id(request.id)
+                    if existing_rule is not None and (
+                        existing_rule.initial_date == recurrence.initial_date
+                        and existing_rule.slot == recurrence.slot
+                        and existing_rule.free_text == recurrence.free_text
+                        and existing_rule.interval_weeks == recurrence.interval_weeks
+                    ):
+                        response = _occurrence_response(existing_rule)
+                        return JSONResponse(
+                            status_code=200,
+                            headers={"Cache-Control": "no-store"},
+                            content=response.model_dump(mode="json", by_alias=True, exclude_none=True),
+                        )
+                    return _error_response(409, "idempotency_conflict", "Series id is already used with a different payload")
+                created_rule = repository.find_rule_by_id(request.id)
+            assert created_rule is not None
+            return _occurrence_response(created_rule)
+
         try:
             draft = request.to_draft()
         except MealCalendarValidationError as error:
             return _validation_response(error)
 
-        repository = MealCalendarRepository(connection)
         existing = repository.find_by_id(request.id)
         if existing is not None:
             if existing.matches(draft):
@@ -346,12 +473,32 @@ def register_routes(application: FastAPI) -> None:
         request: AssignmentWriteRequest,
         connection: Any = Depends(get_connection),
     ) -> AssignmentResponse | JSONResponse:
+        repository = MealCalendarRepository(connection)
+        if request.recurrence_weeks:
+            try:
+                recurrence = request.to_recurrence_draft()
+            except MealCalendarValidationError as error:
+                return _validation_response(error)
+
+            existing = repository.find_by_id(assignment_id)
+            if existing is None:
+                return _error_response(404, "assignment_not_found", "Assignment was not found")
+            if existing.kind != "free_text":
+                return _validation_response(ValueError("recurrence supports free-text assignments only"), field="kind")
+
+            with connection.transaction():
+                if not repository.insert_rule(assignment_id, recurrence):
+                    return _error_response(409, "idempotency_conflict", "Series id is already used with a different payload")
+                repository.delete(assignment_id)
+                created_rule = repository.find_rule_by_id(assignment_id)
+            assert created_rule is not None
+            return _occurrence_response(created_rule)
+
         try:
             draft = request.to_draft()
         except MealCalendarValidationError as error:
             return _validation_response(error)
 
-        repository = MealCalendarRepository(connection)
         existing = repository.find_by_id(assignment_id)
         if existing is None:
             return _error_response(404, "assignment_not_found", "Assignment was not found")
@@ -364,6 +511,62 @@ def register_routes(application: FastAPI) -> None:
         updated = repository.find_by_id(assignment_id)
         assert updated is not None
         return _assignment_response(updated)
+
+    @router.patch(
+        "/series/{series_id}",
+        response_model=SeriesResponse,
+        response_model_exclude_none=True,
+        dependencies=write_dependencies,
+    )
+    def update_series(
+        series_id: UUID,
+        request: SeriesPatchRequest,
+        connection: Any = Depends(get_connection),
+    ) -> JSONResponse | Response:
+        repository = MealCalendarRepository(connection)
+        if request.recurrence_weeks == 0:
+            return _validation_response(ValueError("No repetir must delete the series after confirmation"), field="recurrenceWeeks")
+        existing = repository.find_rule_by_id(series_id)
+        if existing is None:
+            return _error_response(404, "series_not_found", "Series was not found")
+        if request.initial_date != existing.initial_date and not request.confirm_anchor_change:
+            return _validation_response(
+                ValueError("changing the initial date requires confirmation"),
+                field="confirmAnchorChange",
+            )
+        try:
+            draft = request.to_draft(slot=existing.slot)
+        except MealCalendarValidationError as error:
+            return _validation_response(error)
+
+        with connection.transaction():
+            if not repository.update_rule(series_id, draft):
+                return _error_response(404, "series_not_found", "Series was not found")
+            updated = repository.find_rule_by_id(series_id)
+        assert updated is not None
+        return JSONResponse(
+            status_code=200,
+            headers={"Cache-Control": "no-store"},
+            content={
+                "seriesId": str(updated.series_id),
+                "initialDate": updated.initial_date.isoformat(),
+                "slot": updated.slot,
+                "text": updated.free_text,
+                "recurrenceWeeks": updated.interval_weeks,
+            },
+        )
+
+    @router.delete("/series/{series_id}", status_code=204, dependencies=write_dependencies)
+    def delete_series(
+        series_id: UUID,
+        confirmed: bool = Query(default=False),
+        connection: Any = Depends(get_connection),
+    ) -> Response:
+        if not confirmed:
+            return _validation_response(ValueError("series deletion requires confirmation"), field="confirmed")
+        with connection.transaction():
+            MealCalendarRepository(connection).delete_rule(series_id)
+        return Response(status_code=204, headers={"Cache-Control": "no-store"})
 
     @router.delete("/assignments/{assignment_id}", status_code=204, dependencies=write_dependencies)
     def delete_assignment(assignment_id: UUID, connection: Any = Depends(get_connection)) -> Response:

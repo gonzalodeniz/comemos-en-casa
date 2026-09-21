@@ -11,6 +11,10 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).parents[2] / "src"))
 
+from comemos_en_casa.meal_calendar.repository import CalendarAssignment
+from comemos_en_casa.meal_calendar.schemas import RecurrenceRule, RecurrenceRuleDraft
+from comemos_en_casa.meal_calendar.service import occurrence_in_week
+
 
 RECIPE_ID = UUID("00000000-0000-0000-0000-000000000100")
 ASSIGNMENT_ID = UUID("00000000-0000-0000-0000-000000000200")
@@ -65,6 +69,14 @@ class FakeCursor:
         return self._many
 
 
+class FakeTransaction:
+    def __enter__(self) -> "FakeTransaction":
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> None:
+        return None
+
+
 class FakeConnection:
     def __init__(self) -> None:
         self.cursor_instance = FakeCursor()
@@ -72,18 +84,178 @@ class FakeConnection:
     def cursor(self) -> FakeCursor:
         return self.cursor_instance
 
+    def transaction(self) -> FakeTransaction:
+        return FakeTransaction()
+
+
+class StatefulCalendarRepository:
+    state: "CalendarState"
+
+    def __init__(self, connection: object) -> None:
+        pass
+
+    def find_by_id(self, assignment_id: UUID) -> CalendarAssignment | None:
+        return self.state.assignments.get(assignment_id)
+
+    def insert(self, assignment_id: UUID, draft: object) -> bool:
+        if assignment_id in self.state.assignments:
+            return False
+        self.state.assignments[assignment_id] = CalendarAssignment(
+            id=assignment_id,
+            meal_date=draft.meal_date,  # type: ignore[attr-defined]
+            slot=draft.slot,  # type: ignore[attr-defined]
+            kind=draft.kind,  # type: ignore[attr-defined]
+            recipe_id=draft.recipe_id,  # type: ignore[attr-defined]
+            free_text=draft.free_text,  # type: ignore[attr-defined]
+            recipe_title=None,
+            recipe_image_url=None,
+        )
+        return True
+
+    def update(self, assignment_id: UUID, draft: object) -> bool:
+        if assignment_id not in self.state.assignments:
+            return False
+        self.state.assignments[assignment_id] = CalendarAssignment(
+            id=assignment_id,
+            meal_date=draft.meal_date,  # type: ignore[attr-defined]
+            slot=draft.slot,  # type: ignore[attr-defined]
+            kind=draft.kind,  # type: ignore[attr-defined]
+            recipe_id=draft.recipe_id,  # type: ignore[attr-defined]
+            free_text=draft.free_text,  # type: ignore[attr-defined]
+            recipe_title=None,
+            recipe_image_url=None,
+        )
+        return True
+
+    def delete(self, assignment_id: UUID) -> bool:
+        return self.state.assignments.pop(assignment_id, None) is not None
+
+    def find_rule_by_id(self, series_id: UUID) -> RecurrenceRule | None:
+        return self.state.rules.get(series_id)
+
+    def insert_rule(self, series_id: UUID, draft: RecurrenceRuleDraft) -> bool:
+        if series_id in self.state.rules:
+            return False
+        self.state.rules[series_id] = RecurrenceRule.create(
+            id=series_id,
+            initial_date=draft.initial_date,
+            slot=draft.slot,
+            free_text=draft.free_text,
+            interval_weeks=draft.interval_weeks,
+        )
+        return True
+
+    def update_rule(self, series_id: UUID, draft: RecurrenceRuleDraft) -> bool:
+        if series_id not in self.state.rules:
+            return False
+        self.state.rules[series_id] = RecurrenceRule.create(
+            id=series_id,
+            initial_date=draft.initial_date,
+            slot=draft.slot,
+            free_text=draft.free_text,
+            interval_weeks=draft.interval_weeks,
+        )
+        return True
+
+    def delete_rule(self, series_id: UUID) -> bool:
+        return self.state.rules.pop(series_id, None) is not None
+
+    def list_week(self, week_start: date, week_end: date) -> list[CalendarAssignment]:
+        entries = [
+            assignment
+            for assignment in self.state.assignments.values()
+            if week_start <= assignment.meal_date <= week_end
+        ]
+        for rule in self.state.rules.values():
+            occurrence_date = occurrence_in_week(rule, week_start, week_end)
+            if occurrence_date is not None:
+                entries.append(
+                    CalendarAssignment(
+                        id=f"series:{rule.series_id}:{occurrence_date.isoformat()}",
+                        meal_date=occurrence_date,
+                        slot=rule.slot,
+                        kind="free_text",
+                        recipe_id=None,
+                        free_text=rule.free_text,
+                        recipe_title=None,
+                        recipe_image_url=None,
+                        entry_type="recurring_occurrence",
+                        series_id=rule.series_id,
+                        occurrence_date=occurrence_date,
+                        initial_date=rule.initial_date,
+                        recurrence_weeks=rule.interval_weeks,
+                    )
+                )
+        return sorted(entries, key=lambda entry: (entry.meal_date, entry.slot, entry.visible_text, str(entry.id)))
+
+
+class CalendarState:
+    def __init__(self) -> None:
+        self.assignments = {
+            ASSIGNMENT_ID: CalendarAssignment(
+                id=ASSIGNMENT_ID,
+                meal_date=date(2025, 6, 2),
+                slot="lunch",
+                kind="recipe",
+                recipe_id=RECIPE_ID,
+                free_text=None,
+                recipe_title="Tortilla Española",
+                recipe_image_url="https://example.test/tortilla.jpg",
+            ),
+            UUID("00000000-0000-0000-0000-000000000201"): CalendarAssignment(
+                id=UUID("00000000-0000-0000-0000-000000000201"),
+                meal_date=date(2025, 6, 2),
+                slot="lunch",
+                kind="free_text",
+                recipe_id=None,
+                free_text="  Sopa  ",
+                recipe_title=None,
+                recipe_image_url=None,
+            ),
+        }
+        self.rules: dict[UUID, RecurrenceRule] = {}
+
 
 @pytest.fixture
 def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@db/app")
+    state = CalendarState()
+    StatefulCalendarRepository.state = state
+    from comemos_en_casa.meal_calendar import api
+
+    monkeypatch.setattr(api, "MealCalendarRepository", StatefulCalendarRepository)
     sys.modules.pop("comemos_en_casa.app", None)
     module = importlib.import_module("comemos_en_casa.app")
     application = module.create_app()
+    application.state.calendar_state = state
     application.dependency_overrides[module.get_connection] = FakeConnection
     try:
         yield TestClient(application)
     finally:
         application.dependency_overrides.clear()
+
+
+def seed_free_text_assignment(assignment_id: UUID) -> None:
+    StatefulCalendarRepository.state.assignments[assignment_id] = CalendarAssignment(
+        id=assignment_id,
+        meal_date=date(2025, 6, 2),
+        slot="lunch",
+        kind="free_text",
+        recipe_id=None,
+        free_text="Sopa",
+        recipe_title=None,
+        recipe_image_url=None,
+    )
+
+
+def seed_series(series_id: UUID) -> None:
+    StatefulCalendarRepository.state.rules[series_id] = RecurrenceRule.create(
+        id=series_id,
+        initial_date=date(2025, 6, 2),
+        slot="lunch",
+        free_text="Sopa",
+        interval_weeks=1,
+    )
 
 
 def test_calendar_context_and_week_reads_use_no_store_and_public_recipe_presentation(client: TestClient) -> None:
@@ -200,6 +372,7 @@ def test_assignment_create_is_idempotent_for_the_same_uuid_and_payload(
     assert created.headers["cache-control"] == "no-store"
     assert created.json() == {
         "id": str(ASSIGNMENT_ID),
+        "entryType": "assignment",
         "date": "2025-06-02",
         "slot": "dinner",
         "kind": "free_text",
@@ -252,6 +425,7 @@ def test_ordinary_free_text_conversion_is_atomic_and_returns_one_series_occurren
     client: TestClient,
 ) -> None:
     assignment_id = UUID("00000000-0000-0000-0000-000000000301")
+    seed_free_text_assignment(assignment_id)
 
     response = client.patch(
         f"/api/v1/meal-calendar/assignments/{assignment_id}",
@@ -272,6 +446,7 @@ def test_ordinary_free_text_conversion_is_atomic_and_returns_one_series_occurren
 
 def test_series_patch_requires_anchor_confirmation_and_keeps_slot_immutable(client: TestClient) -> None:
     series_id = UUID("00000000-0000-0000-0000-000000000302")
+    seed_series(series_id)
     path = f"/api/v1/meal-calendar/series/{series_id}"
     body = {"initialDate": "2025-06-06", "text": "Crema", "recurrenceWeeks": 2}
 
@@ -294,6 +469,7 @@ def test_series_patch_requires_anchor_confirmation_and_keeps_slot_immutable(clie
 
 def test_series_delete_requires_confirmation_is_destructive_and_idempotent(client: TestClient) -> None:
     series_id = UUID("00000000-0000-0000-0000-000000000303")
+    seed_series(series_id)
     path = f"/api/v1/meal-calendar/series/{series_id}"
 
     missing_confirmation = client.delete(path)

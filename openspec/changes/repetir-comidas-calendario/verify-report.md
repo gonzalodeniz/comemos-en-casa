@@ -1,59 +1,104 @@
 ```yaml
 schema: gentle-ai.verify-result/v1
-evidence_revision: sha256:57d5fcb8b0f8dd74c0f8124e4551e4e28614fc5bc1e11ce8e82a1dadcab875c5
+evidence_revision: sha256:32523b2f8cb68d654eda17e4df095ee77bf746be16a09071618bb4470c9b490c
 verdict: fail
-blockers: 9
-critical_findings: 9
+blockers: 7
+critical_findings: 7
 requirements: 0/13
-scenarios: 0/28
-test_command: make test
-test_exit_code: 0
-test_output_hash: sha256:e7213b2c5904c0d5a30005681981b9765bfe0fb9d68a3726d7fb3048926ea850
-build_command: npm --prefix frontend run build
-build_exit_code: 0
-build_output_hash: sha256:bd4629f6327265245b7c5190a2d8cf1fadf49f2fea80d60463047dab1fa259e1
+scenarios: 0/29
+test_command: "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=backend/src .venv/bin/pytest -q backend/tests/meal_calendar/test_api_contract.py"
+test_exit_code: 1
+test_output_hash: sha256:ef7822e8fc347fd7b2572050872159f79e607220c328d6ca9966b1ff976c9ea1
+build_command: "not run: repository-only Task 5 verification; no build requested"
+build_exit_code: 125
+build_output_hash: sha256:efb2797f9ab64305ed9e38ee2449b49dca40ec2c0f1ff3862b9f3844ca63fc53
 ```
 
-# Verification: repetir-comidas-calendario — slice 1
+# Verification: repetir-comidas-calendario — Task 5 repository GREEN
 
-## Status
+## Verdict
 
-**Overall change verdict: FAIL / not archive-ready.** The required task-checkbox policy makes the nine remaining implementation tasks critical completeness blockers. This is expected for the approved first chained slice and does **not** indicate a defect in its implemented boundary.
+**FAIL for whole-change completeness; PASS for the assigned Task 5 repository slice.** The repository implementation meets its bounded persistence and combined-read contract. The API subset is still RED solely for the explicitly unimplemented Task 6 HTTP contract. Seven implementation tasks remain unchecked, so the change is not ready for archive.
 
-**Slice 1 verdict: PASS.** Commits `da21d9c` and `32da760` implement only persistence/domain foundations and their focused tests. The next apply slice is safe to begin at Task 4 (backend repository/API RED), provided it remains within the approved stacked boundary. Native SDD status remains authoritative: `ready`, `nextRecommended: apply`; verification does not alter that recommendation.
+The authoritative native status is `ready`, with `nextRecommended: apply`; optional verification does not alter that recommendation. The structured action context is `repo-local`, workspace `/opt/apps/comemos-en-casa`, with that workspace as the allowed edit root.
 
-## Structured status and action context
+## Scope, ownership, and commit evidence
 
-- Change: `repetir-comidas-calendario`; artifact store: `openspec`.
-- Native state: `ready`; `nextRecommended: apply`; no native blockers.
-- Action context: `repo-local`; workspace root `/opt/apps/comemos-en-casa`; allowed edit root `/opt/apps/comemos-en-casa`.
-- All inspected implementation ownership is inside the authoritative workspace and user-provided allowed surfaces.
+- Inspected finalized proposal, specification, design, tasks, current apply progress, existing verify report, Task 5 commit, repository implementation, and the four recurrence-related test files.
+- Task 5 commit is `d6c9fb31c95baebaf4eef0768648dc41c3924ae8` (`feat(meal-calendar): persist recurrence rules and combine weekly reads`), directly after Task 4 RED commit `abd4489`.
+- `git diff --check abd4489..d6c9fb3` passed. The committed Task 5 diff contains only `backend/src/comemos_en_casa/meal_calendar/repository.py`, `tasks.md`, and `apply-progress.md` (166 insertions, 12 deletions).
+- No API, frontend, migration, or test files appear in the Task 5 commit, so no API/frontend scope drift occurred.
+- `git log d6c9fb3..HEAD` was empty before this artifact update; this verification created no repository commit. The only pre-existing worktree modification was the canonical `verify-report.md`.
 
-## Slice scope and migration allowlist
+## Task 5 acceptance evidence
 
-The two-commit range `da21d9c^..32da760` changes only:
+- Shared recurrence lookup, candidate listing, insert, update, and delete all use `CALENDAR_KEY = "shared"`; candidate listing additionally limits rows to `initial_date <= week_end`.
+- `list_week` reads ordinary assignments through the preserved `LEFT JOIN recipes`, expands eligible recurrence rules with `occurrence_in_week`, and combines entries only in memory.
+- Virtual occurrence IDs are deterministically derived as `series:{series_id}:{occurrence_date}`. No Task 5 query writes generated dates to `meal_assignments`; rule writes target only `meal_recurrence_rules`.
+- Combined ordering is date ascending, lunch before dinner, normalized visible text, then stable ID. The repository tests cover ordinary/recipe coexistence, two same-text series, repeated reads, and unavailable legacy recipes.
+- The API deliberately has not yet added response discrimination or series routes. Therefore this verification confirms repository metadata (`entry_type`, `series_id`, `occurrence_date`, `initial_date`, `recurrence_weeks`) but does not claim that the public API exposes it until Task 6.
 
-- migration `0007` and its README documentation;
-- meal-calendar schemas and pure date expansion service;
-- recurrence/time tests and the migration-foundation allowlist test;
-- OpenSpec task/progress artifacts.
+## Commands and results
 
-No repository implementation, HTTP/API handler, frontend file, occurrence materialization, recipe linkage, or unrelated product area was changed. The correction in `32da760` adds `0007_meal_calendar_recurrence.sql` to `test_historical_sql_migrations_are_not_rewritten_as_alembic_revisions`; it is compatible with the migration allowlist and passed in the focused and full suites.
+| Scope | Exact command | Result |
+|---|---|---|
+| Focused repository | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=backend/src .venv/bin/pytest -q backend/tests/meal_calendar/test_calendar_repository.py` | PASS — `5 passed in 0.09s` |
+| Recurrence/domain regression | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=backend/src .venv/bin/pytest -q backend/tests/meal_calendar/test_recurrence_migration.py backend/tests/meal_calendar/test_time_text.py` | PASS — `17 passed in 0.36s` |
+| API contract subset | `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=backend/src .venv/bin/pytest -q backend/tests/meal_calendar/test_api_contract.py` | Expected Task 6 RED — exit `1`; `3 passed, 7 failed, 2 warnings in 1.24s` |
 
-`0007_meal_calendar_recurrence.sql` is additive: it defines exactly `meal_recurrence_rules`, a shared-calendar FK, allowed slots, trimmed one-to-100-character free text, recurrence intervals 1–4, and the `(calendar_key, initial_date)` index. It does not define generated-occurrence storage or recipe linkage.
+No build or full suite was run: the user requested focused Task 5 verification, and build/frontend work belongs to later unchecked tasks. The envelope test-output digest is from the final API-subset execution. No source or test files were edited.
+
+### Expected Task 6 RED failures
+
+The seven API-subset failures are all missing Task 6 behavior, not Task 5 repository failures:
+
+1. Week responses do not yet emit `entryType: "assignment"`.
+2. Recurring create rejects `recurrenceWeeks` before series persistence/idempotency can run.
+3. Ordinary-to-series conversion rejects `recurrenceWeeks` before an atomic transition can run.
+4. `PATCH /series/{series_id}` is absent, returning `404` instead of its confirmation/validation contract.
+5. `DELETE /series/{series_id}` is absent, returning `404` instead of confirmation and idempotent deletion behavior.
+6. The `No repetir` series PATCH validation path is absent with that same missing route.
+7. Legacy recipe/free-text read responses lack the new `entryType` discriminator.
+
+The migration regression passes and verifies two coexisting shared rules, SQL checks and index presence, plus zero `meal_recurrence_occurrences` tables. This corroborates the virtual-occurrence-only persistence model.
 
 ## Spec coverage
 
-The specification contains **13 requirements and 28 scenarios**. No requirement is fully complete at the whole-change level because repository/API/frontend work is deliberately deferred; envelope coverage is therefore **0/13 requirements and 0/28 scenarios**.
+The finalized specification contains **13 requirements and 29 scenarios**. At whole-change level, **0/13 requirements and 0/29 scenarios are complete**, because Task 6 API wiring and all subsequent backend/frontend work are intentionally outstanding. Task 5 provides bounded evidence toward shared persistence, virtual weekly expansion, coexistence, deterministic ordering, legacy recipe readability, and shared-calendar filtering; it cannot independently complete API-facing requirements.
 
-Slice evidence covers the persistence/domain portions of Tasks 1–3: migration shape and constraints, free-text-only domain validation, interval validation, and inclusive civil-date expansion. The remaining specifications depend on the unimplemented repository/API/frontend tasks, especially combined weekly reads, stable response identity, series CRUD, idempotency, conversion, confirmations, ordering, and UI flows.
+## Strict TDD compliance
 
-## Task completion and exact blockers
+Strict TDD is active in `openspec/config.yaml`. The project-local override is absent; the global strict-TDD verification guidance was applied.
 
-Tasks 1–3 are checked complete. The following unchecked implementation tasks are critical completeness and archive blockers under the SDD checkbox policy:
+| Check | Result | Details |
+|---|---|---|
+| TDD Cycle Evidence reported | PASS | `apply-progress.md` contains Task 1–5 evidence tables, including Task 5 RED, GREEN, TRIANGULATE, and REFACTOR columns. |
+| Reported test files exist | PASS | `test_time_text.py`, `test_recurrence_migration.py`, `test_calendar_repository.py`, and `test_api_contract.py` all exist. |
+| Task 5 GREEN remains true | PASS | The focused repository run is `5 passed`. |
+| Recurrence/domain regressions remain green | PASS | Migration and time/domain run is `17 passed`. |
+| Task 4/6 API RED distinguished | PASS | The API subset has 3 passing legacy checks and 7 failures attributable to the documented, unchecked Task 6 scope. |
+| Assertion quality | PASS | No tautologies, ghost loops, type-only-only assertions, smoke-only assertions, CSS implementation-detail assertions, or assertions lacking production execution were found in the four related test files. |
 
-- [ ] Extender primero las pruebas de `backend/tests/meal_calendar/test_calendar_repository.py` y `backend/tests/meal_calendar/test_api_contract.py` para exigir listado de reglas candidatas compartidas, expansión combinada, orden por fecha/franja/texto/identidad, identidad estable `(seriesId, occurrenceDate)`, creación idempotente, conflicto `409`, conversión ordinaria atómica, `PATCH /series/{series_id}`, `DELETE /series/{series_id}?confirmed=true` y rechazos no mutantes. Incluir coexistencia de varias series/ordinarias en la misma celda, slot inmutable, `No repetir` destructivo confirmado y compatibilidad con receta heredada. Ejecutar ambos archivos y registrar los fallos esperados. <!-- sdd-owner: implementation -->
-- [ ] Extender `backend/src/comemos_en_casa/meal_calendar/repository.py` con `find_rule_by_id`, inserción idempotente, actualización, borrado y listado de candidatas `calendar_key = "shared"`; modificar `list_week` para combinar asignaciones existentes (incluido `LEFT JOIN recipes`) con ocurrencias virtuales, derivar el identificador estable y aplicar un único orden determinista. Verificar con `backend/tests/meal_calendar/test_calendar_repository.py` y los tests de compatibilidad de `backend/tests/meal_calendar/test_api_contract.py`. <!-- sdd-owner: implementation -->
+### Test layer distribution
+
+| Layer | Tests | Files | Tool |
+|---|---:|---:|---|
+| Unit/repository-domain | 19 | 2 | pytest |
+| PostgreSQL migration integration | 3 | 1 | pytest plus Docker Compose/psql |
+| FastAPI contract integration | 10 | 1 | pytest plus FastAPI TestClient |
+| E2E | 0 | 0 | not configured |
+| Total | 32 | 4 | |
+
+Coverage analysis was skipped because no coverage command is configured. No lint command is configured; frontend type checking is not applicable to the Task 5 Python-only committed scope.
+
+## Review workload and PR boundary
+
+`tasks.md` forecasts a high-risk 900–1,300 line whole change and recommends chained review. The current committed boundary is limited to Task 5 repository code plus required OpenSpec progress/task evidence, at 178 changed lines, and fits the requested stacked slice. No `size:exception` is needed for this commit. The cumulative progress labels it "Slice 3" because the earlier Task 4 RED and migration-allowlist correction were recorded separately; the user-requested Task 5 boundary itself remains repository-only.
+
+## Task completion and archive blockers
+
+Tasks 1–5 are checked. The following exact unchecked implementation markers remain. Each is a critical completeness issue and archive blocker; this partial slice is not ready for archive.
+
 - [ ] Extender `backend/src/comemos_en_casa/meal_calendar/api.py` para aceptar `recurrenceWeeks: 0|1|2|3|4` con ausencia equivalente a `0`, devolver `entryType` discriminado y añadir `PATCH /series/{series_id}` y `DELETE /series/{series_id}?confirmed=true`; ejecutar creación/actualización/borrado y conversión de asignación libre dentro de transacciones, con UUID reutilizable, conflicto de idempotencia, `422` para receta/intervalo/fecha/franja/texto inválidos, confirmación obligatoria de reanclaje y borrado confirmado idempotente. No ofrecer rutas por `occurrenceDate`. Verificar con `pytest backend/tests/meal_calendar/test_api_contract.py`. <!-- sdd-owner: implementation -->
 - [ ] Ejecutar y ajustar únicamente las pruebas backend necesarias en `backend/tests/meal_calendar/test_time_text.py`, `test_calendar_repository.py`, `test_api_contract.py` y `test_recurrence_migration.py` para triangular errores de límites de semana, retries, fallos simulados de inserción, reanclaje no confirmado, borrado repetido, coexistencia, calendario compartido y recetas históricas; verificar con `pytest` y después `make test-backend`. <!-- sdd-owner: implementation -->
 - [ ] Ampliar `frontend/src/App.test.tsx` con pruebas fallidas para la unión `entryType`, frecuencias `0..4`, payload con UUID estable de creación, conversión mediante `assignmentId`, apertura de ocurrencia con `initialDate`, franja deshabilitada, confirmación de reanclaje, confirmación destructiva de `No repetir`, `deleteSeries` en vez de `deleteAssignment`, refetch posterior, coexistencia y receta heredada sin controles recurrentes. Añadir casos de reducer solo si la cobertura de la interfaz no permite observar el estado; ejecutar `cd frontend && npm test`. <!-- sdd-owner: implementation -->
@@ -62,66 +107,8 @@ Tasks 1–3 are checked complete. The following unchecked implementation tasks a
 - [ ] Ejecutar la suite de `frontend/src/App.test.tsx` junto con `cd frontend && npm run build`, y ajustar casos deterministas para relectura de semana tras crear, convertir, editar o borrar, identidad estable en reintento, series en una misma celda, confirmaciones canceladas y presentación de recetas disponibles/no disponibles. No modificar el layout semanal fuera de los estilos estrictamente necesarios. <!-- sdd-owner: implementation -->
 - [ ] Revisar los archivos modificados del backend y frontend para eliminar duplicación entre asignaciones y ocurrencias, mantener nombres `camelCase`/`PascalCase` y PEP 8, conservar consultas parametrizadas, mensajes de confirmación específicos y documentación de rollback; ejecutar `make test`, `cd frontend && npm run typecheck` y `cd frontend && npm run build`, y documentar la evidencia antes de solicitar revisión. <!-- sdd-owner: implementation -->
 
-## Commands and results
+## Blockers
 
-| Command | Result |
-|---|---|
-| `PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=backend/src .venv/bin/pytest -q backend/tests/meal_calendar/test_recurrence_migration.py backend/tests/meal_calendar/test_time_text.py backend/tests/test_alembic_foundation.py` | PASS — `20 passed in 0.46s`; output SHA-256 `1486e7c36f400bea3b7391d78be22c4a0b3367bfbf5f045b0fa70e488b65fe0a`. |
-| `make test` | PASS — `108 passed, 2 warnings in 3.60s`; it also ran frontend typecheck and production build. Output SHA-256 `e7213b2c5904c0d5a30005681981b9765bfe0fb9d68a3726d7fb3048926ea850`. The warnings are third-party Starlette/httpx deprecations. |
-| `npm --prefix frontend run build` | PASS — TypeScript check and Vite production build completed. Output SHA-256 `bd4629f6327265245b7c5190a2d8cf1fadf49f2fea80d60463047dab1fa259e1`. |
-
-Coverage analysis was skipped because the configured verification capabilities provide no coverage command. No standalone linter is configured. The configured typecheck passed as part of `make test` and the explicit build command.
-
-## Strict TDD compliance
-
-Strict TDD is active in `openspec/config.yaml`. `apply-progress.md` contains the required `TDD Cycle Evidence` table for Tasks 1–3. Its referenced tests exist and the current focused execution is GREEN.
-
-| Check | Result | Details |
-|---|---|---|
-| TDD evidence reported | PASS | Table present for all three completed tasks. |
-| Test files exist | PASS | `test_recurrence_migration.py` and `test_time_text.py` exist. |
-| GREEN confirmed | PASS | Current focused run passed all 20 selected recurrence/time/allowlist tests. |
-| Triangulation | PASS | Tests cover validation failures, intervals 1–4, both week boundaries, empty adjacent week, future anchor, month/year crossing, migration checks, index, FK, coexistence, and no occurrence table. |
-| Safety net | PASS | Apply-progress records the pre-change 15-test safety run; this historical command result is recorded rather than independently reproducible after the change. |
-
-TDD compliance: **5/5 checks passed** for the completed slice.
-
-### Test layer distribution
-
-| Layer | Tests | Files | Tools |
-|---|---:|---:|---|
-| Unit | 19 | 3 | pytest |
-| Integration | 1 | 1 | pytest + PostgreSQL via Docker Compose |
-| E2E | 0 | 0 | Not configured |
-| **Total** | **20** | **3** | |
-
-### Assertion quality
-
-`test_recurrence_migration.py`, `test_time_text.py`, and `test_alembic_foundation.py` were inspected. Assertions exercise migration SQL, a live isolated PostgreSQL transaction, domain constructors, or the pure expansion function. No tautologies, ghost loops, type-only-only checks, smoke-only tests, or CSS/implementation-detail assertions were found.
-
-**Assertion quality: 0 CRITICAL, 0 WARNING.**
-
-## Review workload and PR boundary
-
-The two commits have `483` added and `5` removed lines across code, tests, docs, and OpenSpec artifacts (`488` changed lines). The implementation/test/migration-documentation portion is `389` added and `2` removed lines (`391` changed lines). No scope crept into repository/API/frontend work, so the committed boundary matches slice 1 of the stacked-to-main plan.
-
-The current-session preflight records user acceptance of the size exception. `tasks.md` still says `Chain strategy: pending`, while `apply-progress.md` says `stacked-to-main` and says no exception was used. Treat the session preflight as current authority; reconcile those stale historical planning statements in the next progress record, without changing this slice.
-
-## Risks and next apply safety
-
-- **Critical archive blockers:** the nine unchecked tasks above leave all end-to-end recurrence requirements incomplete. This report is not a clean whole-change pass and is not archive-ready.
-- **Safe next slice:** yes. Begin only Task 4 RED tests for repository/API behavior, then proceed through its approved backend slice. Do not implement frontend work or widen into recipe flows.
-- **Residual implementation risk:** the current migration/domain code has no repository or API wiring yet, so it cannot itself persist/read/serve rules in the product; this is intentional for the chain boundary.
-- **Migration risk:** allowlist compatibility is verified; deployment still requires PostgreSQL migrations in lexical order through `0007`.
-
-## Slice 2 RED update — Task 4
-
-Task 4 RED was applied as the start of the stacked-to-main backend repository/API slice. Only the two allowed test files were extended; no production code was changed. The persisted Task 4 checkbox is now checked in `tasks.md`.
-
-Focused command:
-
-```text
-PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=backend/src .venv/bin/pytest -q backend/tests/meal_calendar/test_calendar_repository.py backend/tests/meal_calendar/test_api_contract.py
-```
-
-Expected RED evidence: `10 failed, 5 passed, 2 warnings`. The failures expose the absent recurrence repository methods, combined weekly expansion, series HTTP routes, recurrence write fields, and the newly required ordinary `entryType`; collection completed without syntax errors. Production implementation remains intentionally deferred to Tasks 5–6.
+1. Task 6 API recurrence create/convert/series-route implementation is unchecked and its contract tests remain intentionally RED.
+2. Backend triangulation is unchecked.
+3. Frontend RED, types/client/reducer, editor, frontend triangulation, and refactor tasks are unchecked.

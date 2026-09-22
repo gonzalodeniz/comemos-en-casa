@@ -16,10 +16,14 @@ export type RequestState<T> = {
 
 export type AssignmentEditor = {
   date: string;
+  initialDate: string;
   slot: MealSlot;
   kind: AssignmentKind;
   assignmentId: string | null;
+  seriesId: string | null;
+  createId: string | null;
   freeText: string;
+  recurrenceWeeks: number;
 };
 
 export type MutationState = {
@@ -63,10 +67,12 @@ export type CalendarAction =
   | { type: "recipes/success"; payload: RecipeSearchResult }
   | { type: "recipes/error"; payload: string }
   | { type: "recipes/selected"; payload: RecipeSummary | null }
-  | { type: "editor/openCreate"; payload: { date: string; slot: MealSlot } }
+  | { type: "editor/openCreate"; payload: { date: string; slot: MealSlot; createId: string } }
   | { type: "editor/openEdit"; payload: CalendarAssignment }
   | { type: "editor/close" }
   | { type: "editor/freeTextChanged"; payload: string }
+  | { type: "editor/dateChanged"; payload: string }
+  | { type: "editor/recurrenceChanged"; payload: number }
   | { type: "editor/kindChanged"; payload: AssignmentKind }
   | { type: "mutation/loading"; payload: { type: "create" | "update" | "delete"; assignmentId: string | null } }
   | { type: "mutation/success"; payload: string }
@@ -131,10 +137,15 @@ export function calendarReducer(state: CalendarState, action: CalendarAction): C
       return {
         ...state,
         editor: {
-          ...action.payload,
+          date: action.payload.date,
+          initialDate: action.payload.date,
+          slot: action.payload.slot,
           assignmentId: null,
+          seriesId: null,
+          createId: action.payload.createId,
           kind: state.selectedRecipe ? "recipe" : "free_text",
           freeText: "",
+          recurrenceWeeks: 0,
         },
         mutation: { status: "idle", type: null, assignmentId: null, message: null },
       };
@@ -143,11 +154,15 @@ export function calendarReducer(state: CalendarState, action: CalendarAction): C
       return {
         ...state,
         editor: {
-          date: action.payload.date,
+          date: action.payload.initialDate ?? action.payload.date,
+          initialDate: action.payload.initialDate ?? action.payload.date,
           slot: action.payload.slot,
           kind: action.payload.kind,
-          assignmentId: action.payload.id,
+          assignmentId: action.payload.entryType === "recurring_occurrence" ? null : action.payload.id,
+          seriesId: action.payload.seriesId ?? null,
+          createId: null,
           freeText: action.payload.text ?? "",
+          recurrenceWeeks: action.payload.recurrenceWeeks ?? 0,
         },
         selectedRecipe: recipe?.available && recipe.id
           ? { id: recipe.id, title: recipe.title, coverImageUrl: recipe.coverImageUrl ?? "" }
@@ -159,9 +174,15 @@ export function calendarReducer(state: CalendarState, action: CalendarAction): C
       return { ...state, editor: null };
     case "editor/freeTextChanged":
       return state.editor ? { ...state, editor: { ...state.editor, freeText: action.payload } } : state;
+    case "editor/dateChanged":
+      return state.editor ? { ...state, editor: { ...state.editor, date: action.payload } } : state;
+    case "editor/recurrenceChanged":
+      return state.editor && state.editor.kind === "free_text"
+        ? { ...state, editor: { ...state.editor, recurrenceWeeks: action.payload } }
+        : state;
     case "editor/kindChanged":
-      return state.editor && !state.editor.assignmentId
-        ? { ...state, editor: { ...state.editor, kind: action.payload } }
+      return state.editor && !state.editor.assignmentId && !state.editor.seriesId
+        ? { ...state, editor: { ...state.editor, kind: action.payload, recurrenceWeeks: action.payload === "free_text" ? state.editor.recurrenceWeeks : 0 } }
         : state;
     case "mutation/loading":
       return { ...state, mutation: { status: "loading", ...action.payload, message: null } };

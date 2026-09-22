@@ -10,6 +10,7 @@ from uuid import UUID
 CALENDAR_KEY = "shared"
 MEAL_SLOTS = frozenset({"lunch", "dinner"})
 ASSIGNMENT_KINDS = frozenset({"recipe", "free_text"})
+RECURRENCE_INTERVALS = frozenset({1, 2, 3, 4})
 FREE_TEXT_MIN_CODE_POINTS = 1
 FREE_TEXT_MAX_CODE_POINTS = 100
 
@@ -46,6 +47,93 @@ def normalize_free_text(value: str) -> str:
     if not FREE_TEXT_MIN_CODE_POINTS <= len(cleaned) <= FREE_TEXT_MAX_CODE_POINTS:
         raise MealCalendarValidationError("free text must contain 1 to 100 code points")
     return cleaned
+
+
+@dataclass(frozen=True)
+class RecurrenceRuleDraft:
+    """Validated values for one indefinite free-text recurrence rule."""
+
+    initial_date: date
+    slot: Literal["lunch", "dinner"]
+    free_text: str
+    interval_weeks: int
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        initial_date: date,
+        slot: str,
+        free_text: str,
+        interval_weeks: int,
+        kind: str = "free_text",
+        recipe_id: UUID | None = None,
+    ) -> "RecurrenceRuleDraft":
+        if isinstance(initial_date, datetime) or not isinstance(initial_date, date):
+            raise MealCalendarValidationError("initial date must be a date")
+        if slot not in MEAL_SLOTS:
+            raise MealCalendarValidationError("slot must be lunch or dinner")
+        if kind != "free_text" or recipe_id is not None:
+            raise MealCalendarValidationError("recurrence supports free-text meals only")
+        if interval_weeks not in RECURRENCE_INTERVALS:
+            raise MealCalendarValidationError("interval must be between 1 and 4 weeks")
+
+        return cls(
+            initial_date=initial_date,
+            slot=slot,
+            free_text=normalize_free_text(free_text),
+            interval_weeks=interval_weeks,
+        )
+
+
+@dataclass(frozen=True)
+class RecurrenceRule:
+    """A validated persisted recurrence rule, without persistence behavior."""
+
+    id: UUID
+    initial_date: date
+    slot: Literal["lunch", "dinner"]
+    free_text: str
+    interval_weeks: int
+    calendar_key: Literal["shared"] = CALENDAR_KEY
+
+    @property
+    def series_id(self) -> UUID:
+        return self.id
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        id: UUID,
+        initial_date: date,
+        slot: str,
+        free_text: str,
+        interval_weeks: int,
+        calendar_key: str = CALENDAR_KEY,
+        kind: str = "free_text",
+        recipe_id: UUID | None = None,
+    ) -> "RecurrenceRule":
+        if calendar_key != CALENDAR_KEY:
+            raise MealCalendarValidationError("recurrence calendar must be shared")
+        draft = RecurrenceRuleDraft.create(
+            initial_date=initial_date,
+            slot=slot,
+            free_text=free_text,
+            interval_weeks=interval_weeks,
+            kind=kind,
+            recipe_id=recipe_id,
+        )
+        if not isinstance(id, UUID):
+            raise MealCalendarValidationError("series id must be a UUID")
+        return cls(
+            id=id,
+            initial_date=draft.initial_date,
+            slot=draft.slot,
+            free_text=draft.free_text,
+            interval_weeks=draft.interval_weeks,
+            calendar_key=CALENDAR_KEY,
+        )
 
 
 @dataclass(frozen=True)

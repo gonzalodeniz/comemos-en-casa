@@ -7,14 +7,15 @@ from datetime import date
 from typing import Any
 from uuid import UUID
 
-from .schemas import AssignmentDraft, CALENDAR_KEY
+from .schemas import AssignmentDraft, CALENDAR_KEY, RecurrenceRule, RecurrenceRuleDraft
+from .service import occurrence_in_week
 
 
 @dataclass(frozen=True)
 class CalendarAssignment:
-    """One persisted assignment with its current public recipe presentation."""
+    """One calendar entry with its current public recipe presentation."""
 
-    id: UUID
+    id: UUID | str
     meal_date: date
     slot: str
     kind: str
@@ -22,6 +23,11 @@ class CalendarAssignment:
     free_text: str | None
     recipe_title: str | None
     recipe_image_url: str | None
+    entry_type: str = "assignment"
+    series_id: UUID | None = None
+    occurrence_date: date | None = None
+    initial_date: date | None = None
+    recurrence_weeks: int | None = None
 
     @property
     def visible_text(self) -> str:
@@ -62,7 +68,7 @@ class MealCalendarRepository:
         self._connection = connection
 
     def list_week(self, week_start: date, week_end: date) -> list[CalendarAssignment]:
-        """Return every shared assignment in the inclusive weekly date range."""
+        """Return ordinary assignments and virtual recurrence occurrences for a week."""
         with self._connection.cursor() as cursor:
             cursor.execute(
                 self._SELECT_ASSIGNMENT
@@ -72,18 +78,102 @@ class MealCalendarRepository:
                 """,
                 (CALENDAR_KEY, week_start, week_end),
             )
-            assignments = [self._restore(row) for row in cursor.fetchall()]
+            entries = [self._restore(row) for row in cursor.fetchall()]
+
+        for rule in self.list_recurrence_candidates(week_end):
+            occurrence_date = occurrence_in_week(rule, week_start, week_end)
+            if occurrence_date is not None:
+                entries.append(self._occurrence(rule, occurrence_date))
 
         slot_order = {"lunch": 0, "dinner": 1}
         return sorted(
-            assignments,
-            key=lambda assignment: (
-                assignment.meal_date,
-                slot_order[assignment.slot],
-                self._sort_key(assignment.visible_text),
-                str(assignment.id),
+            entries,
+            key=lambda entry: (
+                entry.meal_date,
+                slot_order[entry.slot],
+                self._entry_sort_key(entry),
+                str(entry.id),
             ),
         )
+
+    def find_rule_by_id(self, series_id: UUID) -> RecurrenceRule | None:
+        """Return one shared recurrence rule, if it still exists."""
+        with self._connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, initial_date, meal_slot, free_text, interval_weeks
+                FROM meal_recurrence_rules
+                WHERE id = %s AND calendar_key = %s
+                """,
+                (series_id, CALENDAR_KEY),
+            )
+            row = cursor.fetchone()
+        return None if row is None else self._restore_rule(row)
+
+    def list_recurrence_candidates(self, week_end: date) -> list[RecurrenceRule]:
+        """Return shared rules that can contribute an occurrence by ``week_end``."""
+        with self._connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, initial_date, meal_slot, free_text, interval_weeks
+                FROM meal_recurrence_rules
+                WHERE calendar_key = %s AND initial_date <= %s
+                """,
+                (CALENDAR_KEY, week_end),
+            )
+            rows = cursor.fetchall()
+        return [self._restore_rule(row) for row in rows if len(row) == 5]
+
+    def insert_rule(self, series_id: UUID, draft: RecurrenceRuleDraft) -> bool:
+        """Insert one rule without committing; return false when its UUID exists."""
+        with self._connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO meal_recurrence_rules (
+                    id, calendar_key, initial_date, meal_slot, free_text, interval_weeks
+                )
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (id) DO NOTHING
+                RETURNING id
+                """,
+                (
+                    series_id,
+                    CALENDAR_KEY,
+                    draft.initial_date,
+                    draft.slot,
+                    draft.free_text,
+                    draft.interval_weeks,
+                ),
+            )
+            return cursor.fetchone() is not None
+
+    def update_rule(self, series_id: UUID, draft: RecurrenceRuleDraft) -> bool:
+        """Update one shared rule without committing."""
+        with self._connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE meal_recurrence_rules\n"
+                "SET initial_date = %s, meal_slot = %s, free_text = %s, interval_weeks = %s\n"
+                "WHERE id = %s AND calendar_key = %s\n"
+                "RETURNING id",
+                (
+                    draft.initial_date,
+                    draft.slot,
+                    draft.free_text,
+                    draft.interval_weeks,
+                    series_id,
+                    CALENDAR_KEY,
+                ),
+            )
+            return cursor.fetchone() is not None
+
+    def delete_rule(self, series_id: UUID) -> bool:
+        """Delete one shared rule without committing."""
+        with self._connection.cursor() as cursor:
+            cursor.execute(
+                "DELETE FROM meal_recurrence_rules WHERE id = %s AND calendar_key = %s RETURNING id",
+                (series_id, CALENDAR_KEY),
+            )
+            return cursor.fetchone() is not None
 
     def find_by_id(self, assignment_id: UUID) -> CalendarAssignment | None:
         """Return one assignment and current recipe presentation, if it still exists."""
@@ -158,6 +248,41 @@ class MealCalendarRepository:
             recipe_title=row[6],
             recipe_image_url=row[7],
         )
+
+    @staticmethod
+    def _restore_rule(row: tuple[Any, ...]) -> RecurrenceRule:
+        return RecurrenceRule.create(
+            id=row[0],
+            initial_date=row[1],
+            slot=row[2],
+            free_text=row[3],
+            interval_weeks=row[4],
+        )
+
+    @staticmethod
+    def _occurrence(rule: RecurrenceRule, occurrence_date: date) -> CalendarAssignment:
+        occurrence_id = f"series:{rule.series_id}:{occurrence_date.isoformat()}"
+        return CalendarAssignment(
+            id=occurrence_id,
+            meal_date=occurrence_date,
+            slot=rule.slot,
+            kind="free_text",
+            recipe_id=None,
+            free_text=rule.free_text,
+            recipe_title=None,
+            recipe_image_url=None,
+            entry_type="recurring_occurrence",
+            series_id=rule.series_id,
+            occurrence_date=occurrence_date,
+            initial_date=rule.initial_date,
+            recurrence_weeks=rule.interval_weeks,
+        )
+
+    @classmethod
+    def _entry_sort_key(cls, entry: CalendarAssignment) -> tuple[int, str]:
+        """Sort unavailable legacy recipes after readable meal text."""
+        unavailable_recipe = entry.kind == "recipe" and entry.recipe_title is None
+        return (1 if unavailable_recipe else 0, cls._sort_key(entry.visible_text))
 
     @staticmethod
     def _sort_key(value: str) -> str:

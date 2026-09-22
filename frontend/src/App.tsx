@@ -8,6 +8,7 @@ import {
   createRecipe,
   deleteAssignment,
   deleteRecipe,
+  deleteSeries,
   getCalendarContext,
   getCalendarWeek,
   getCollections,
@@ -20,6 +21,7 @@ import {
   setRecipeStatus,
   updateAssignment,
   updateRecipe,
+  updateSeries,
   uploadRecipeImage,
 } from "./api";
 import { calendarReducer, initialCalendarState } from "./calendarReducer";
@@ -186,6 +188,7 @@ function AssignmentCard({ assignment, deleting, onEdit }: { assignment: Calendar
       </button>
       <h3><button type="button" className="assignment-card-title" onClick={onEdit} disabled={deleting}>{accessibleTitle}</button></h3>
       {assignment.kind === "recipe" && !assignment.recipe?.available ? <small>Receta no disponible</small> : null}
+      {assignment.entryType === "recurring_occurrence" && assignment.recurrenceWeeks ? <small className="recurrence-label">Repite cada {assignment.recurrenceWeeks === 1 ? "semana" : `${assignment.recurrenceWeeks} semanas`}</small> : null}
       <div className="assignment-actions">
         {recipeId ? <Link to={`/recetas/${recipeId}`}>Ver receta</Link> : null}
       </div>
@@ -527,16 +530,69 @@ function CalendarPage() {
   function retryCalendar() { setReloadVersion((version) => version + 1); }
   function navigateWeek(amount: number) { if (activeWeekStart) navigate(`/semanas/${shiftWeek(activeWeekStart, amount)}`); }
   function openCurrentWeek() { if (state.context.data) navigate(`/semanas/${state.context.data.currentWeekStart}`); }
+  function openCreateEditor(date: string, slot: MealSlot) {
+    dispatch({ type: "editor/openCreate", payload: { date, slot, createId: generateAssignmentId() } });
+  }
   function openNewMeal() {
-    if (activeWeekStart) dispatch({ type: "editor/openCreate", payload: { date: activeWeekStart, slot: "lunch" } });
+    if (activeWeekStart) openCreateEditor(activeWeekStart, "lunch");
+  }
+  async function saveSeries(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const editor = state.editor;
+    if (!editor?.seriesId || state.mutation.status === "loading") return;
+    const text = normalizeFreeText(editor.freeText);
+    if (!text) { dispatch({ type: "mutation/error", payload: "Escribe una descripción para la comida." }); return; }
+    const anchorChanged = editor.date !== (editor.initialDate ?? editor.date);
+    if (editor.recurrenceWeeks === 0) {
+      if (!window.confirm(`¿Dejar de repetir ${text}?`)) return;
+      dispatch({ type: "mutation/loading", payload: { type: "delete", assignmentId: editor.seriesId } });
+      try {
+        await deleteSeries(editor.seriesId, true);
+        dispatch({ type: "mutation/success", payload: "La serie se eliminó." });
+        dispatch({ type: "editor/close" });
+        setAssignmentModal(null);
+        setReloadVersion((version) => version + 1);
+      } catch (error) { dispatch({ type: "mutation/error", payload: errorMessage(error) }); }
+      return;
+    }
+    if (anchorChanged && !window.confirm(`¿Cambiar la fecha inicial de la serie a ${dayLabel(editor.date)}?`)) return;
+    dispatch({ type: "mutation/loading", payload: { type: "update", assignmentId: editor.seriesId } });
+    try {
+      await updateSeries(editor.seriesId, { initialDate: editor.date, text, recurrenceWeeks: editor.recurrenceWeeks, confirmAnchorChange: anchorChanged });
+      dispatch({ type: "mutation/success", payload: "La serie se actualizó." });
+      dispatch({ type: "editor/close" });
+      setAssignmentModal(null);
+      setReloadVersion((version) => version + 1);
+    } catch (error) { dispatch({ type: "mutation/error", payload: errorMessage(error) }); }
   }
   async function saveAssignment(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); const editor = state.editor; if (!editor || state.mutation.status === "loading") return;
+    event.preventDefault(); const editor = state.editor; if (!editor || editor.seriesId || state.mutation.status === "loading") return;
     let payload: AssignmentWritePayload;
     if (editor.kind === "recipe") { if (!state.selectedRecipe) { dispatch({ type: "mutation/error", payload: "Elige una receta pública antes de guardar." }); return; } payload = { date: editor.date, slot: editor.slot, kind: "recipe", recipeId: state.selectedRecipe.id }; }
-    else { const text = normalizeFreeText(editor.freeText); if (!text) { dispatch({ type: "mutation/error", payload: "Escribe una descripción para la comida." }); return; } dispatch({ type: "editor/freeTextChanged", payload: text }); payload = { date: editor.date, slot: editor.slot, kind: "free_text", text }; }
-    const assignmentId = editor.assignmentId; const isEditing = assignmentId !== null; dispatch({ type: "mutation/loading", payload: { type: isEditing ? "update" : "create", assignmentId } });
-    try { const assignment = assignmentId ? await updateAssignment(assignmentId, payload) : await createAssignment({ ...payload, id: generateAssignmentId() }); dispatch({ type: "week/assignmentSaved", payload: assignment }); dispatch({ type: "mutation/success", payload: isEditing ? "La comida se actualizó." : "La comida se guardó." }); dispatch({ type: "editor/close" }); if (isEditing) setAssignmentModal(null); } catch (error) { dispatch({ type: "mutation/error", payload: errorMessage(error) }); }
+    else { const text = normalizeFreeText(editor.freeText); if (!text) { dispatch({ type: "mutation/error", payload: "Escribe una descripción para la comida." }); return; } dispatch({ type: "editor/freeTextChanged", payload: text }); payload = { date: editor.date, slot: editor.slot, kind: "free_text", text, ...(editor.recurrenceWeeks > 0 ? { recurrenceWeeks: editor.recurrenceWeeks } : {}) }; }
+    const assignmentId = editor.assignmentId; const isEditing = assignmentId !== null; const isRecurringMutation = editor.kind === "free_text" && editor.recurrenceWeeks > 0; dispatch({ type: "mutation/loading", payload: { type: isEditing ? "update" : "create", assignmentId } });
+    try {
+      const assignment = assignmentId ? await updateAssignment(assignmentId, payload) : await createAssignment({ ...payload, id: editor.createId ?? generateAssignmentId() });
+      if (isRecurringMutation) {
+        dispatch({ type: "mutation/success", payload: isEditing ? "La serie se creó." : "La comida se guardó." });
+        dispatch({ type: "editor/close" });
+        setAssignmentModal(null);
+        setReloadVersion((version) => version + 1);
+      } else {
+        dispatch({ type: "week/assignmentSaved", payload: assignment }); dispatch({ type: "mutation/success", payload: isEditing ? "La comida se actualizó." : "La comida se guardó." }); dispatch({ type: "editor/close" }); if (isEditing) setAssignmentModal(null);
+      }
+    } catch (error) { dispatch({ type: "mutation/error", payload: errorMessage(error) }); }
+  }
+  async function removeSeries(seriesId: string, text: string) {
+    if (state.mutation.status === "loading" || !window.confirm(`¿Eliminar la serie ${text}?`)) return;
+    dispatch({ type: "mutation/loading", payload: { type: "delete", assignmentId: seriesId } });
+    try {
+      await deleteSeries(seriesId, true);
+      dispatch({ type: "mutation/success", payload: "La serie se eliminó." });
+      dispatch({ type: "editor/close" });
+      setAssignmentModal(null);
+      setReloadVersion((version) => version + 1);
+    } catch (error) { dispatch({ type: "mutation/error", payload: errorMessage(error) }); }
   }
   async function removeAssignment(assignment: CalendarAssignment) {
     const title = assignment.kind === "recipe" ? assignment.recipe?.title : assignment.text ?? "esta comida";
@@ -562,14 +618,14 @@ function CalendarPage() {
   const assignments = state.week.data?.assignments ?? []; const days = activeWeekStart ? weekDays(activeWeekStart) : []; const editor = state.editor; const isSaving = state.mutation.status === "loading" && (state.mutation.type === "create" || state.mutation.type === "update");
   const isDeleting = state.mutation.status === "loading" && state.mutation.type === "delete";
   const editingAssignment = editor?.assignmentId ? assignments.find((assignment) => assignment.id === editor.assignmentId) : null;
-  const assignmentEditor = editor ? <form className="assignment-editor" onSubmit={saveAssignment} aria-labelledby="assignment-editor-title"><div><p className="eyebrow">{editor.assignmentId ? "Editar comida" : "Nueva comida"}</p><h3 id="assignment-editor-title">{dayLabel(editor.date)} · {editor.slot === "lunch" ? "Comida" : "Cena"}</h3></div>{!editor.assignmentId ? <fieldset className="assignment-kind"><legend>Tipo de comida</legend><label><input type="radio" checked={editor.kind === "recipe"} onChange={() => dispatch({ type: "editor/kindChanged", payload: "recipe" })} />Receta pública</label><label><input type="radio" checked={editor.kind === "free_text"} onChange={() => dispatch({ type: "editor/kindChanged", payload: "free_text" })} />Texto libre</label></fieldset> : null}{editor.kind === "recipe" ? <div className="recipe-choice"><p>{state.selectedRecipe ? <>Receta seleccionada: <strong>{state.selectedRecipe.title}</strong></> : "Busca y elige una receta pública."}</p><p className="field-hint">Puedes elegir otra receta desde los resultados de abajo.</p></div> : <label className="free-text-field" htmlFor="meal-text">Descripción de la comida<input id="meal-text" value={editor.freeText} onChange={(event) => dispatch({ type: "editor/freeTextChanged", payload: event.target.value })} onBlur={(event) => dispatch({ type: "editor/freeTextChanged", payload: normalizeFreeText(event.target.value) })} placeholder="Por ejemplo, crema de verduras" /></label>}<div className="editor-actions"><button type="submit" disabled={isSaving || isDeleting}>{isSaving ? "Guardando…" : editor.assignmentId ? "Guardar cambios" : "Guardar comida"}</button>{editingAssignment ? <button type="button" className="danger-button" onClick={() => void removeAssignment(editingAssignment)} disabled={isSaving || isDeleting}>{isDeleting ? "Eliminando…" : "Eliminar"}</button> : null}<button type="button" className="secondary-button" onClick={editor.assignmentId ? closeAssignmentModal : () => dispatch({ type: "editor/close" })} disabled={isSaving || isDeleting}>Cancelar</button></div></form> : null;
+  const assignmentEditor = editor ? <form className="assignment-editor" onSubmit={editor.seriesId ? saveSeries : saveAssignment} aria-labelledby="assignment-editor-title"><div><p className="eyebrow">{editor.seriesId ? "Editar serie" : editor.assignmentId ? "Editar comida" : "Nueva comida"}</p><h3 id="assignment-editor-title">{editor.seriesId ? "Serie de comidas" : `${dayLabel(editor.date)} · ${editor.slot === "lunch" ? "Comida" : "Cena"}`}</h3></div>{editor.seriesId ? <><label className="free-text-field" htmlFor="series-initial-date">Fecha inicial<input id="series-initial-date" type="date" value={editor.date} onChange={(event) => dispatch({ type: "editor/dateChanged", payload: event.target.value })} /></label><label className="free-text-field" htmlFor="series-meal-slot">Comida/Cena<select id="series-meal-slot" value={editor.slot} disabled><option value="lunch">Comida</option><option value="dinner">Cena</option></select></label></> : null}{!editor.assignmentId && !editor.seriesId ? <fieldset className="assignment-kind"><legend>Tipo de comida</legend><label><input type="radio" checked={editor.kind === "recipe"} onChange={() => dispatch({ type: "editor/kindChanged", payload: "recipe" })} />Receta pública</label><label><input type="radio" checked={editor.kind === "free_text"} onChange={() => dispatch({ type: "editor/kindChanged", payload: "free_text" })} />Texto libre</label></fieldset> : null}{editor.kind === "recipe" ? <div className="recipe-choice"><p>{state.selectedRecipe ? <>Receta seleccionada: <strong>{state.selectedRecipe.title}</strong></> : "Busca y elige una receta pública."}</p><p className="field-hint">Puedes elegir otra receta desde los resultados de abajo.</p></div> : <><label className="free-text-field" htmlFor="meal-text">Descripción de la comida<input id="meal-text" value={editor.freeText} onChange={(event) => dispatch({ type: "editor/freeTextChanged", payload: event.target.value })} onBlur={(event) => dispatch({ type: "editor/freeTextChanged", payload: normalizeFreeText(event.target.value) })} placeholder="Por ejemplo, crema de verduras" /></label><label className="free-text-field" htmlFor="recurrence-weeks">Repetición<select id="recurrence-weeks" value={editor.recurrenceWeeks} onChange={(event) => dispatch({ type: "editor/recurrenceChanged", payload: Number(event.target.value) })}><option value="0">No repetir</option><option value="1">Cada semana</option><option value="2">Cada 2 semanas</option><option value="3">Cada 3 semanas</option><option value="4">Cada 4 semanas</option></select></label></>}{<div className="editor-actions"><button type="submit" disabled={isSaving || isDeleting}>{isSaving ? "Guardando…" : editor.seriesId ? "Guardar serie" : editor.assignmentId ? "Guardar cambios" : "Guardar comida"}</button>{editor.seriesId ? <button type="button" className="danger-button" onClick={() => void removeSeries(editor.seriesId!, editor.freeText)} disabled={isSaving || isDeleting}>{isDeleting ? "Eliminando…" : "Eliminar serie"}</button> : editingAssignment ? <button type="button" className="danger-button" onClick={() => void removeAssignment(editingAssignment)} disabled={isSaving || isDeleting}>{isDeleting ? "Eliminando…" : "Eliminar"}</button> : null}<button type="button" className="secondary-button" onClick={editor.assignmentId || editor.seriesId ? closeAssignmentModal : () => dispatch({ type: "editor/close" })} disabled={isSaving || isDeleting}>Cancelar</button></div>}</form> : null;
   const calendarCellContent = (day: string, slot: MealSlot, label: string) => {
     const cellAssignments = assignments.filter((assignment) => assignment.date === day && assignment.slot === slot);
     const dayDescription = dayLabel(day);
     const slotLabel = label.toLowerCase();
     const addActionText = `Añadir ${slotLabel}`;
 
-    return <>{cellAssignments.length ? cellAssignments.map((assignment) => <AssignmentCard key={assignment.id} assignment={assignment} deleting={state.mutation.status === "loading" && state.mutation.type === "delete" && state.mutation.assignmentId === assignment.id} onEdit={() => openEditAssignment(assignment)} />) : <span className="empty-cell">Sin plan</span>}<button type="button" className="add-assignment" onClick={() => dispatch({ type: "editor/openCreate", payload: { date: day, slot } })} aria-label={`${addActionText} el ${dayDescription}`}>+ {addActionText}</button></>;
+    return <>{cellAssignments.length ? cellAssignments.map((assignment) => <AssignmentCard key={assignment.id} assignment={assignment} deleting={state.mutation.status === "loading" && state.mutation.type === "delete" && state.mutation.assignmentId === assignment.id} onEdit={() => openEditAssignment(assignment)} />) : <span className="empty-cell">Sin plan</span>}<button type="button" className="add-assignment" onClick={() => openCreateEditor(day, slot)} aria-label={`${addActionText} el ${dayDescription}`}>+ {addActionText}</button></>;
   };
   return <main className="app-shell calendar-workspace">
     <div className="calendar-frame"><CalendarSidebar /><div className="calendar-content">
@@ -590,8 +646,8 @@ function CalendarPage() {
         </table>
       </div></> : null}
       {state.mutation.status === "success" ? <p className="notice success-notice" role="status">{state.mutation.message}</p> : null}{state.mutation.status === "error" && !assignmentModal ? <p className="notice error-notice" role="alert">{state.mutation.message}</p> : null}
-      {editor && !editor.assignmentId ? assignmentEditor : null}
-      {assignmentModal?.type === "edit" && editor?.assignmentId ? <AssignmentModal heading="Editar comida" onClose={closeAssignmentModal} closeDisabled={isSaving || isDeleting}>{state.mutation.status === "error" ? <p className="notice error-notice" role="alert">{state.mutation.message}</p> : null}{assignmentEditor}</AssignmentModal> : null}
+      {editor && !editor.assignmentId && !editor.seriesId ? assignmentEditor : null}
+      {assignmentModal?.type === "edit" && (editor?.assignmentId || editor?.seriesId) ? <AssignmentModal heading={editor.seriesId ? "Editar serie" : "Editar comida"} onClose={closeAssignmentModal} closeDisabled={isSaving || isDeleting}>{state.mutation.status === "error" ? <p className="notice error-notice" role="alert">{state.mutation.message}</p> : null}{assignmentEditor}</AssignmentModal> : null}
     </section>
     <footer className="calendar-planning-footer"><span aria-hidden="true">🌿</span><p>“La planificación de hoy es el sabor de un mañana más tranquilo.”</p><strong>Planifica · Cocina · Disfruta. <span aria-hidden="true">❤️</span></strong></footer>
     </div></div>

@@ -12,6 +12,8 @@ The calendar owns `0003_meal_calendar_recipe_fk.sql`. Apply all migrations in le
 
 `0006_collections_favorites.sql` adds private, user-owned `recipe_favorites`, `recipe_collections`, and `collection_recipes` relations. Apply it after `0005`. It does not restrict the public recipe catalogue: every saved recipe reference is protected by foreign keys, and deleting a recipe cascades cleanup of favorites and collection memberships.
 
+`0007_meal_calendar_recurrence.sql` adds the shared `meal_recurrence_rules` table after `0001` through `0006`. Each row is one indefinite free-text series with an interval of one to four weeks; generated dates are not materialized. The migration is additive and has no destructive downgrade: an application rollback simply ignores the table, while deleting its data requires an explicit future migration and a decision about existing series.
+
 ## Local verification
 
 Start the PostgreSQL service before running the migration integration test:

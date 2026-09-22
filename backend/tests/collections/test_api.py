@@ -26,7 +26,7 @@ USER = User(USER_ID, "subject", "persona@example.test", "Persona", None)
 class CollectionsRepository:
     favorites: set[UUID] = set()
     collections: dict[UUID, tuple[UUID, Collection]] = {}
-    recipes = {RECIPE_ID: RecipeSummary(RECIPE_ID, "Sopa pública", "", "draft")}
+    recipes = {RECIPE_ID: RecipeSummary(RECIPE_ID, "Sopa pública", "")}
 
     def __init__(self, _: object) -> None:
         pass
@@ -110,7 +110,7 @@ def test_favorites_are_private_and_use_spanish_aliases(client: TestClient) -> No
     response = client.get("/api/v1/me/favorites")
 
     assert response.status_code == 200
-    assert response.json() == {"favoritos": [{"id": str(RECIPE_ID), "titulo": "Sopa pública", "imagenUrl": "", "estado": "draft"}]}
+    assert response.json() == {"favoritos": [{"id": str(RECIPE_ID), "titulo": "Sopa pública", "imagenUrl": ""}]}
     assert client.delete(f"/api/v1/recipes/{RECIPE_ID}/favorite").status_code == 204
 
 

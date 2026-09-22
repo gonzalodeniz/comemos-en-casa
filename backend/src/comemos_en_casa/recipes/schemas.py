@@ -1,6 +1,6 @@
 """Validated recipe catalogue values, independent of persistence and HTTP."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 import re
 from unicodedata import category, normalize
@@ -15,7 +15,21 @@ DETAIL_MIN_CODE_POINTS = 1
 DETAIL_MAX_CODE_POINTS = 10_000
 INGREDIENT_NAME_MAX_CODE_POINTS = 500
 INGREDIENT_QUANTITY_MAX_CODE_POINTS = 100
+LABEL_MAX_CODE_POINTS = 25
+MAX_RECIPE_LABELS = 10
 LOCAL_MEDIA_IMAGE_URL_RE = re.compile(r"^/media/recipes/[0-9a-f-]+\.(?:jpg|png|webp)$")
+
+# The order is part of the label-colour allocation contract.
+RECIPE_LABEL_PALETTE = (
+    "#1D4ED8",
+    "#047857",
+    "#B45309",
+    "#BE123C",
+    "#7C3AED",
+    "#0F766E",
+    "#C2410C",
+    "#4338CA",
+)
 
 
 class RecipeValidationError(ValueError):
@@ -78,10 +92,61 @@ def normalize_title_search(value: str) -> str:
     return normalize("NFC", without_marks)
 
 
+def normalize_label(value: str) -> str:
+    """Normalize one label name, returning an empty string for blank input.
+
+    Control characters are rejected before whitespace processing so that a newline
+    or tab cannot be silently converted into a valid label separator.
+    """
+    label = _require_string(value, "label")
+    if not label.strip():
+        return ""
+    if any(category(character) == "Cc" for character in label):
+        raise RecipeValidationError("label must not contain control characters")
+    label = _normalize_whitespace(label.lower())
+    if not label:
+        return ""
+    return _validate_length(label, minimum=1, maximum=LABEL_MAX_CODE_POINTS, field="label")
+
+
+def normalize_labels(values: Iterable[str]) -> tuple[str, ...]:
+    """Normalize, deduplicate, and bound recipe labels in first-seen order."""
+    if isinstance(values, (str, bytes)):
+        raise RecipeValidationError("labels must be a list of strings")
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        label = normalize_label(value)
+        if label and label not in seen:
+            seen.add(label)
+            normalized.append(label)
+            if len(normalized) == MAX_RECIPE_LABELS:
+                break
+    return tuple(normalized)
+
+
 def _validated_id(value: UUID) -> UUID:
     if not isinstance(value, UUID):
         raise RecipeValidationError("id must be a UUID")
     return value
+
+
+@dataclass(frozen=True)
+class RecipeLabel:
+    """A globally shared, normalized recipe label."""
+
+    id: UUID
+    name: str
+    color: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "id", _validated_id(self.id))
+        normalized_name = normalize_label(self.name)
+        if not normalized_name:
+            raise RecipeValidationError("label must not be empty")
+        object.__setattr__(self, "name", normalized_name)
+        if not isinstance(self.color, str) or not self.color:
+            raise RecipeValidationError("label color must be a non-empty string")
 
 
 @dataclass(frozen=True)
@@ -143,12 +208,12 @@ class Recipe:
 
 @dataclass(frozen=True)
 class ManagedRecipe:
-    """A publicly readable recipe with its lifecycle state and normalized content."""
+    """A publicly readable recipe with normalized content and global labels."""
 
     recipe: Recipe
-    status: str
     ingredients: tuple[Ingredient, ...]
     steps: tuple[PreparationStep, ...]
+    labels: tuple[RecipeLabel, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -158,10 +223,9 @@ class RecipeListItem:
     id: UUID
     title: str
     image_url: str
+    labels: tuple[RecipeLabel, ...] = ()
 
 
 @dataclass(frozen=True)
 class ManagedRecipeListItem(RecipeListItem):
-    """A public list row including the explicitly public draft/published state."""
-
-    status: str
+    """A public list row with its globally shared labels."""

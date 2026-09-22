@@ -60,7 +60,7 @@ def test_migration_keeps_recipes_public_and_cascades_saved_reference_cleanup() -
 
 
 def test_list_favorites_returns_public_recipe_values_in_saved_order() -> None:
-    cursor = RecordingCursor(rows=[(RECIPE_ID, "Sopa", "", "draft")])
+    cursor = RecordingCursor(rows=[(RECIPE_ID, "Sopa", "")])
 
     favorites = CollectionsRepository(RecordingConnection(cursor)).list_favorites(USER_ID)
 
@@ -68,6 +68,7 @@ def test_list_favorites_returns_public_recipe_values_in_saved_order() -> None:
     query, params = cursor.calls[0]
     assert "FROM recipe_favorites AS favorites" in query
     assert "JOIN recipes AS recipes" in query
+    assert "status" not in query
     assert "WHERE favorites.user_id = %s" in query
     assert "ORDER BY favorites.created_at DESC, favorites.recipe_id" in query
     assert params == (USER_ID,)
@@ -76,8 +77,8 @@ def test_list_favorites_returns_public_recipe_values_in_saved_order() -> None:
 def test_collection_reads_are_scoped_to_the_owner_and_include_public_recipes() -> None:
     cursor = RecordingCursor(
         rows=[
-            (COLLECTION_ID, "Cenas", RECIPE_ID, "Sopa", "", "published"),
-            (COLLECTION_ID, "Cenas", None, None, None, None),
+            (COLLECTION_ID, "Cenas", RECIPE_ID, "Sopa", ""),
+            (COLLECTION_ID, "Cenas", None, None, None),
         ]
     )
 
@@ -88,6 +89,7 @@ def test_collection_reads_are_scoped_to_the_owner_and_include_public_recipes() -
     assert [recipe.id for recipe in collection.recipes] == [RECIPE_ID]
     query, params = cursor.calls[0]
     assert "WHERE collections.user_id = %s AND collections.id = %s" in query
+    assert "status" not in query
     assert params == (USER_ID, COLLECTION_ID)
 
 

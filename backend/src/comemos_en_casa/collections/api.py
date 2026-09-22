@@ -29,7 +29,6 @@ class RecipeResponse(_ApiModel):
     id: UUID
     title: str = Field(serialization_alias="titulo")
     image_url: str = Field(serialization_alias="imagenUrl")
-    status: str = Field(serialization_alias="estado")
 
 
 class FavoritesResponse(_ApiModel):
@@ -59,7 +58,7 @@ def _error(status_code: int, code: str, message: str) -> JSONResponse:
 
 
 def _recipe_response(recipe: RecipeSummary) -> RecipeResponse:
-    return RecipeResponse(id=recipe.id, title=recipe.title, image_url=recipe.image_url, status=recipe.status)
+    return RecipeResponse(id=recipe.id, title=recipe.title, image_url=recipe.image_url)
 
 
 def _collection_response(collection: Collection) -> CollectionResponse:

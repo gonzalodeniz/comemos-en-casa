@@ -32,7 +32,6 @@ class RecipeSummary:
     id: UUID
     title: str
     image_url: str
-    status: str
 
 
 @dataclass(frozen=True)

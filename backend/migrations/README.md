@@ -14,6 +14,8 @@ The calendar owns `0003_meal_calendar_recipe_fk.sql`. Apply all migrations in le
 
 `0007_meal_calendar_recurrence.sql` adds the shared `meal_recurrence_rules` table after `0001` through `0006`. Each row is one indefinite free-text series with an interval of one to four weeks; generated dates are not materialized. The migration is additive and has no destructive downgrade: an application rollback simply ignores the table, while deleting its data requires an explicit future migration and a decision about existing series.
 
+`0008_recipe_labels.sql` removes the obsolete recipe editorial status and adds globally shared `recipe_labels` plus the cascading `recipe_label_assignments` relation. Labels are created by recipe writes, are unique by normalized name, and are not populated by the migration. Apply it after `0007`; existing recipes remain in the public catalogue.
+
 ## Local verification
 
 Start the PostgreSQL service before running the migration integration test:

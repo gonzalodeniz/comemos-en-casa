@@ -1,4 +1,4 @@
-"""Public recipe catalogue and management domain."""
+"""Public recipe catalogue, management domain, and global labels."""
 
 from .schemas import (
     Ingredient,
@@ -6,8 +6,11 @@ from .schemas import (
     ManagedRecipeListItem,
     PreparationStep,
     Recipe,
+    RecipeLabel,
     RecipeListItem,
     RecipeValidationError,
+    normalize_label,
+    normalize_labels,
 )
 
 __all__ = [
@@ -16,6 +19,9 @@ __all__ = [
     "ManagedRecipeListItem",
     "PreparationStep",
     "Recipe",
+    "RecipeLabel",
     "RecipeListItem",
     "RecipeValidationError",
+    "normalize_label",
+    "normalize_labels",
 ]

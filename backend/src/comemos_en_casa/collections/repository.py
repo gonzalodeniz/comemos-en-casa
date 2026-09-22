@@ -17,8 +17,7 @@ class CollectionsRepository:
             collections.name,
             recipes.id,
             recipes.title,
-            recipes.image_url,
-            recipes.status
+            recipes.image_url
         FROM recipe_collections AS collections
         LEFT JOIN collection_recipes AS memberships ON memberships.collection_id = collections.id
         LEFT JOIN recipes AS recipes ON recipes.id = memberships.recipe_id
@@ -36,7 +35,7 @@ class CollectionsRepository:
         with self._connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT recipes.id, recipes.title, recipes.image_url, recipes.status
+                SELECT recipes.id, recipes.title, recipes.image_url
                 FROM recipe_favorites AS favorites
                 JOIN recipes AS recipes ON recipes.id = favorites.recipe_id
                 WHERE favorites.user_id = %s
@@ -145,7 +144,7 @@ class CollectionsRepository:
 
     @staticmethod
     def _recipe_summary(row: tuple[Any, ...]) -> RecipeSummary:
-        return RecipeSummary(id=row[0], title=row[1], image_url=row[2], status=row[3])
+        return RecipeSummary(id=row[0], title=row[1], image_url=row[2])
 
     @classmethod
     def _collections(cls, rows: list[tuple[Any, ...]]) -> list[Collection]:

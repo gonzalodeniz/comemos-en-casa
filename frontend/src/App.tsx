@@ -14,18 +14,18 @@ import {
   getCollections,
   getCurrentUser,
   getFavorites,
+  getLabelSuggestions,
   getPublicRecipe,
   getRecipeCatalogue,
   logout,
   setFavorite,
-  setRecipeStatus,
   updateAssignment,
   updateRecipe,
   updateSeries,
   uploadRecipeImage,
 } from "./api";
 import { calendarReducer, initialCalendarState } from "./calendarReducer";
-import type { AssignmentWritePayload, AuthenticatedUser, CalendarAssignment, MealSlot, RecipeCollection, RecipeDetail, RecipeIngredient, RecipeStatus, RecipeSummary, RecipeWritePayload } from "./types";
+import type { AssignmentWritePayload, AuthenticatedUser, CalendarAssignment, MealSlot, RecipeCollection, RecipeDetail, RecipeIngredient, RecipeLabel, RecipeSummary, RecipeWritePayload } from "./types";
 
 const mealRows: Array<{ slot: MealSlot; label: string; icon: string }> = [
   { slot: "lunch", label: "Comida", icon: "☀" },
@@ -34,7 +34,7 @@ const mealRows: Array<{ slot: MealSlot; label: string; icon: string }> = [
 
 type SessionState = { status: "loading" | "ready" | "error"; user: AuthenticatedUser | null };
 type LoadState<T> = { status: "loading" | "ready" | "error"; data: T; error: string | null };
-type RecipeEditorForm = RecipeWritePayload & { recipeId: string | null; image: File | null };
+type RecipeEditorForm = Omit<RecipeWritePayload, "labels"> & { recipeId: string | null; labels: RecipeLabel[]; image: File | null; labelInput: string };
 
 function useMediaQuery(query: string) {
   const getMatches = () => typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia(query).matches;
@@ -53,11 +53,25 @@ function useMediaQuery(query: string) {
 }
 
 function emptyRecipeForm(): RecipeEditorForm {
-  return { recipeId: null, title: "", detail: "", ingredients: [{ name: "", quantity: null }], steps: [{ instruction: "" }], image: null };
+  return { recipeId: null, title: "", detail: "", ingredients: [{ name: "", quantity: null }], steps: [{ instruction: "" }], labels: [], labelInput: "", image: null };
 }
 
 function recipeToForm(recipe: RecipeDetail): RecipeEditorForm {
-  return { recipeId: recipe.id, title: recipe.title, detail: recipe.detail, ingredients: recipe.ingredients.length ? recipe.ingredients : [{ name: "", quantity: null }], steps: recipe.steps.length ? recipe.steps : [{ instruction: "" }], image: null };
+  return { recipeId: recipe.id, title: recipe.title, detail: recipe.detail, ingredients: recipe.ingredients.length ? recipe.ingredients : [{ name: "", quantity: null }], steps: recipe.steps.length ? recipe.steps : [{ instruction: "" }], labels: sortLabels(recipe.labels), labelInput: "", image: null };
+}
+
+function normalizeLabel(value: string): string {
+  return value.normalize("NFC").toLocaleLowerCase().trim().replace(/\s+/gu, " ");
+}
+
+function sortLabels(labels: RecipeLabel[] = []): RecipeLabel[] {
+  return [...labels].sort((left, right) => left.name < right.name ? -1 : left.name > right.name ? 1 : left.id < right.id ? -1 : 1);
+}
+
+function parseLabelFilters(search: string): string[] {
+  const values = new URLSearchParams(search).getAll("label");
+  const seen = new Set<string>();
+  return values.map(normalizeLabel).filter((value) => value && !seen.has(value) && seen.add(value));
 }
 
 function errorMessage(error: unknown): string {
@@ -239,42 +253,89 @@ function AssignmentModal({ heading, children, onClose, closeDisabled = false }: 
   </div>;
 }
 
+function RecipeLabels({ labels, className = "" }: { labels?: RecipeLabel[]; className?: string }) {
+  const orderedLabels = sortLabels(labels);
+  if (!orderedLabels.length) return null;
+  return <ul className={`recipe-labels ${className}`.trim()} aria-label="Etiquetas">{orderedLabels.map((label) => <li key={label.id} style={{ backgroundColor: label.color }}>{label.name}</li>)}</ul>;
+}
+
 function RecipeCard({ recipe, action }: { recipe: RecipeSummary; action?: React.ReactNode }) {
   return <article className="recipe-card">
     {recipe.coverImageUrl ? <img src={recipe.coverImageUrl} alt="" /> : <div className="recipe-image-placeholder" aria-hidden="true">🍲</div>}
     <div className="recipe-card-content">
-      {recipe.status === "draft" ? <span className="status-pill">Borrador público</span> : null}
       <h3><Link to={`/recetas/${recipe.id}`}>{recipe.title}</Link></h3>
+      <RecipeLabels labels={recipe.labels} />
       <div className="recipe-card-actions"><Link to={`/recetas/${recipe.id}`}>Ver receta</Link>{action}</div>
     </div>
   </article>;
 }
 
+function LabelSuggestions({ query, selected, onSelect }: { query: string; selected: string[]; onSelect: (label: RecipeLabel) => void }) {
+  const [suggestions, setSuggestions] = useState<RecipeLabel[]>([]);
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      getLabelSuggestions(query, controller.signal).then(setSuggestions).catch((error: unknown) => {
+        if (!(error instanceof DOMException && error.name === "AbortError")) setSuggestions([]);
+      });
+    }, 120);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [query]);
+  const selectedNames = new Set(selected.map(normalizeLabel));
+  const available = suggestions.filter((label) => !selectedNames.has(normalizeLabel(label.name)));
+  return available.length ? <ul className="label-suggestions" aria-label="Sugerencias de etiquetas">{available.map((label) => <li key={label.id}><button type="button" onClick={() => onSelect(label)}><span className="label-color-dot" style={{ backgroundColor: label.color }} aria-hidden="true" />{label.name}</button></li>)}</ul> : null;
+}
+
 function RecipeCataloguePage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const selectedLabels = parseLabelFilters(location.search);
   const [query, setQuery] = useState("");
+  const [labelQuery, setLabelQuery] = useState("");
   const [load, setLoad] = useState<LoadState<RecipeSummary[]>>({ status: "loading", data: [], error: null });
   const [reload, setReload] = useState(0);
+
+  function updateLabels(nextLabels: string[]) {
+    const params = new URLSearchParams(location.search);
+    params.delete("label");
+    nextLabels.map(normalizeLabel).filter(Boolean).forEach((label) => params.append("label", label));
+    const nextSearch = params.toString();
+    navigate(`${location.pathname}${nextSearch ? `?${nextSearch}` : ""}`);
+  }
+  function selectLabel(label: RecipeLabel) {
+    const normalized = normalizeLabel(label.name);
+    if (!selectedLabels.includes(normalized)) updateLabels([...selectedLabels, normalized]);
+    setLabelQuery("");
+  }
 
   useEffect(() => {
     const controller = new AbortController();
     setLoad((current) => ({ ...current, status: "loading", error: null }));
-    getRecipeCatalogue(query, controller.signal)
+    getRecipeCatalogue(query, selectedLabels, controller.signal)
       .then((recipes) => setLoad({ status: "ready", data: recipes, error: null }))
       .catch((error: unknown) => {
         if (!(error instanceof DOMException && error.name === "AbortError")) setLoad((current) => ({ ...current, status: "error", error: errorMessage(error) }));
       });
     return () => controller.abort();
-  }, [query, reload]);
+  }, [query, location.search, reload]);
 
   return <main className="app-shell">
     <section className="page-hero" aria-labelledby="catalogue-title">
-      <div><p className="eyebrow">Recetario público</p><h1 id="catalogue-title">Recetas para cada día</h1><p>Explora recetas públicas, incluidos los borradores, y guárdalas en tus listas al iniciar sesión.</p></div>
-      <Link className="primary-link" to="/calendario">Ver calendario</Link>
+      <div><p className="eyebrow">Recetario público</p><h1 id="catalogue-title">Recetas para cada día</h1><p>Explora recetas públicas y guárdalas en tus listas al iniciar sesión.</p></div>
+      <Link className="primary-link" to="/mis-recetas">Nueva receta</Link>
     </section>
-    <form className="catalogue-search" role="search" onSubmit={(event) => event.preventDefault()}>
-      <label htmlFor="catalogue-query">Buscar recetas</label>
-      <input id="catalogue-query" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nombre de receta o ingrediente" />
-    </form>
+    <div className="catalogue-controls">
+      <form className="catalogue-search" role="search" onSubmit={(event) => event.preventDefault()}>
+        <label htmlFor="catalogue-query">Buscar recetas</label>
+        <input id="catalogue-query" type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nombre de receta o ingrediente" />
+      </form>
+      <div className="label-filter">
+        <label htmlFor="label-filter-query">Filtrar por etiquetas</label>
+        <input id="label-filter-query" value={labelQuery} onChange={(event) => setLabelQuery(event.target.value)} placeholder="Busca una etiqueta" autoComplete="off" />
+        <LabelSuggestions query={labelQuery} selected={selectedLabels} onSelect={selectLabel} />
+        {selectedLabels.length ? <ul className="selected-labels" aria-label="Filtros seleccionados">{selectedLabels.map((label) => <li key={label}><span>{label}</span><button type="button" aria-label={`Quitar filtro ${label}`} onClick={() => updateLabels(selectedLabels.filter((selected) => selected !== label))}>×</button></li>)}</ul> : null}
+      </div>
+    </div>
     {load.status === "loading" ? <p className="loading-state" role="status">Cargando recetas…</p> : null}
     {load.status === "error" ? <div className="notice error-notice" role="alert"><p>{load.error}</p><button type="button" onClick={() => setReload((value) => value + 1)}>Reintentar</button></div> : null}
     {load.status === "ready" && load.data.length === 0 ? <p className="empty-state">No hay recetas que coincidan con la búsqueda.</p> : null}
@@ -339,8 +400,9 @@ function RecipeDetailPage({ session }: { session: SessionState }) {
     {detail.data ? <article className="recipe-detail">
       <div className="recipe-detail-image">{detail.data.coverImageUrl ? <img src={detail.data.coverImageUrl} alt="" /> : <div className="recipe-image-placeholder" aria-hidden="true">🍲</div>}</div>
       <div className="recipe-detail-content">
-        <p className="eyebrow">{detail.data.status === "draft" ? "Borrador público" : "Receta pública"}</p>
+        <p className="eyebrow">Receta pública</p>
         <h1>{detail.data.title}</h1>
+        <RecipeLabels labels={detail.data.labels} />
         <p className="recipe-description">{detail.data.detail}</p>
         {session.user ? <section className="recipe-saved-actions" aria-labelledby="save-recipe-title">
           <h2 id="save-recipe-title">Guardar receta</h2>
@@ -417,14 +479,13 @@ function RecipeWorkspacePage({ session }: { session: SessionState }) {
   }, [session.user, reload]);
 
   useEffect(() => {
-    if (!session.user) return;
     const controller = new AbortController();
     setRecipes((current) => ({ ...current, status: "loading", error: null }));
     getRecipeCatalogue("", controller.signal)
       .then((data) => setRecipes({ status: "ready", data, error: null }))
       .catch((error: unknown) => { if (!(error instanceof DOMException && error.name === "AbortError")) setRecipes((current) => ({ ...current, status: "error", error: errorMessage(error) })); });
     return () => controller.abort();
-  }, [session.user, reload]);
+  }, [reload]);
 
   async function submitCollection(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -452,6 +513,18 @@ function RecipeWorkspacePage({ session }: { session: SessionState }) {
   }
   function removeIngredient(index: number) { setEditor((current) => current ? { ...current, ingredients: current.ingredients.filter((_, itemIndex) => itemIndex !== index) } : current); }
   function removeStep(index: number) { setEditor((current) => current ? { ...current, steps: current.steps.filter((_, itemIndex) => itemIndex !== index) } : current); }
+  function addEditorLabel(value: string, suggestion?: RecipeLabel) {
+    const normalized = normalizeLabel(value);
+    if (!normalized) return;
+    setEditor((current) => {
+      if (!current || current.labels.length >= 10 || current.labels.some((label) => normalizeLabel(label.name) === normalized)) return current;
+      const label = suggestion ?? { id: `local-${normalized}`, name: normalized, color: "#64748b" };
+      return { ...current, labels: sortLabels([...current.labels, label]), labelInput: "" };
+    });
+  }
+  function removeEditorLabel(labelName: string) {
+    setEditor((current) => current ? { ...current, labels: current.labels.filter((label) => label.name !== labelName) } : current);
+  }
 
   async function saveRecipe(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -461,6 +534,7 @@ function RecipeWorkspacePage({ session }: { session: SessionState }) {
       detail: editor.detail.trim(),
       ingredients: editor.ingredients.map((ingredient) => ({ name: normalizeFreeText(ingredient.name), quantity: normalizeFreeText(ingredient.quantity ?? "") || null })).filter((ingredient) => ingredient.name),
       steps: editor.steps.map((step) => ({ instruction: step.instruction.trim() })).filter((step) => step.instruction),
+      labels: editor.labels.map((label) => label.name),
     };
     if (!payload.title || !payload.detail) { setRecipeMessage({ kind: "error", text: "El título y la descripción son obligatorios." }); return; }
     if (editor.image && editor.image.size > 10 * 1024 * 1024) { setRecipeMessage({ kind: "error", text: "La imagen no puede superar 10 MB." }); return; }
@@ -470,19 +544,7 @@ function RecipeWorkspacePage({ session }: { session: SessionState }) {
       if (editor.image) result = await uploadRecipeImage(result.id, editor.image);
       setEditor(recipeToForm(result));
       setRecipes((current) => ({ ...current, data: current.data.some((recipe) => recipe.id === result.id) ? current.data.map((recipe) => recipe.id === result.id ? result : recipe) : [result, ...current.data] }));
-      setRecipeMessage({ kind: "success", text: editor.recipeId ? "Los cambios se guardaron correctamente." : "La receta se creó como borrador." });
-    } catch (error) { setRecipeMessage({ kind: "error", text: errorMessage(error) }); }
-    finally { setIsSavingRecipe(false); }
-  }
-
-  async function changeStatus(status: RecipeStatus) {
-    if (!editor?.recipeId || isSavingRecipe) return;
-    setIsSavingRecipe(true); setRecipeMessage(null);
-    try {
-      const result = await setRecipeStatus(editor.recipeId, status);
-      setEditor(recipeToForm(result));
-      setRecipes((current) => ({ ...current, data: current.data.map((recipe) => recipe.id === result.id ? result : recipe) }));
-      setRecipeMessage({ kind: "success", text: status === "published" ? "La receta se publicó." : "La receta volvió a borrador." });
+      setRecipeMessage({ kind: "success", text: editor.recipeId ? "Los cambios se guardaron correctamente." : "La receta se creó correctamente." });
     } catch (error) { setRecipeMessage({ kind: "error", text: errorMessage(error) }); }
     finally { setIsSavingRecipe(false); }
   }
@@ -498,22 +560,20 @@ function RecipeWorkspacePage({ session }: { session: SessionState }) {
     finally { setIsSavingRecipe(false); }
   }
 
-  if (session.status === "loading") return <main className="app-shell"><p className="loading-state" role="status">Comprobando tu sesión…</p></main>;
-  if (!session.user) return <main className="app-shell"><section className="empty-state"><h1>Mis recetas</h1><p>Inicia sesión para gestionar recetas, favoritos y colecciones.</p><a className="primary-link" href="/api/v1/auth/login">Iniciar sesión</a></section></main>;
-  const recipeStatus = editor?.recipeId ? recipes.data.find((recipe) => recipe.id === editor.recipeId)?.status : undefined;
-  return <main className="app-shell"><section className="page-hero" aria-labelledby="my-recipes-title"><div><p className="eyebrow">Espacio privado</p><h1 id="my-recipes-title">Mis recetas</h1><p>Crea, edita y publica recetas; conserva también tus favoritos y colecciones.</p></div><button type="button" onClick={() => { setEditor(emptyRecipeForm()); setRecipeMessage(null); }}>Nueva receta</button></section>
-    <section className="private-section recipe-management" aria-labelledby="recipe-management-title"><div className="section-heading"><div><h2 id="recipe-management-title">Gestionar recetas</h2><p>Las recetas se crean como borradores públicos. Guarda los cambios antes de publicar.</p></div></div>
+  return <main className="app-shell"><section className="page-hero" aria-labelledby="my-recipes-title"><div><p className="eyebrow">Recetario público</p><h1 id="my-recipes-title">Mis recetas</h1><p>Crea y edita recetas públicas sin iniciar sesión; tus favoritos y colecciones siguen siendo privados.</p></div><button type="button" onClick={() => { setEditor(emptyRecipeForm()); setRecipeMessage(null); }}>Nueva receta</button></section>
+    <section className="private-section recipe-management" aria-labelledby="recipe-management-title"><div className="section-heading"><div><h2 id="recipe-management-title">Gestionar recetas</h2><p>Añade contenido y etiquetas a cualquier receta pública.</p></div></div>
       {recipeMessage ? <p className={recipeMessage.kind === "error" ? "notice error-notice" : "notice success-notice"} role={recipeMessage.kind === "error" ? "alert" : "status"}>{recipeMessage.text}</p> : null}
-      {editor ? <form className="recipe-editor" onSubmit={saveRecipe} aria-labelledby="recipe-editor-title"><div className="editor-heading"><div><p className="eyebrow">{editor.recipeId ? "Editar receta" : "Nueva receta"}</p><h3 id="recipe-editor-title">{editor.recipeId ? "Contenido de la receta" : "Completa los datos iniciales"}</h3></div>{recipeStatus ? <span className="status-pill">{recipeStatus === "published" ? "Publicada" : "Borrador público"}</span> : null}</div>
+      {editor ? <form className="recipe-editor" onSubmit={saveRecipe} aria-labelledby="recipe-editor-title"><div className="editor-heading"><div><p className="eyebrow">{editor.recipeId ? "Editar receta" : "Nueva receta"}</p><h3 id="recipe-editor-title">{editor.recipeId ? "Contenido de la receta" : "Completa los datos iniciales"}</h3></div></div>
         <label>Título<input required maxLength={200} value={editor.title} onChange={(event) => setEditor({ ...editor, title: event.target.value })} /></label><label>Descripción<textarea required maxLength={10000} value={editor.detail} onChange={(event) => setEditor({ ...editor, detail: event.target.value })} /></label>
+        <fieldset className="label-editor"><legend>Etiquetas <span className="field-hint">Máximo 10</span></legend><div className="selected-labels">{editor.labels.map((label) => <span className="selected-label" key={label.id} style={{ backgroundColor: label.color }}>{label.name}<button type="button" aria-label={`Quitar etiqueta ${label.name}`} onClick={() => removeEditorLabel(label.name)}>×</button></span>)}</div><label htmlFor="recipe-label-input">Añadir etiqueta<input id="recipe-label-input" maxLength={25} value={editor.labelInput} onChange={(event) => setEditor({ ...editor, labelInput: event.target.value })} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); addEditorLabel(editor.labelInput); } }} placeholder="Por ejemplo, cocina rápida" autoComplete="off" /></label><LabelSuggestions query={editor.labelInput} selected={editor.labels.map((label) => label.name)} onSelect={(label) => addEditorLabel(label.name, label)} /><p className="field-hint">Se normalizan espacios y mayúsculas al guardar.</p></fieldset>
         <fieldset><legend>Ingredientes</legend>{editor.ingredients.map((ingredient, index) => <div className="recipe-row" key={`ingredient-${index}`}><label>Ingrediente<input value={ingredient.name} maxLength={500} onChange={(event) => updateIngredient(index, "name", event.target.value)} /></label><label>Cantidad<input value={ingredient.quantity ?? ""} maxLength={100} onChange={(event) => updateIngredient(index, "quantity", event.target.value)} /></label><button type="button" className="text-button" onClick={() => removeIngredient(index)} aria-label={`Eliminar ingrediente ${index + 1}`}>Eliminar</button></div>)}<button type="button" className="secondary-button" onClick={() => setEditor({ ...editor, ingredients: [...editor.ingredients, { name: "", quantity: null }] })}>Añadir ingrediente</button></fieldset>
         <fieldset><legend>Preparación</legend>{editor.steps.map((step, index) => <div className="recipe-row step-row" key={`step-${index}`}><label>Paso {index + 1}<textarea value={step.instruction} onChange={(event) => updateStep(index, event.target.value)} /></label><button type="button" className="text-button" onClick={() => removeStep(index)} aria-label={`Eliminar paso ${index + 1}`}>Eliminar</button></div>)}<button type="button" className="secondary-button" onClick={() => setEditor({ ...editor, steps: [...editor.steps, { instruction: "" }] })}>Añadir paso</button></fieldset>
         <label>Imagen de la receta <span className="field-hint">JPEG, PNG o WebP; máximo 10 MB.</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setEditor({ ...editor, image: event.target.files?.[0] ?? null })} /></label>{editor.image ? <p className="field-hint">Imagen seleccionada: {editor.image.name}</p> : null}
-        <div className="editor-actions"><button type="submit" disabled={isSavingRecipe}>{isSavingRecipe ? "Guardando…" : "Guardar receta"}</button>{editor.recipeId ? <><button type="button" className="secondary-button" onClick={() => void changeStatus(recipeStatus === "published" ? "draft" : "published")} disabled={isSavingRecipe}>{recipeStatus === "published" ? "Pasar a borrador" : "Publicar receta"}</button><button type="button" className="danger-button" onClick={() => void removeRecipe()} disabled={isSavingRecipe}>Eliminar receta</button></> : null}<button type="button" className="text-button" onClick={() => setEditor(null)} disabled={isSavingRecipe}>Cerrar</button></div>
+        <div className="editor-actions"><button type="submit" disabled={isSavingRecipe}>{isSavingRecipe ? "Guardando…" : "Guardar receta"}</button>{editor.recipeId ? <button type="button" className="danger-button" onClick={() => void removeRecipe()} disabled={isSavingRecipe}>Eliminar receta</button> : null}<button type="button" className="text-button" onClick={() => setEditor(null)} disabled={isSavingRecipe}>Cerrar</button></div>
       </form> : null}
       {recipes.status === "loading" ? <p className="loading-state" role="status">Cargando recetas…</p> : null}{recipes.status === "error" ? <div className="notice error-notice" role="alert"><p>{recipes.error}</p><button type="button" onClick={() => setReload((value) => value + 1)}>Reintentar</button></div> : null}{recipes.status === "ready" && !recipes.data.length ? <p>Aún no hay recetas para gestionar.</p> : null}{recipes.data.length ? <div className="recipe-catalogue compact-catalogue" aria-label="Recetas disponibles">{recipes.data.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} action={<button type="button" className="secondary-button" onClick={() => void openRecipeEditor(recipe.id)} disabled={openingId === recipe.id}>{openingId === recipe.id ? "Abriendo…" : "Editar"}</button>} />)}</div> : null}
     </section>
-    {saved.status === "loading" ? <p className="loading-state" role="status">Cargando favoritos y colecciones…</p> : null}{saved.status === "error" ? <div className="notice error-notice" role="alert"><p>{saved.error}</p><button type="button" onClick={() => setReload((value) => value + 1)}>Reintentar</button></div> : null}{saved.status === "ready" ? <><section className="private-section" aria-labelledby="favorites-title"><h2 id="favorites-title">Favoritos</h2>{saved.data.favorites.length ? <div className="recipe-catalogue compact-catalogue">{saved.data.favorites.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} />)}</div> : <p>Aún no tienes recetas favoritas.</p>}</section><section className="private-section" aria-labelledby="collections-title"><div className="section-heading"><div><h2 id="collections-title">Colecciones</h2><p>Estas colecciones solo son visibles para ti.</p></div></div><form className="create-collection" onSubmit={submitCollection}><label htmlFor="workspace-collection-name">Nueva colección</label><input id="workspace-collection-name" value={collectionName} onChange={(event) => setCollectionName(event.target.value)} placeholder="Por ejemplo, Cenas rápidas" /><button type="submit">Crear colección</button></form>{collectionMessage ? <p className="save-message" role="status">{collectionMessage}</p> : null}{saved.data.collections.length ? <div className="collection-grid">{saved.data.collections.map((collection) => <article className="collection-card" key={collection.id}><h3>{collection.name}</h3><p>{collection.recipes.length} {collection.recipes.length === 1 ? "receta" : "recetas"}</p>{collection.recipes.length ? <ul>{collection.recipes.slice(0, 4).map((recipe) => <li key={recipe.id}><Link to={`/recetas/${recipe.id}`}>{recipe.title}</Link></li>)}</ul> : <p className="muted">Todavía no hay recetas en esta colección.</p>}</article>)}</div> : <p>Aún no tienes colecciones.</p>}</section></> : null}
+    {session.user ? <>{saved.status === "loading" ? <p className="loading-state" role="status">Cargando favoritos y colecciones…</p> : null}{saved.status === "error" ? <div className="notice error-notice" role="alert"><p>{saved.error}</p><button type="button" onClick={() => setReload((value) => value + 1)}>Reintentar</button></div> : null}{saved.status === "ready" ? <><section className="private-section" aria-labelledby="favorites-title"><h2 id="favorites-title">Favoritos</h2>{saved.data.favorites.length ? <div className="recipe-catalogue compact-catalogue">{saved.data.favorites.map((recipe) => <RecipeCard key={recipe.id} recipe={recipe} />)}</div> : <p>Aún no tienes recetas favoritas.</p>}</section><section className="private-section" aria-labelledby="collections-title"><div className="section-heading"><div><h2 id="collections-title">Colecciones</h2><p>Estas colecciones solo son visibles para ti.</p></div></div><form className="create-collection" onSubmit={submitCollection}><label htmlFor="workspace-collection-name">Nueva colección</label><input id="workspace-collection-name" value={collectionName} onChange={(event) => setCollectionName(event.target.value)} placeholder="Por ejemplo, Cenas rápidas" /><button type="submit">Crear colección</button></form>{collectionMessage ? <p className="save-message" role="status">{collectionMessage}</p> : null}{saved.data.collections.length ? <div className="collection-grid">{saved.data.collections.map((collection) => <article className="collection-card" key={collection.id}><h3>{collection.name}</h3><p>{collection.recipes.length} {collection.recipes.length === 1 ? "receta" : "recetas"}</p>{collection.recipes.length ? <ul>{collection.recipes.slice(0, 4).map((recipe) => <li key={recipe.id}><Link to={`/recetas/${recipe.id}`}>{recipe.title}</Link></li>)}</ul> : <p className="muted">Todavía no hay recetas en esta colección.</p>}</article>)}</div> : <p>Aún no tienes colecciones.</p>}</section></> : null}</> : null}
   </main>;
 }
 

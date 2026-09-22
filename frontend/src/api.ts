@@ -8,7 +8,7 @@ import type {
   RecipeCollection,
   RecipeDetail,
   RecipeSearchResult,
-  RecipeStatus,
+  RecipeLabel,
   RecipeSummary,
   RecipeWritePayload,
   SeriesWritePayload,
@@ -47,7 +47,7 @@ type ApiRecipe = {
   id: string;
   titulo: string;
   imagenUrl: string;
-  estado: RecipeStatus;
+  labels: RecipeLabel[];
 };
 
 type ApiRecipeDetail = ApiRecipe & {
@@ -96,7 +96,7 @@ const calendarRequest = <T>(path: string, options?: RequestOptions) => request<T
 const apiRequest = <T>(path: string, options?: RequestOptions) => request<T>(API_ROOT, path, options);
 
 function toRecipeSummary(recipe: ApiRecipe): RecipeSummary {
-  return { id: recipe.id, title: recipe.titulo, coverImageUrl: recipe.imagenUrl, status: recipe.estado };
+  return { id: recipe.id, title: recipe.titulo, coverImageUrl: recipe.imagenUrl, labels: recipe.labels ?? [] };
 }
 
 function toRecipeDetail(recipe: ApiRecipeDetail): RecipeDetail {
@@ -114,6 +114,7 @@ function toRecipeWriteBody(recipe: RecipeWritePayload) {
     detalle: recipe.detail,
     ingredientes: recipe.ingredients.map((ingredient) => ({ nombre: ingredient.name, cantidad: ingredient.quantity || undefined })),
     pasos: recipe.steps.map((step) => ({ instruccion: step.instruction })),
+    labels: recipe.labels,
   };
 }
 
@@ -134,10 +135,19 @@ export function searchPublicRecipes(query: string, signal?: AbortSignal): Promis
   return calendarRequest<RecipeSearchResult>(`/recipes?${params.toString()}`, { signal });
 }
 
-export async function getRecipeCatalogue(query = "", signal?: AbortSignal): Promise<RecipeSummary[]> {
+export async function getRecipeCatalogue(query = "", labelsOrSignal: string[] | AbortSignal = [], signal?: AbortSignal): Promise<RecipeSummary[]> {
+  const labels = Array.isArray(labelsOrSignal) ? labelsOrSignal : [];
+  const requestSignal = Array.isArray(labelsOrSignal) ? signal : labelsOrSignal;
   const params = new URLSearchParams({ q: query, limit: "50" });
-  const response = await apiRequest<{ recetas: ApiRecipe[] }>(`/recipes?${params.toString()}`, { signal });
+  labels.forEach((label) => params.append("label", label));
+  const response = await apiRequest<{ recetas: ApiRecipe[] }>(`/recipes?${params.toString()}`, { signal: requestSignal });
   return response.recetas.map(toRecipeSummary);
+}
+
+export async function getLabelSuggestions(query = "", signal?: AbortSignal): Promise<RecipeLabel[]> {
+  const params = new URLSearchParams({ q: query, limit: "50" });
+  const response = await apiRequest<{ labels: RecipeLabel[] }>(`/labels?${params.toString()}`, { signal });
+  return response.labels;
 }
 
 export async function getPublicRecipe(recipeId: string, signal?: AbortSignal): Promise<RecipeDetail> {
@@ -150,10 +160,6 @@ export async function createRecipe(recipe: RecipeWritePayload): Promise<RecipeDe
 
 export async function updateRecipe(recipeId: string, recipe: RecipeWritePayload): Promise<RecipeDetail> {
   return toRecipeDetail(await apiRequest<ApiRecipeDetail>(`/recipes/${encodeURIComponent(recipeId)}`, { method: "PATCH", body: toRecipeWriteBody(recipe) }));
-}
-
-export async function setRecipeStatus(recipeId: string, status: RecipeStatus): Promise<RecipeDetail> {
-  return toRecipeDetail(await apiRequest<ApiRecipeDetail>(`/recipes/${encodeURIComponent(recipeId)}/${status === "published" ? "publish" : "draft"}`, { method: "POST" }));
 }
 
 export async function deleteRecipe(recipeId: string): Promise<void> {
@@ -179,6 +185,10 @@ export async function uploadRecipeImage(recipeId: string, file: File): Promise<R
     });
   }
   return toRecipeDetail((await response.json()) as ApiRecipeDetail);
+}
+
+export async function removeRecipeImage(recipeId: string): Promise<RecipeDetail> {
+  return toRecipeDetail(await apiRequest<ApiRecipeDetail>(`/recipes/${encodeURIComponent(recipeId)}/image`, { method: "DELETE" }));
 }
 
 export async function logout(): Promise<void> {

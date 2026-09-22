@@ -1,7 +1,6 @@
 export type MealSlot = "lunch" | "dinner";
 export type AssignmentKind = "recipe" | "free_text";
 export type AssignmentEntryType = "assignment" | "recurring_occurrence";
-export type RecipeStatus = "draft" | "published";
 
 export interface CalendarContext {
   timezone: string;
@@ -9,11 +8,17 @@ export interface CalendarContext {
   guestMode: boolean;
 }
 
+export interface RecipeLabel {
+  id: string;
+  name: string;
+  color: string;
+}
+
 export interface RecipeSummary {
   id: string;
   title: string;
   coverImageUrl: string;
-  status?: RecipeStatus;
+  labels?: RecipeLabel[];
 }
 
 export interface RecipeIngredient {
@@ -36,6 +41,7 @@ export interface RecipeWritePayload {
   detail: string;
   ingredients: RecipeIngredient[];
   steps: RecipeStep[];
+  labels: string[];
 }
 
 export interface RecipeReference {

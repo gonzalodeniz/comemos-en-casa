@@ -44,5 +44,6 @@ def test_historical_sql_migrations_are_not_rewritten_as_alembic_revisions() -> N
         "0005_recipe_management.sql",
         "0006_collections_favorites.sql",
         "0007_meal_calendar_recurrence.sql",
+        "0008_recipe_labels.sql",
     ]
     assert sorted(path.name for path in alembic_versions.glob("*.py")) == ["0000_baseline.py"]

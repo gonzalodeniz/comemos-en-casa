@@ -1,5 +1,6 @@
 export type MealSlot = "lunch" | "dinner";
 export type AssignmentKind = "recipe" | "free_text";
+export type AssignmentEntryType = "assignment" | "recurring_occurrence";
 export type RecipeStatus = "draft" | "published";
 
 export interface CalendarContext {
@@ -46,11 +47,16 @@ export interface RecipeReference {
 
 export interface CalendarAssignment {
   id: string;
+  entryType?: AssignmentEntryType;
   date: string;
   slot: MealSlot;
   kind: AssignmentKind;
   recipe?: RecipeReference;
   text?: string;
+  seriesId?: string;
+  occurrenceDate?: string;
+  initialDate?: string;
+  recurrenceWeeks?: number;
 }
 
 export interface AssignmentWritePayload {
@@ -60,6 +66,14 @@ export interface AssignmentWritePayload {
   kind: AssignmentKind;
   recipeId?: string;
   text?: string;
+  recurrenceWeeks?: number;
+}
+
+export interface SeriesWritePayload {
+  initialDate: string;
+  text: string;
+  recurrenceWeeks: number;
+  confirmAnchorChange: boolean;
 }
 
 export interface CalendarWeek {

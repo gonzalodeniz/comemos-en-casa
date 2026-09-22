@@ -11,6 +11,7 @@ import type {
   RecipeStatus,
   RecipeSummary,
   RecipeWritePayload,
+  SeriesWritePayload,
 } from "./types";
 
 const CALENDAR_API_ROOT = "/api/v1/meal-calendar";
@@ -224,6 +225,14 @@ export function updateAssignment(assignmentId: string, payload: AssignmentWriteP
   return calendarRequest<CalendarAssignment>(`/assignments/${encodeURIComponent(assignmentId)}`, { method: "PATCH", body: payload });
 }
 
+export async function updateSeries(seriesId: string, payload: SeriesWritePayload): Promise<void> {
+  await calendarRequest<void>(`/series/${encodeURIComponent(seriesId)}`, { method: "PATCH", body: payload });
+}
+
 export async function deleteAssignment(assignmentId: string): Promise<void> {
   await calendarRequest<void>(`/assignments/${encodeURIComponent(assignmentId)}`, { method: "DELETE" });
+}
+
+export async function deleteSeries(seriesId: string, confirmed: boolean): Promise<void> {
+  await calendarRequest<void>(`/series/${encodeURIComponent(seriesId)}?confirmed=${confirmed ? "true" : "false"}`, { method: "DELETE" });
 }

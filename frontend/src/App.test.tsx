@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, expect, test, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import App from "./App";
-import { createAssignment, deleteAssignment, getCalendarContext, getCalendarWeek, getCurrentUser, updateAssignment } from "./api";
+import { createAssignment, deleteAssignment, deleteSeries, getCalendarContext, getCalendarWeek, getCurrentUser, updateAssignment, updateSeries } from "./api";
 import type { CalendarAssignment } from "./types";
 
 vi.mock("./api", () => ({
@@ -13,6 +13,7 @@ vi.mock("./api", () => ({
   createRecipe: vi.fn(),
   deleteAssignment: vi.fn(),
   deleteRecipe: vi.fn(),
+  deleteSeries: vi.fn(),
   getCalendarContext: vi.fn(),
   getCalendarWeek: vi.fn(),
   getCollections: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock("./api", () => ({
   setRecipeStatus: vi.fn(),
   updateAssignment: vi.fn(),
   updateRecipe: vi.fn(),
+  updateSeries: vi.fn(),
   uploadRecipeImage: vi.fn(),
 }));
 
@@ -49,6 +51,8 @@ function mockCalendar(weekStart = "2026-09-14", assignments: CalendarAssignment[
     assignments,
   }));
   vi.mocked(deleteAssignment).mockResolvedValue();
+  vi.mocked(deleteSeries).mockResolvedValue();
+  vi.mocked(updateSeries).mockResolvedValue();
   return weekStart;
 }
 
@@ -332,4 +336,97 @@ test("keeps the existing calendar error visible", async () => {
   render(<MemoryRouter initialEntries={["/"]}><App /></MemoryRouter>);
 
   expect(await screen.findByRole("alert")).toBeTruthy();
+});
+
+test("creates a recurring free-text meal with the selected recurrence and editor UUID", async () => {
+  const assignment: CalendarAssignment = {
+    id: "series-id:2026-09-14",
+    entryType: "recurring_occurrence",
+    date: "2026-09-14",
+    slot: "lunch",
+    kind: "free_text",
+    text: "Lentejas",
+    seriesId: "series-id",
+    initialDate: "2026-09-14",
+    recurrenceWeeks: 2,
+  };
+  mockCalendar();
+  vi.stubGlobal("crypto", { randomUUID: vi.fn().mockReturnValue("create-uuid") });
+  vi.mocked(createAssignment).mockResolvedValue(assignment);
+
+  render(<MemoryRouter initialEntries={["/"]}><App /></MemoryRouter>);
+  fireEvent.click(await screen.findByRole("button", { name: "Añadir comida el lun, 14 sept" }));
+  fireEvent.change(screen.getByLabelText("Descripción de la comida"), { target: { value: "Lentejas" } });
+  fireEvent.change(screen.getByLabelText("Repetición"), { target: { value: "2" } });
+  fireEvent.click(screen.getByRole("button", { name: "Guardar comida" }));
+
+  await waitFor(() => expect(createAssignment).toHaveBeenCalledWith({
+    id: "create-uuid",
+    date: "2026-09-14",
+    slot: "lunch",
+    kind: "free_text",
+    text: "Lentejas",
+    recurrenceWeeks: 2,
+  }));
+  await waitFor(() => expect(vi.mocked(getCalendarWeek).mock.calls.length).toBeGreaterThan(1));
+});
+
+test("edits and deletes a recurring occurrence through its series", async () => {
+  const assignment: CalendarAssignment = {
+    id: "series-id:2026-09-14",
+    entryType: "recurring_occurrence",
+    date: "2026-09-14",
+    slot: "dinner",
+    kind: "free_text",
+    text: "Guiso",
+    seriesId: "series-id",
+    occurrenceDate: "2026-09-14",
+    initialDate: "2026-09-14",
+    recurrenceWeeks: 2,
+  };
+  mockCalendar("2026-09-14", [assignment]);
+  const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+  vi.mocked(updateSeries).mockResolvedValue();
+  vi.mocked(deleteSeries).mockResolvedValue();
+
+  render(<MemoryRouter initialEntries={["/"]}><App /></MemoryRouter>);
+  fireEvent.click(await screen.findByRole("button", { name: "Guiso" }));
+  const dialog = await screen.findByRole("dialog", { name: "Editar serie" });
+  const mealSlot = within(dialog).getByLabelText("Comida/Cena") as HTMLSelectElement;
+  expect(mealSlot.value).toBe("dinner");
+  expect(mealSlot.disabled).toBe(true);
+  fireEvent.change(within(dialog).getByLabelText("Descripción de la comida"), { target: { value: "Guiso nuevo" } });
+  fireEvent.change(within(dialog).getByLabelText("Repetición"), { target: { value: "3" } });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Guardar serie" }));
+
+  await waitFor(() => expect(updateSeries).toHaveBeenCalledWith("series-id", {
+    initialDate: "2026-09-14",
+    text: "Guiso nuevo",
+    recurrenceWeeks: 3,
+    confirmAnchorChange: false,
+  }));
+  await waitFor(() => expect(vi.mocked(getCalendarWeek).mock.calls.length).toBeGreaterThan(1));
+  fireEvent.click(await screen.findByRole("button", { name: "Guiso" }));
+  const deleteDialog = await screen.findByRole("dialog", { name: "Editar serie" });
+  fireEvent.change(within(deleteDialog).getByLabelText("Repetición"), { target: { value: "0" } });
+  fireEvent.click(within(deleteDialog).getByRole("button", { name: "Guardar serie" }));
+  await waitFor(() => expect(deleteSeries).toHaveBeenCalledWith("series-id", true));
+  expect(deleteAssignment).not.toHaveBeenCalled();
+  expect(confirmSpy).toHaveBeenCalled();
+});
+
+test("does not show recurrence controls when editing a recipe", async () => {
+  const assignment: CalendarAssignment = {
+    id: "recipe-assignment",
+    date: "2026-09-14",
+    slot: "lunch",
+    kind: "recipe",
+    recipe: { id: "recipe-id", available: true, title: "Arroz", coverImageUrl: null },
+  };
+  mockCalendar("2026-09-14", [assignment]);
+
+  render(<MemoryRouter initialEntries={["/"]}><App /></MemoryRouter>);
+  fireEvent.click(await screen.findByRole("button", { name: "Arroz" }));
+  const dialog = await screen.findByRole("dialog", { name: "Editar comida" });
+  expect(within(dialog).queryByLabelText("Repetición")).toBeNull();
 });

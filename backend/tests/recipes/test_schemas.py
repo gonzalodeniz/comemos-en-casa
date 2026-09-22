@@ -8,6 +8,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parents[2] / "src"))
 
+from comemos_en_casa.recipes import schemas
 from comemos_en_casa.recipes.schemas import (
     Recipe,
     RecipeValidationError,
@@ -160,3 +161,67 @@ def test_title_search_rejects_non_string_queries(query: object) -> None:
 def test_title_search_normalizes_case_accents_and_whitespace() -> None:
     assert normalize_title_search(" Tortilla\tESPAÑOLA ") == "tortilla espanola"
     assert normalize_title_search("  \t\n ") == ""
+
+
+def test_label_normalization_preserves_accents_and_internal_spaces() -> None:
+    assert schemas.normalize_label("  COCINA\u00a0\u2003 rápida  ") == "cocina rápida"
+    assert schemas.normalize_label("menú ★ 2 / fácil") == "menú ★ 2 / fácil"
+
+
+@pytest.mark.parametrize("value", ["x" * 26, "  " + ("á" * 26) + "  "])
+def test_label_normalization_rejects_more_than_25_characters(value: str) -> None:
+    with pytest.raises(RecipeValidationError, match="label"):
+        schemas.normalize_label(value)
+
+
+@pytest.mark.parametrize("value", ["contains\x00nul", "contains\x1fseparator"])
+def test_label_normalization_rejects_control_characters(value: str) -> None:
+    with pytest.raises(RecipeValidationError, match="label"):
+        schemas.normalize_label(value)
+
+
+def test_label_list_ignores_empty_values_deduplicates_before_the_ten_label_limit() -> None:
+    values = [
+        " Sopa ",
+        "sopa",
+        "",
+        "   \t",
+        "Ágil",
+        "a\u0301GIL",
+        "uno",
+        "dos",
+        "tres",
+        "cuatro",
+        "cinco",
+        "seis",
+        "siete",
+        "ocho",
+        "nueve",
+        "diez",
+        "once",
+    ]
+
+    assert schemas.normalize_labels(values) == (
+        "sopa",
+        "ágil",
+        "uno",
+        "dos",
+        "tres",
+        "cuatro",
+        "cinco",
+        "seis",
+        "siete",
+        "ocho",
+    )
+
+
+def test_recipe_label_exposes_identity_name_and_color() -> None:
+    label = schemas.RecipeLabel(
+        id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+        name="sin gluten",
+        color="#047857",
+    )
+
+    assert label.id == UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+    assert label.name == "sin gluten"
+    assert label.color == "#047857"

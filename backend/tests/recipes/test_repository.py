@@ -11,7 +11,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parents[2] / "src"))
 
-from comemos_en_casa.recipes.repository import RecipeCatalogueRepository
+from comemos_en_casa.recipes.repository import RecipeCatalogueRepository, RecipeManagementRepository
 from comemos_en_casa.recipes.schemas import Recipe, RecipeListItem, RecipeValidationError
 
 
@@ -28,6 +28,15 @@ MIGRATION = (
     / "0002_recipe_catalogue_foundation.sql"
 )
 MIGRATION_NOTES = MIGRATION.parents[1] / "README.md"
+MIGRATIONS_DIRECTORY = MIGRATION.parent
+
+
+def _labels_migration() -> Path:
+    for migration in sorted(MIGRATIONS_DIRECTORY.glob("*.sql")):
+        sql = migration.read_text(encoding="utf-8").lower()
+        if "recipe_labels" in sql and "recipe_label_assignments" in sql:
+            return migration
+    return MIGRATIONS_DIRECTORY / "0008_recipe_labels.sql"
 
 
 def test_catalogue_migration_creates_the_recipe_identity_and_foundation_fields() -> None:
@@ -100,6 +109,22 @@ def postgres_calendar_catalogue_connection() -> Iterator[Any]:
     try:
         connection.execute(MIGRATION_0001.read_text(encoding="utf-8"))
         connection.execute(MIGRATION.read_text(encoding="utf-8"))
+        yield connection
+    finally:
+        connection.rollback()
+        connection.close()
+
+
+@pytest.fixture
+def postgres_recipe_labels_connection() -> Iterator[Any]:
+    """Apply every recipe prerequisite and the labels migration in one transaction."""
+    connection = _open_postgres_connection()
+    try:
+        for migration in sorted(MIGRATIONS_DIRECTORY.glob("*.sql")):
+            connection.execute(migration.read_text(encoding="utf-8"))
+        labels_migration = _labels_migration()
+        if not labels_migration.exists():
+            pytest.fail("The recipe labels migration has not been added yet")
         yield connection
     finally:
         connection.rollback()
@@ -257,6 +282,51 @@ def test_search_rejects_non_string_queries_before_opening_a_cursor(query: object
         RecipeCatalogueRepository(connection).search_public_by_title(query)  # type: ignore[arg-type]
 
     assert connection.cursor_calls == 0
+
+
+def test_management_reuses_global_labels_and_cleans_only_orphans(
+    postgres_recipe_labels_connection: Any,
+) -> None:
+    connection = postgres_recipe_labels_connection
+    repository = RecipeManagementRepository(connection)
+    first = make_recipe()
+    second = Recipe.restore(
+        id=UUID("12345678-1234-5678-1234-567812345679"),
+        title="Ensalada",
+        image_url="https://example.test/ensalada.jpg",
+        detail="Mezclar y servir",
+    )
+
+    repository.create_management(first, [], [], labels=[" RÁPIDO ", "fácil"])
+    repository.create_management(second, [], [], labels=["rápido"])
+
+    stored_labels = connection.execute(
+        "SELECT id, name, color FROM recipe_labels ORDER BY name"
+    ).fetchall()
+    assert [name for _, name, _ in stored_labels] == ["fácil", "rápido"]
+    assert stored_labels[0][2].startswith("#")
+
+    first_read = repository.find_management_by_id(first.id)
+    second_read = repository.find_management_by_id(second.id)
+    assert first_read is not None
+    assert second_read is not None
+    assert [label.name for label in first_read.labels] == ["fácil", "rápido"]
+    assert [label.name for label in second_read.labels] == ["rápido"]
+    assert first_read.labels[1].id == second_read.labels[0].id
+    assert first_read.labels[1].color == second_read.labels[0].color
+
+    replacement = Recipe.update_foundation(
+        id=first.id,
+        title=first.title,
+        image_url=first.image_url,
+        detail=first.detail,
+    )
+    assert repository.update_management(replacement, [], [], labels=["rápido"]) is True
+    assert connection.execute("SELECT name FROM recipe_labels ORDER BY name").fetchall() == [("rápido",)]
+    assert connection.execute(
+        "SELECT recipe_id, label_id FROM recipe_label_assignments ORDER BY recipe_id"
+    ).fetchall() == [(first.id, stored_labels[1][0]), (second.id, stored_labels[1][0])]
+    assert connection.info.transaction_status.name == "INTRANS"
 
 
 def test_catalogue_migration_applies_in_isolation_with_constraints_and_trigram_index(

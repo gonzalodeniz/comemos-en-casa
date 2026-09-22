@@ -64,6 +64,15 @@ class RecipeRepository:
         return recipe_id == self.stored.recipe.id
 
 
+def _reset_repository() -> None:
+    RecipeRepository.stored = ManagedRecipe(
+        recipe=Recipe(id=RECIPE_ID, title="Borrador público", image_url="", detail="Una receta visible."),
+        status="draft",
+        ingredients=(Ingredient(name="Tomate", quantity="2"),),
+        steps=(PreparationStep(instruction="Cortar el tomate."),),
+    )
+
+
 @pytest.fixture
 def client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> TestClient:
     monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@db/app")
@@ -74,45 +83,142 @@ def client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> TestClient:
     from comemos_en_casa.auth.api import current_user_dependency
     from comemos_en_casa.recipes import api
 
-    RecipeRepository.stored = ManagedRecipe(
-        recipe=Recipe(id=RECIPE_ID, title="Borrador público", image_url="", detail="Una receta visible."),
-        status="draft",
-        ingredients=(Ingredient(name="Tomate", quantity="2"),),
-        steps=(PreparationStep(instruction="Cortar el tomate."),),
-    )
+    _reset_repository()
     monkeypatch.setattr(api, "RecipeManagementRepository", RecipeRepository)
     application.dependency_overrides[app_module.get_connection] = lambda: object()
     application.dependency_overrides[current_user_dependency] = lambda: USER
     return TestClient(application)
 
 
-def test_public_reads_include_drafts_and_spanish_field_labels(client: TestClient) -> None:
+@pytest.fixture
+def anonymous_client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> TestClient:
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:pass@db/app")
+    monkeypatch.setenv("MEDIA_ROOT", str(tmp_path / "media"))
+    sys.modules.pop("comemos_en_casa.app", None)
+    app_module = importlib.import_module("comemos_en_casa.app")
+    application = app_module.create_app()
+    from comemos_en_casa.recipes import api
+
+    _reset_repository()
+    monkeypatch.setattr(api, "RecipeManagementRepository", RecipeRepository)
+    application.dependency_overrides[app_module.get_connection] = lambda: object()
+    return TestClient(application)
+
+
+def test_public_reads_have_labels_and_no_editorial_status(client: TestClient) -> None:
     listing = client.get("/api/v1/recipes")
     detail = client.get(f"/api/v1/recipes/{RECIPE_ID}")
 
     assert listing.status_code == detail.status_code == 200
-    assert listing.json()["recetas"][0]["estado"] == "draft"
+    assert "estado" not in listing.json()["recetas"][0]
+    assert "estado" not in detail.json()
     assert detail.json()["titulo"] == "Borrador público"
     assert detail.json()["ingredientes"] == [{"nombre": "Tomate", "cantidad": "2"}]
+    assert all(set(label) == {"id", "name", "color"} for label in detail.json()["labels"])
 
 
-def test_authenticated_create_publish_and_image_upload(client: TestClient) -> None:
+def test_recipe_write_contract_normalizes_labels_and_returns_label_objects(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/recipes",
+        json={
+            "titulo": "Sopa",
+            "detalle": "Hervir.",
+            "ingredientes": [],
+            "pasos": [],
+            "labels": ["  COCINA   rápida  ", "cocina rápida", ""],
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["labels"]
+    assert response.json()["labels"][0]["name"] == "cocina rápida"
+    assert all(set(label) == {"id", "name", "color"} for label in response.json()["labels"])
+    assert "estado" not in response.json()
+
+
+def test_anonymous_recipe_crud_and_image_operations(anonymous_client: TestClient) -> None:
+    payload = {"titulo": "Sopa", "detalle": "Hervir.", "ingredientes": [], "pasos": [], "labels": []}
+    created = anonymous_client.post("/api/v1/recipes", json=payload)
+    assert created.status_code == 201
+
+    updated = anonymous_client.patch(f"/api/v1/recipes/{RECIPE_ID}", json=payload)
+    replaced = anonymous_client.put(f"/api/v1/recipes/{RECIPE_ID}", json=payload)
+    deleted = anonymous_client.delete(f"/api/v1/recipes/{RECIPE_ID}")
+    uploaded = anonymous_client.post(
+        f"/api/v1/recipes/{RECIPE_ID}/image",
+        files={"file": ("sopa.png", b"\x89PNG\r\n\x1a\nimage-data", "image/png")},
+    )
+    removed_image = anonymous_client.delete(f"/api/v1/recipes/{RECIPE_ID}/image")
+
+    assert updated.status_code == replaced.status_code == 200
+    assert deleted.status_code == 204
+    assert uploaded.status_code == removed_image.status_code == 200
+    assert removed_image.json()["imagenUrl"] == ""
+
+
+def test_editorial_state_routes_are_removed(client: TestClient) -> None:
+    assert client.post(f"/api/v1/recipes/{RECIPE_ID}/publish").status_code == 404
+    assert client.post(f"/api/v1/recipes/{RECIPE_ID}/draft").status_code == 404
+
+
+def test_authenticated_create_and_image_upload_are_public_contracts(client: TestClient) -> None:
     create = client.post(
         "/api/v1/recipes",
-        json={"titulo": "Sopa", "detalle": "Hervir.", "ingredientes": [{"nombre": "Agua"}], "pasos": [{"instruccion": "Hervir agua."}]},
+        json={"titulo": "Sopa", "detalle": "Hervir.", "ingredientes": [{"nombre": "Agua"}], "pasos": [{"instruccion": "Hervir agua."}], "labels": []},
     )
-    recipe_id = create.json()["id"]
-    publish = client.post(f"/api/v1/recipes/{recipe_id}/publish")
+    recipe_id = create.json().get("id", str(RECIPE_ID))
     image = client.post(
         f"/api/v1/recipes/{recipe_id}/image",
         files={"file": ("sopa.png", b"\x89PNG\r\n\x1a\nimage-data", "image/png")},
     )
 
     assert create.status_code == 201
-    assert create.json()["estado"] == "draft"
-    assert publish.json()["estado"] == "published"
+    assert "estado" not in create.json()
     assert image.status_code == 200
     assert image.json()["imagenUrl"].startswith("/media/recipes/")
+
+
+def test_repeated_label_query_params_use_and_semantics_and_ignore_empty_values(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    labels = {
+        "rápido": SimpleNamespace(id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1"), name="rápido", color="#1D4ED8"),
+        "vegetariano": SimpleNamespace(id=UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2"), name="vegetariano", color="#047857"),
+    }
+    recipes = [
+        SimpleNamespace(id=UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1"), title="Ambas", image_url="", status="draft", labels=[labels["rápido"], labels["vegetariano"]]),
+        SimpleNamespace(id=UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb2"), title="Rápida", image_url="", status="draft", labels=[labels["rápido"]]),
+        SimpleNamespace(id=UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb3"), title="Verde", image_url="", status="draft", labels=[labels["vegetariano"]]),
+    ]
+
+    class FilteringRepository(RecipeRepository):
+        def search_management_by_title(self, query: str, limit: int, *args: object, **kwargs: object) -> list[object]:
+            requested = kwargs.get("labels") or kwargs.get("label_names")
+            if requested is None and args:
+                requested = args[0]
+            if requested is None:
+                return recipes[:limit]
+            effective = set(requested)
+            return [recipe for recipe in recipes if effective <= {label.name for label in recipe.labels}][:limit]
+
+        search_public_by_title = search_management_by_title
+
+    from comemos_en_casa.recipes import api
+
+    monkeypatch.setattr(api, "RecipeManagementRepository", FilteringRepository)
+
+    both = client.get(
+        "/api/v1/recipes",
+        params=[("label", "RÁPIDO"), ("label", " vegetariano "), ("label", "rápido")],
+    )
+    empty = client.get("/api/v1/recipes", params=[("label", ""), ("label", "  ")])
+    nonexistent = client.get("/api/v1/recipes", params=[("label", "desconocida")])
+
+    assert [recipe["id"] for recipe in both.json()["recetas"]] == ["bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1"]
+    assert len(empty.json()["recetas"]) == 3
+    assert nonexistent.json()["recetas"] == []
 
 
 def test_image_upload_rejects_non_image_content(client: TestClient) -> None:

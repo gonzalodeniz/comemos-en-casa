@@ -4,12 +4,14 @@
 Allow recipes to be categorized with global labels so users can discover recipes by one or more labels.
 
 ## Tasks
-- [ ] Define global label domain, normalization, colors, and lifecycle.
-- [ ] Define recipe create/edit payloads and the public label autocomplete API.
-- [ ] Define public catalog filtering with repeated `label` parameters and AND semantics.
-- [ ] Define removal of draft/published lifecycle and the unified Recetas catalog.
-- [ ] Define and implement frontend/backend regression coverage.
+- [x] Define global label domain, normalization, colors, and lifecycle.
+- [x] Define recipe create/edit payloads and the public label autocomplete API.
+- [x] Define public catalog filtering with repeated `label` parameters and AND semantics.
+- [x] Define removal of draft/published lifecycle and the unified Recetas catalog.
+- [x] Define and implement frontend/backend regression coverage.
 - [ ] **Pending after this user story:** remove the former “Mis recetas” area, including its endpoints, components, tests, and links for favorites and collections.
+
+**Evidence:** `cc8f5de` (label contracts), `2ad5a2e` (backend/API and public lifecycle), `92531aa` (frontend workflow), `5f71d47` (migration coverage); `make test` passed (132 tests, frontend typecheck/build) and frontend tests passed (17 tests).
 
 ## Confirmed behavior
 - Labels are global and may be created implicitly while creating or editing a recipe.

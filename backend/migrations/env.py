@@ -1,8 +1,10 @@
-import os
 from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+from sqlalchemy.engine import make_url
+
+from app.database import database_url
 
 config = context.config
 if config.config_file_name is not None:
@@ -10,10 +12,7 @@ if config.config_file_name is not None:
 
 config.set_main_option(
     "sqlalchemy.url",
-    os.getenv(
-        "DATABASE_URL",
-        config.get_main_option("sqlalchemy.url"),
-    ).replace("%", "%%"),
+    make_url(database_url()).render_as_string(hide_password=False).replace("%", "%%"),
 )
 
 

@@ -12,7 +12,10 @@ services:
     build:
       context: ./backend
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-comemos}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your shell for local development}@postgres:5432/${POSTGRES_DB:-comemos}
+      DB_HOST: postgres
+      DB_USER: ${POSTGRES_USER:-comemos}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your shell for local development}
+      DB_NAME: ${POSTGRES_DB:-comemos}
     ports:
       - "8000:8000"
     depends_on:

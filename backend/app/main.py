@@ -1,14 +1,10 @@
-import os
-
 from fastapi import FastAPI, HTTPException
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+psycopg://localhost/comemos",
-)
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+from app.database import database_url
+
+engine = create_engine(database_url(), pool_pre_ping=True)
 
 app = FastAPI(title="Comemos en casa API")
 

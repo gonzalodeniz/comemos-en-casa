@@ -19,15 +19,16 @@ React: <http://localhost:5173>. API: <http://localhost:8000/health> (proceso viv
 Para probar la integración, usá un **proyecto Compose aislado** sobre una base nueva; no ejecutes estas comprobaciones contra datos que quieras conservar. Si ya tenés otra instancia ocupando los puertos 8000 o 5173, detenela primero o usá otra máquina. Desde la raíz:
 
 ```sh
-docker compose -p cec-foundation-test up -d --build --wait
-docker compose -p cec-foundation-test exec -T backend python -m alembic upgrade head
-docker compose -p cec-foundation-test exec -T -e RUN_DB_INTEGRATION=1 backend python -m pytest -q
-docker compose -p cec-foundation-test stop
-docker compose -p cec-foundation-test up -d --wait
-docker compose -p cec-foundation-test exec -T backend python -m alembic current
-docker compose -p cec-foundation-test exec -T -e RUN_DB_INTEGRATION=1 backend python -m pytest -q tests/test_database_integration.py
+PROJECT="cec-foundation-test-$$"
+docker compose -p "$PROJECT" up -d --build --wait
+docker compose -p "$PROJECT" exec -T backend python -m alembic upgrade head
+docker compose -p "$PROJECT" exec -T -e RUN_DB_INTEGRATION=1 backend python -m pytest -q
+docker compose -p "$PROJECT" stop
+docker compose -p "$PROJECT" up -d --wait
+docker compose -p "$PROJECT" exec -T backend python -m alembic current
+docker compose -p "$PROJECT" exec -T -e RUN_DB_INTEGRATION=1 backend python -m pytest -q tests/test_database_integration.py
 ```
 
-La prueba de integración debe pasar después de migrar y nuevamente tras el reinicio: la versión persiste. Para detener el proyecto de prueba sin borrar sus datos, ejecutá `docker compose -p cec-foundation-test down` (sin `-v`). El nombre del proyecto y el volumen quedan separados del entorno habitual.
+La prueba de integración debe pasar después de migrar y nuevamente tras el reinicio: la versión persiste. Para detener el proyecto de prueba sin borrar sus datos, ejecutá `docker compose -p "$PROJECT" down` (sin `-v`). El nombre del proyecto y el volumen quedan separados del entorno habitual.
 
 Si ya instalaste dependencias locales, las pruebas aisladas de la API se ejecutan con `cd backend && python -m pytest -q` y las del frontend con `cd frontend && npm test && npm run build`. La prueba de integración se omite en la suite local salvo que establezcas `RUN_DB_INTEGRATION=1` con una base aislada. Consultá también [backend/README.md](backend/README.md) y [frontend/README.md](frontend/README.md).

@@ -1,6 +1,6 @@
 # Plan aprobado — base del proyecto y persistencia
 
-**Estado:** aprobado por el usuario; implementación pendiente. **Rama:** `feat/architecture-foundation`, creada desde `main` en `96e0e7f`. Este plan desarrolla solo la primera etapa de [arquitectura](../arquitectura.md); no implementa HU-001 ni HU-002.
+**Estado:** aprobado por el usuario; base implementada y verificada. **Rama:** `feat/architecture-foundation`, creada desde `main` en `96e0e7f`. Este plan desarrolla solo la primera etapa de [arquitectura](../arquitectura.md); no implementa HU-001 ni HU-002.
 
 ## Resultado esperado
 
@@ -32,4 +32,4 @@ Desde una copia limpia del repositorio, una persona puede levantar localmente Re
 
 ## Fuera de alcance y puerta de aprobación
 
-Quedan fuera de esta etapa la implementación de [HU-001](../historias-usuarios/HU-001-gestion-de-usuarios.md), [HU-002](../historias-usuarios/HU-002-planificacion-de-comidas.md), la carga de [etiquetas predeterminadas](../etiquetas-predeterminadas.md), el correo, el despliegue remoto y las copias de seguridad. La aprobación del plan consta en el [documento de tareas](../../odd/tasks/architecture-foundation.md); la ejecución de las tareas aún está pendiente.
+Quedan fuera de esta etapa la implementación de [HU-001](../historias-usuarios/HU-001-gestion-de-usuarios.md), [HU-002](../historias-usuarios/HU-002-planificacion-de-comidas.md), la carga de [etiquetas predeterminadas](../etiquetas-predeterminadas.md), el correo, el despliegue remoto y las copias de seguridad. La aprobación del plan y la evidencia de ejecución constan en el [documento de tareas](../../odd/tasks/architecture-foundation.md). HU-001 y HU-002 permanecen pendientes.

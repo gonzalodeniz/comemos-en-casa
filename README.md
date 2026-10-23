@@ -12,7 +12,7 @@ docker compose up -d --build --wait
 docker compose exec backend python -m alembic upgrade head
 ```
 
-React: <http://localhost:5173>. API: <http://localhost:8000/health> (proceso vivo) y <http://localhost:8000/ready> (conexión a PostgreSQL; HTTP 503 cuando no está disponible). Compose conserva PostgreSQL en el volumen `postgres_data`. La migración inicial solo registra `0001_baseline`; aún no crea tablas de negocio. Opcionalmente, `POSTGRES_USER` y `POSTGRES_DB` modifican usuario y nombre de base.
+Los puertos de desarrollo solo se publican en `127.0.0.1` (no en la red local). React: <http://localhost:5173>. API: <http://localhost:8000/health> (proceso vivo) y <http://localhost:8000/ready> (conexión a PostgreSQL; HTTP 503 cuando no está disponible). Compose conserva PostgreSQL en el volumen `postgres_data`. La migración inicial solo registra `0001_baseline`; aún no crea tablas de negocio. Opcionalmente, `POSTGRES_USER` y `POSTGRES_DB` modifican usuario y nombre de base.
 
 ## Pruebas
 

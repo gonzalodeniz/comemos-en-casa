@@ -16,7 +16,7 @@
 
 Facilitar la organización compartida de las comidas familiares mediante una vista semanal de lunes a domingo y una vista mensual. Cada día distingue **almuerzo** y **cena**, y cada franja puede contener como máximo una **etiqueta alimentaria**.
 
-Al asignar, sustituir o eliminar una etiqueta, el usuario puede aplicar la operación únicamente a la fecha seleccionada o repetirla cada cierto número de semanas durante un período máximo de un año. Las asignaciones generadas mediante repetición se guardan como copias individuales e independientes, no como ocurrencias vinculadas a una serie permanente.
+Al asignar, sustituir o eliminar una etiqueta, el usuario puede aplicar la operación únicamente a la fecha seleccionada o repetirla cada cierto número de semanas hasta una fecha final elegida por el usuario, dentro del límite anual definido en RN-09. La fecha final se incluye si coincide con una repetición calculada; no se añade una asignación fuera del intervalo semanal. Se permite consultar y modificar fechas pasadas. Las asignaciones generadas mediante repetición se guardan como copias individuales e independientes, no como ocurrencias vinculadas a una serie permanente.
 
 ## 3. Glosario específico
 
@@ -24,7 +24,9 @@ Al asignar, sustituir o eliminar una etiqueta, el usuario puede aplicar la opera
 - **Franja de comida:** uno de los dos espacios planificables en una fecha: **almuerzo** o **cena**.
 - **Asignación:** relación entre una fecha, una franja de comida y, como máximo, una etiqueta alimentaria.
 - **Etiqueta alimentaria:** término que identifica un alimento concreto, un tipo de alimento o un grupo de alimentos y sirve para clasificar recetas y planificar comidas.
-- **Repetición de una operación:** aplicación de una asignación, sustitución o eliminación en fechas separadas por un intervalo entero de semanas durante un máximo de un año desde la fecha inicial.
+- **Repetición de una operación:** aplicación de una asignación, sustitución o eliminación en fechas separadas por un intervalo entero de semanas, desde la fecha inicial hasta una fecha final elegida, dentro del límite anual.
+- **Fecha final:** límite inclusivo elegido por el usuario; solo se aplica la operación ese día si coincide con una de las fechas calculadas por el intervalo semanal.
+- **Fecha final máxima:** día anterior a la misma fecha del año siguiente; si el inicio es el 29 de febrero, es el 28 de febrero del año siguiente, incluido.
 - **Intervalo de repetición:** número entero positivo de semanas entre las fechas afectadas por una operación repetida (1, 2, 3, 4, etc.).
 - **Copia individual:** asignación concreta creada por una repetición que, una vez guardada, puede modificarse o eliminarse sin afectar a las demás copias.
 
@@ -64,6 +66,7 @@ Al asignar, sustituir o eliminar una etiqueta, el usuario puede aplicar la opera
 5. La etiqueta se muestra en la planificación una vez guardada.
 6. El sistema valida que la fecha, la franja y la etiqueta seleccionada sean válidas.
 7. La selección procede del [catálogo de etiquetas predeterminadas](../etiquetas-predeterminadas.md). La creación y edición de etiquetas por parte del usuario se abordará más adelante.
+8. Se permite seleccionar y modificar fechas pasadas, tanto de forma individual como mediante repetición.
 
 ### CA-05 — Repetir una asignación o sustitución
 
@@ -72,12 +75,14 @@ Al asignar, sustituir o eliminar una etiqueta, el usuario puede aplicar la opera
 3. Solo se admiten intervalos enteros positivos.
 4. La repetición conserva la misma franja de comida y el mismo día de la semana de la fecha inicial.
 5. La primera asignación se realiza en la fecha seleccionada y las siguientes se calculan sumando el intervalo indicado en semanas.
-6. La repetición alcanza únicamente fechas anteriores a cumplirse un año desde la fecha inicial. La fecha equivalente del año siguiente queda excluida.
+6. El usuario elige una fecha final comprendida entre la fecha inicial y la fecha final máxima de RN-09, ambas incluidas. Puede elegir un final anterior al máximo. Si el final coincide con una repetición calculada, se incluye; si no coincide, no se añade una operación en esa fecha. Un final igual al inicio es válido y afecta solo a la fecha inicial. Se rechazan finales anteriores al inicio o posteriores al máximo anual.
 7. En cada fecha coincidente, la nueva etiqueta sustituye cualquier etiqueta que ya exista en esa franja.
 8. Antes de guardar, el sistema informa de que las etiquetas existentes en las fechas coincidentes serán sustituidas.
 9. Todas las asignaciones resultantes se guardan como copias individuales e independientes.
 10. Modificar o eliminar posteriormente una de las copias no altera las demás.
 11. Si no se activa la repetición, la operación afecta exclusivamente a la fecha seleccionada.
+12. Se permiten fechas iniciales pasadas; el límite anual se calcula desde la fecha inicial seleccionada, no desde la fecha actual.
+13. Cancelar la confirmación no guarda asignaciones ni sustituciones.
 
 ### CA-06 — Sustituir una etiqueta individual
 
@@ -92,17 +97,19 @@ Al asignar, sustituir o eliminar una etiqueta, el usuario puede aplicar la opera
 2. La eliminación afecta únicamente a la asignación seleccionada, salvo que el usuario active expresamente la repetición del borrado.
 3. El sistema solicita confirmación antes de eliminarla.
 4. Tras eliminarla, la franja queda sin planificar.
+5. Si el usuario cancela la confirmación, la asignación permanece sin cambios.
 
 ### CA-08 — Repetir la eliminación de una etiqueta
 
 1. Al eliminar una etiqueta, se ofrece la opción **«Repetir cada N semanas»**, desactivada por defecto.
 2. Si se activa, el usuario elige un intervalo entero positivo de semanas.
 3. La operación parte de la fecha seleccionada y revisa las fechas coincidentes con el mismo día de la semana y la misma franja.
-4. La repetición alcanza únicamente fechas anteriores a cumplirse un año desde la fecha inicial. La fecha equivalente del año siguiente queda excluida.
+4. El usuario elige una fecha final entre el inicio y el máximo anual de RN-09, ambos incluidos. Rigen las mismas reglas de CA-05: final inclusivo solo si coincide con una repetición, inicio igual a final válido, rechazo de finales anteriores al inicio o superiores al máximo, y cálculo desde el inicio aunque esté en el pasado.
 5. En cada fecha coincidente se elimina la asignación solo si contiene exactamente la misma etiqueta que se está borrando en la fecha inicial.
 6. Si una fecha coincidente está vacía o contiene otra etiqueta, no se modifica.
 7. Antes de guardar, el sistema informa del intervalo y de las asignaciones que serán eliminadas.
 8. El borrado repetido actúa sobre las asignaciones existentes en el momento de la operación y no crea una regla que afecte a asignaciones añadidas posteriormente.
+9. Cancelar la confirmación no elimina ninguna asignación.
 
 ### CA-09 — Independencia de las asignaciones copiadas
 
@@ -137,7 +144,7 @@ Al asignar, sustituir o eliminar una etiqueta, el usuario puede aplicar la opera
 
 **RN-08.** Una operación repetida conserva el día de la semana y la franja de la fecha inicial.
 
-**RN-09.** Una repetición se limita al período que comienza en la fecha seleccionada y termina antes de la misma fecha del año siguiente.
+**RN-09.** El usuario elige una fecha final entre la fecha inicial y la fecha final máxima, ambas incluidas. Para un inicio distinto del 29 de febrero, la fecha final máxima es el día anterior a la misma fecha del año siguiente; esa fecha equivalente queda excluida. Para un inicio el 29 de febrero, la fecha final máxima es el 28 de febrero del año siguiente, incluido. El final elegido se incluye únicamente si coincide con una fecha calculada por el intervalo semanal; no genera una ocurrencia adicional fuera de ese intervalo. Inicio y final iguales son válidos; se rechaza un final anterior al inicio o superior al máximo.
 
 **RN-10.** Las asignaciones producidas mediante una repetición son copias individuales e independientes.
 
@@ -150,6 +157,10 @@ Al asignar, sustituir o eliminar una etiqueta, el usuario puede aplicar la opera
 **RN-14.** Los cambios deben persistir y ser compartidos entre todos los usuarios autorizados.
 
 **RN-15.** La fecha de la planificación se interpreta según la zona horaria **Atlantic/Canary**, evitando cambios de día inesperados por conversiones horarias.
+
+**RN-16.** Se permite consultar y modificar fechas pasadas. Una repetición puede comenzar en el pasado y su máximo anual se calcula desde la fecha seleccionada, no desde hoy.
+
+**RN-17.** Cancelar una confirmación de sustitución o eliminación, individual o repetida, no modifica la planificación.
 
 ## 6. Escenarios de prueba
 
@@ -186,14 +197,14 @@ Al asignar, sustituir o eliminar una etiqueta, el usuario puede aplicar la opera
 ### Escenario 6 — Repetición cada semana
 
 **Dado** que el usuario añade «Carne» al almuerzo de un lunes,  
-**cuando** configura la repetición cada 1 semana,  
-**entonces** se crean copias individuales de «Carne» en los almuerzos de los lunes comprendidos dentro del año siguiente a la fecha inicial.
+**cuando** configura la repetición cada 1 semana y elige una fecha final válida,\
+**entonces** se crean copias individuales de «Carne» en los almuerzos de los lunes desde el inicio hasta el final elegido, incluido si coincide, sin superar el máximo anual de RN-09.
 
 ### Escenario 7 — Repetición cada tres semanas
 
 **Dado** que el usuario añade «Sardinas» a una cena de viernes,  
-**cuando** configura la repetición cada 3 semanas,  
-**entonces** se crean copias individuales en el viernes inicial y en los viernes separados por intervalos de 21 días, sin alcanzar la fecha equivalente del año siguiente.
+**cuando** configura la repetición cada 3 semanas y elige una fecha final válida,\
+**entonces** se crean copias individuales en el viernes inicial y en los viernes separados por intervalos de 21 días hasta el final elegido, sin añadir fechas fuera del intervalo ni superar el máximo anual de RN-09.
 
 ### Escenario 8 — Sustitución repetida
 
@@ -217,7 +228,7 @@ Al asignar, sustituir o eliminar una etiqueta, el usuario puede aplicar la opera
 
 **Dado** que varios almuerzos coincidentes contienen «Carne»,  
 **cuando** el usuario elimina «Carne» y repite el borrado cada dos semanas,  
-**entonces** se elimina «Carne» de los almuerzos coincidentes durante el período máximo de un año.
+**entonces** se elimina «Carne» de los almuerzos coincidentes hasta la fecha final elegida, incluida si coincide, dentro del máximo anual de RN-09.
 
 ### Escenario 12 — No borrar una etiqueta diferente
 
@@ -243,6 +254,48 @@ Al asignar, sustituir o eliminar una etiqueta, el usuario puede aplicar la opera
 **cuando** intenta acceder a la planificación,  
 **entonces** el sistema le solicita autenticarse.
 
+### Escenario 16 — Incluir una fecha final coincidente
+
+**Dado** un inicio el lunes 2 de noviembre de 2026 y un intervalo de una semana,\
+**cuando** el usuario elige como final el lunes 30 de noviembre de 2026,\
+**entonces** las fechas son 2, 9, 16, 23 y 30 de noviembre.
+
+### Escenario 17 — No añadir una fecha final fuera del intervalo
+
+**Dado** el mismo inicio e intervalo del escenario 16,\
+**cuando** el usuario elige como final el domingo 29 de noviembre de 2026,\
+**entonces** la última fecha afectada es el lunes 23 y no se añade una operación el día 29.
+
+### Escenario 18 — Inicio y final iguales
+
+**Dado** que el usuario activa la repetición con un intervalo entero positivo,\
+**cuando** elige la misma fecha como inicio y final,\
+**entonces** la operación es válida y afecta únicamente a la fecha inicial.
+
+### Escenario 19 — Rechazar fechas finales no válidas
+
+**Dado** un inicio el 2 de noviembre de 2026, cuya fecha final máxima es el 1 de noviembre de 2027,\
+**cuando** el usuario introduce un final anterior al inicio o posterior a ese máximo,\
+**entonces** se rechaza la operación sin modificar ninguna asignación.
+
+### Escenario 20 — Límite para un inicio el 29 de febrero
+
+**Dado** un inicio el 29 de febrero de 2028,\
+**cuando** se valida la fecha final de la repetición,\
+**entonces** se acepta como máximo el 28 de febrero de 2029, incluido como límite, y se rechaza el 1 de marzo de 2029; solo se aplican operaciones en fechas que coincidan con el intervalo semanal.
+
+### Escenario 21 — Modificar planificación histórica
+
+**Dado** que la fecha seleccionada está en el pasado,\
+**cuando** un usuario activo asigna, sustituye o elimina una etiqueta, de forma individual o repetida,\
+**entonces** la operación está permitida y, si se repite, el máximo anual parte de esa fecha inicial, no de hoy.
+
+### Escenario 22 — Cancelar sin modificar la planificación
+
+**Dado** que se muestra una confirmación de sustitución o eliminación individual o repetida,\
+**cuando** el usuario la cancela,\
+**entonces** no se guarda ningún cambio y todas las asignaciones permanecen como estaban.
+
 ## 7. Dependencias
 
 - HU-001 — Gestión de usuarios y autenticación.
@@ -256,7 +309,9 @@ Al asignar, sustituir o eliminar una etiqueta, el usuario puede aplicar la opera
 - Garantizar mediante una restricción de unicidad que solo exista una asignación por fecha y franja.
 - Materializar como registros individuales todas las asignaciones producidas por una repetición.
 - Calcular las fechas repetidas a partir de la fecha inicial y del intervalo semanal, sin depender del número de semana del año.
-- Excluir cualquier fecha igual o posterior a la fecha inicial más un año natural.
+- Validar el final elegido entre el inicio y el máximo anual de RN-09: día anterior a la misma fecha del año siguiente, con el caso especial del 29 de febrero limitado al 28 de febrero siguiente, incluido.
+- Generar las fechas desde el inicio mediante múltiplos enteros del intervalo semanal y conservar solo las menores o iguales al final elegido. No añadir ese final si no coincide con una ocurrencia.
+- Aceptar inicio y final iguales, rechazar finales fuera del intervalo válido y no imponer una restricción basada en hoy para la planificación histórica.
 - Ejecutar de forma transaccional las asignaciones, sustituciones y eliminaciones repetidas para evitar resultados parciales.
 - Informar antes de una sustitución repetida qué asignaciones existentes serán reemplazadas.
 - Al repetir un borrado, filtrar por fecha, franja y etiqueta exacta.
@@ -271,7 +326,11 @@ Al asignar, sustituir o eliminar una etiqueta, el usuario puede aplicar la opera
 - [ ] La vista mensual permite consultar y navegar entre meses.
 - [ ] Se pueden asignar, sustituir y eliminar etiquetas individuales.
 - [ ] Se pueden repetir asignaciones, sustituciones y eliminaciones cada N semanas.
-- [ ] Ninguna repetición alcanza una fecha igual o posterior a un año desde su inicio.
+- [ ] El usuario puede elegir un final anterior al máximo anual; se incluye si coincide con una repetición, sin añadir fechas fuera del intervalo semanal.
+- [ ] Se valida el máximo anual de RN-09, incluido el límite del 28 de febrero para un inicio el 29 de febrero.
+- [ ] Inicio y final iguales son válidos; un final anterior al inicio o posterior al máximo se rechaza sin cambios.
+- [ ] Se pueden consultar y modificar fechas pasadas; el máximo anual se calcula desde el inicio seleccionado.
+- [ ] Cancelar una confirmación individual o repetida no modifica la planificación.
 - [ ] Las asignaciones repetidas se guardan como copias independientes.
 - [ ] Una sustitución repetida reemplaza las etiquetas coincidentes existentes.
 - [ ] Un borrado repetido solo elimina la misma etiqueta.
@@ -282,4 +341,8 @@ Al asignar, sustituir o eliminar una etiqueta, el usuario puede aplicar la opera
 ## 10. Decisiones y cuestiones pendientes
 
 1. **Creación y edición del catálogo de etiquetas:** esta historia utiliza el catálogo predeterminado; la creación y edición por parte del usuario se cubrirá más adelante.
-No hay cuestiones pendientes para esta historia.
+2. **Fecha final de repetición:** la elige el usuario dentro del máximo anual; es inclusiva si coincide con una ocurrencia del intervalo semanal.
+3. **Inicio el 29 de febrero:** fecha final máxima del 28 de febrero siguiente, incluida como límite.
+4. **Planificación histórica:** se puede consultar y modificar; la ventana anual parte siempre de la fecha inicial seleccionada.
+
+No hay cuestiones funcionales pendientes para esta historia. La planificación técnica y su TASKS no autorizan por sí solos la implementación.

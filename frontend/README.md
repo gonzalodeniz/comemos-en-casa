@@ -17,3 +17,7 @@ npm run dev
 npm test
 npm run build
 ```
+
+## Ruta de publicación
+
+El build de despliegue define `VITE_BASE=/comemos/` y publica la interfaz bajo `/comemos/`; las llamadas API usan `/comemos/api/v1`. Para desarrollo local, Vite mantiene su servidor HMR separado y no se expone en el proxy público.

@@ -3,7 +3,9 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  test: {
-    environment: "node",
+  base: "/comemos/",
+  server: {
+    proxy: { "/comemos/api/v1": { target: "http://localhost:8000", rewrite: (path) => path.replace(/^\/comemos/, "") } },
   },
+  test: { environment: "node" },
 });

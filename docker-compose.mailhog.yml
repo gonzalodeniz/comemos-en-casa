@@ -1,0 +1,12 @@
+services:
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    networks:
+      - app_network
+    ports:
+      - "127.0.0.1:8025:8025"
+
+networks:
+  app_network:
+    name: comemos-dev
+    external: true

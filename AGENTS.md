@@ -12,7 +12,7 @@ Use Docker Compose from the root for the integrated local environment:
 - `docker compose exec backend python -m alembic upgrade head` applies database migrations.
 - `cd backend && python -m pytest -q` runs API tests; use `cd frontend && npm test` for frontend tests.
 - `cd frontend && npm run build` type-checks and produces the production Vite bundle.
-- `cd backend && uvicorn app.main:app --reload` and `cd frontend && npm run dev` start each service independently.
+- `cd backend && uvicorn app.main:app --reload --no-proxy-headers` and `cd frontend && npm run dev` start each service independently. Keep proxy headers disabled unless trusted-proxy configuration is explicitly introduced.
 
 Run database integration tests only against a fresh, isolated Compose project/database; set `RUN_DB_INTEGRATION=1` as documented in the root README. Do not run them against data you need to preserve.
 

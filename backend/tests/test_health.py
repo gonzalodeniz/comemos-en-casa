@@ -1,3 +1,8 @@
+"""Verifica los endpoints de salud y disponibilidad.
+
+Comprueba respuestas de estado y el comportamiento cuando la dependencia de base de datos no está disponible.
+"""
+
 from fastapi.testclient import TestClient
 
 from app.main import app

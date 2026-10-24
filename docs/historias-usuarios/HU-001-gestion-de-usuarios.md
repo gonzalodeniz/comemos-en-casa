@@ -23,7 +23,7 @@ Todos los usuarios registrados y activos tendrán los mismos permisos para gesti
 - El sistema debe permitir crear usuarios mediante nombre, correo electrónico y contraseña.
 - El correo electrónico debe tener un formato válido.
 - No pueden existir dos usuarios con el mismo correo electrónico.
-- La contraseña debe cumplir unos requisitos mínimos de seguridad.
+- La contraseña debe tener entre 8 y 128 caracteres; se aceptan espacios y caracteres Unicode, sin reglas de composición.
 - Cualquier usuario autenticado y activo puede registrar nuevos miembros de la familia y establecer su contraseña.
 - Si el sistema no tiene usuarios, debe mostrar el formulario para crear la primera cuenta. Tras crearla, debe mostrar el formulario de inicio de sesión.
 - No se permite el registro público cuando ya existe al menos un usuario.
@@ -37,8 +37,8 @@ Todos los usuarios registrados y activos tendrán los mismos permisos para gesti
 
 ### CA-03 — Protección contra ataques de fuerza bruta
 - El sistema debe limitar los intentos fallidos de autenticación por dirección IP y por combinación de cuenta e IP.
-- Tras cinco intentos fallidos para la misma combinación de cuenta e IP en quince minutos, debe rechazar temporalmente nuevos intentos para esa combinación durante quince minutos. No debe bloquear la cuenta para intentos procedentes de otras direcciones IP.
-- Tras cinco intentos fallidos desde una misma dirección IP en quince minutos, el sistema debe rechazar temporalmente nuevos intentos desde esa IP durante quince minutos, para dificultar ataques contra múltiples cuentas.
+- Tras cinco intentos fallidos para la misma combinación de cuenta e IP en una ventana móvil inclusiva de quince minutos, debe rechazar temporalmente nuevos intentos para esa combinación durante quince minutos. No debe bloquear la cuenta para intentos procedentes de otras direcciones IP.
+- Tras cinco intentos fallidos desde una misma dirección IP en una ventana móvil inclusiva de quince minutos, el sistema debe rechazar temporalmente nuevos intentos desde esa IP durante quince minutos, para dificultar ataques contra múltiples cuentas.
 - Las respuestas de autenticación no deben revelar si una cuenta existe, está limitada o tiene una contraseña incorrecta.
 - El sistema debe registrar los intentos fallidos y las restricciones sin almacenar contraseñas ni otros secretos.
 - Las restricciones deben finalizar automáticamente al expirar el período establecido.
@@ -58,7 +58,7 @@ Todos los usuarios registrados y activos tendrán los mismos permisos para gesti
 
 ### CA-06 — Cambio de contraseña
 - El usuario autenticado debe poder cambiar su propia contraseña proporcionando la contraseña actual.
-- La nueva contraseña debe cumplir los requisitos de seguridad establecidos.
+- La nueva contraseña debe tener entre 8 y 128 caracteres; se aceptan espacios y caracteres Unicode, sin reglas de composición.
 - Cualquier usuario autenticado y activo puede cambiar la contraseña de otro usuario sin conocer la contraseña actual ni requerir verificación del titular.
 - El sistema no debe almacenar contraseñas en texto plano.
 
@@ -228,6 +228,15 @@ Todos los usuarios registrados y activos tendrán los mismos permisos para gesti
 - [ ] La funcionalidad está documentada.
 - [ ] Los cambios han sido revisados e integrados en el proyecto.
 
-## 9. Cuestiones pendientes
+## 9. Decisiones técnicas confirmadas
 
-No hay cuestiones pendientes.
+El usuario confirmó estas decisiones para la implementación:
+
+- Conservar el correo introducido para mostrarlo; normalizar el dominio a minúsculas y comparar la parte local sin distinguir mayúsculas para unicidad e inicio de sesión. No aplicar transformaciones específicas de proveedores. Esta política práctica puede considerar duplicadas algunas direcciones que ciertos servidores SMTP distinguen por mayúsculas.
+- Usar Argon2id con una configuración inicial mínima de 19 MiB, dos iteraciones y paralelismo uno; medir el rendimiento antes de ajustar parámetros.
+- Guardar sesiones revocables en PostgreSQL; entregar un token aleatorio de 256 bits en una cookie `HttpOnly`, `SameSite=Lax`, `Secure` bajo HTTPS, sin atributo `Domain` y con `Path=/`. Caducidad por inactividad de 30 minutos y absoluta de 8 horas, aplicadas por el servidor. Cierre de sesión, cambios/restablecimientos de contraseña y desactivación o eliminación de cuenta revocan las sesiones afectadas.
+- Exigir token CSRF y origen permitido en escrituras; CORS solo permite orígenes configurados explícitamente y credenciales, nunca comodín. No confiar en cabeceras de proxy si este no está configurado explícitamente; usar la IP observada por la API.
+- Restablecimiento con token aleatorio de un solo uso almacenado únicamente como hash, caducidad de 30 minutos y respuestas genéricas. Limitar a tres solicitudes por cuenta y diez por IP cada hora. Usar adaptador SMTP configurable por entorno, sin proveedor fijado, y una `APP_PUBLIC_URL` obligatoria para componer el enlace.
+- Exponer la API bajo `/api/v1`: consulta de estado inicial, registro inicial, autenticación/cierre/sesión, listado y gestión de usuarios, solicitudes de recuperación y confirmación del restablecimiento.
+
+La longitud mínima de 8 caracteres sigue la decisión explícita del usuario. Es inferior a la recomendación actual de NIST para contraseñas usadas como único factor; revisar el riesgo antes de desplegar autenticación sin MFA.

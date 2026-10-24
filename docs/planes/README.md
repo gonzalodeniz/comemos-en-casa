@@ -8,4 +8,4 @@ Las historias de usuario y decisiones de producto permanecen en `docs/`. La arqu
 ## Planes disponibles
 
 - [Base del proyecto y persistencia](arquitectura-base.md): aprobado e implementado.
-- [HU-001 — Gestión de usuarios y acceso](hu-001-gestion-de-usuarios.md): plan y [TASKS](../../odd/tasks/hu-001-gestion-de-usuarios.md) aprobados; commit de la documentación autorizado, tareas pendientes y sin implementación iniciada.
+- [HU-001 — Gestión de usuarios y acceso](hu-001-gestion-de-usuarios.md): plan y [TASKS](../../odd/tasks/hu-001-gestion-de-usuarios.md) aprobados; T1–T3 y T5 completadas, T4/T6–T8 pendientes.

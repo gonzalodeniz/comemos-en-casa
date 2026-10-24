@@ -1,0 +1,64 @@
+/* Define la presentación visual de la aplicación.
+
+Establece la disposición y los estilos de los formularios, mensajes y vistas de gestión de usuarios. */
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #1e293b;
+  background: #f1f5f9;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+button, input { font: inherit; }
+button {
+  border: 0;
+  border-radius: .55rem;
+  padding: .65rem 1rem;
+  color: white;
+  background: #166534;
+  cursor: pointer;
+  font-weight: 650;
+}
+button:disabled { cursor: wait; opacity: .6; }
+button.secondary { color: #334155; background: #e2e8f0; }
+button.danger { background: #b91c1c; }
+button.link-button { margin-top: .75rem; padding: .25rem 0; color: #166534; background: transparent; text-decoration: underline; }
+input { width: 100%; margin-top: .35rem; padding: .65rem .75rem; border: 1px solid #cbd5e1; border-radius: .5rem; background: white; }
+input:focus { outline: 3px solid #bbf7d0; border-color: #15803d; }
+label { display: block; margin: .9rem 0; font-weight: 600; }
+small { display: block; color: #475569; }
+p { color: #475569; line-height: 1.5; }
+h1, h2, h3, p { margin-top: 0; }
+
+.app-shell { width: min(1120px, calc(100% - 2rem)); margin: 0 auto; padding: 2rem 0 4rem; }
+.app-header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
+.app-header h1 { margin-bottom: 0; font-size: clamp(1.8rem, 4vw, 2.5rem); }
+.eyebrow { margin-bottom: .35rem; color: #15803d; font-size: .78rem; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
+.session-tools { display: flex; align-items: center; gap: .75rem; }
+.panel { padding: 1.4rem; border: 1px solid #e2e8f0; border-radius: .9rem; background: white; box-shadow: 0 12px 30px rgb(15 23 42 / 5%); }
+.panel.narrow { width: min(100%, 460px); margin: 2rem auto; }
+.panel form > button { width: 100%; margin-top: .9rem; }
+.dashboard { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, .8fr); align-items: start; gap: 1.2rem; }
+.user-list { display: grid; gap: .75rem; }
+.user-card { padding: 1rem; border: 1px solid #e2e8f0; border-radius: .7rem; }
+.user-card-heading { display: flex; justify-content: space-between; gap: 1rem; }
+.user-card-heading h3 { margin: 0 0 .25rem; font-size: 1rem; }
+.user-card-heading p { margin-bottom: .5rem; overflow-wrap: anywhere; }
+.status { align-self: flex-start; padding: .25rem .5rem; border-radius: 99px; font-size: .78rem; font-weight: 700; }
+.status.active { color: #166534; background: #dcfce7; }
+.status.inactive { color: #991b1b; background: #fee2e2; }
+.button-row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.actions { margin-top: .6rem; }
+.inline-form { margin: .8rem 0; padding: .8rem; border-radius: .6rem; background: #f8fafc; }
+.inline-form label { margin-top: .25rem; }
+.message { padding: .8rem 1rem; border-radius: .6rem; }
+.message.error { color: #991b1b; background: #fee2e2; }
+.message.success { color: #166534; background: #dcfce7; }
+
+@media (max-width: 760px) {
+  .dashboard { grid-template-columns: 1fr; }
+  .app-header { align-items: flex-start; flex-direction: column; }
+  .session-tools { width: 100%; justify-content: space-between; }
+}

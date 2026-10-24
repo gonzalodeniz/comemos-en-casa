@@ -1,6 +1,6 @@
 # Plan aprobado — HU-001: gestión de usuarios y acceso
 
-**Estado:** plan y tareas aprobados por el usuario; commit de la documentación autorizado. Implementación no iniciada ni autorizada por esta aprobación. **Referencia:** [HU-001](../historias-usuarios/HU-001-gestion-de-usuarios.md), especificación funcional aprobada. Este documento propone cómo implementarla sobre la [base arquitectónica](../arquitectura.md); no modifica sus reglas de negocio.
+**Estado:** plan y tareas aprobados; implementación autorizada. T1, T2, T3 y T5 completadas; T4, T6, T7 y T8 pendientes. No hay commit de código, publicación ni PR autorizados. **Referencia:** [HU-001](../historias-usuarios/HU-001-gestion-de-usuarios.md), especificación funcional aprobada. Este documento define cómo implementarla sobre la [base arquitectónica](../arquitectura.md); no modifica sus reglas de negocio salvo la aclaración de contraseña confirmada por el usuario.
 
 ## Resultado esperado y punto de partida
 
@@ -20,14 +20,16 @@ Ya existen React/TypeScript/Vite, FastAPI, PostgreSQL, SQLAlchemy y Alembic. La 
 
 Se propone mantener una API modular dentro de `backend/app/`, con reglas de usuarios separadas del transporte HTTP y del acceso SQLAlchemy; componentes y pruebas de formularios en `frontend/src/`. Son ubicaciones propuestas, no archivos existentes.
 
-Como punto de partida para revisar, se proponen sesiones revocables almacenadas en PostgreSQL y transportadas mediante cookie, junto con contadores de acceso compartidos en la misma base. Esto prioriza invalidación y atomicidad sin añadir infraestructura, a cambio de consultas y mantenimiento de registros. Antes de implementarlo se debe concretar y aprobar:
+Se mantienen sesiones revocables, tokens hash en PostgreSQL y contadores compartidos. El contrato T1 quedó confirmado por el usuario antes de implementar las tareas dependientes:
 
-1. Contrato API, normalización/unicidad del correo y comportamiento de reactivación de una cuenta.
-2. Política mínima de contraseñas, biblioteca y parámetros de derivación; evaluar Argon2id, ya contemplado en la historia, sin fijar parámetros aquí.
-3. Duración y renovación de sesiones, cookies, protección CSRF, configuración de origen y obtención fiable de la IP; invalidación tras cambios/restablecimientos de contraseña y reactivación.
-4. Caducidad de enlaces, límite de solicitudes de recuperación, proveedor/configuración de correo y URL pública del enlace. Las credenciales irán en configuración externa, nunca en Git.
+1. **Correo:** conservar el original para mostrarlo; minúsculas en el dominio y comparación local sin distinguir mayúsculas para identidad. No hacer transformaciones específicas de proveedores. Esta política puede considerar duplicadas direcciones que algunos servidores SMTP distinguen por mayúsculas.
+2. **Contraseñas:** longitud de 8 a 128 caracteres, con espacios y Unicode, sin reglas de composición. Argon2id comienza en 19 MiB, 2 iteraciones y paralelismo 1; medir antes de ajustar. El mínimo elegido es inferior a la recomendación actual de NIST para contraseñas como único factor; el riesgo debe revisarse antes de despliegues sin MFA.
+3. **Sesiones y navegador:** token aleatorio de 256 bits; guardar solo su hash. Cookie `HttpOnly`, `SameSite=Lax`, `Secure` bajo HTTPS, sin `Domain` y con `Path=/`. Aplicar en servidor caducidad por inactividad de 30 minutos y absoluta de 8 horas. Revocar en logout, cambio/restablecimiento de contraseña y desactivación/eliminación de cuenta. Exigir token CSRF y origen permitido en escrituras; CORS con credenciales solo para orígenes configurados explícitamente, nunca comodín.
+4. **IP:** usar la dirección observada por la API; no confiar en `Forwarded`/`X-Forwarded-For` salvo configuración explícita de proxy de confianza.
+5. **Recuperación:** token aleatorio de un solo uso, almacenado como hash, caducidad de 30 minutos, respuestas genéricas y límites de tres solicitudes por cuenta y diez por IP cada hora.
+6. **Correo saliente y API:** adaptador SMTP configurable mediante variables de entorno, sin seleccionar proveedor; `APP_PUBLIC_URL` obligatoria para construir enlaces. API bajo `/api/v1`: `GET /auth/bootstrap`, `POST /auth/register-initial`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/session`, `GET/POST /users`, `PATCH/DELETE /users/{id}`, `POST /users/{id}/password`, `POST /password-resets` y `POST /password-resets/confirm`.
 
-La aprobación del plan confirma su alcance y enfoque; no fija los valores ni contratos que siguen sin concretarse. Esas concreciones se resolverán en T1 del documento de tareas, antes de los trabajos dependientes, sin reabrir las reglas funcionales aprobadas.
+El contrato no fija un proveedor SMTP ni credenciales; no se enviará correo real en pruebas. Las decisiones funcionales aprobadas permanecen sin cambios.
 
 ## Fases y pruebas de salida
 
@@ -54,4 +56,4 @@ Las fases son un orden de entrega, no una autorización para integrar temporalme
 
 Quedan fuera HU-002, etiquetas, recetas, compra, roles, verificación de correo, despliegue remoto y copias de seguridad. No se crearán tablas de funcionalidades futuras solo para probar su preservación; se verificará el diseño de relaciones y se añadirá la integración cuando existan esos datos.
 
-El usuario ha aprobado este plan y el [documento TASKS](../../odd/tasks/hu-001-gestion-de-usuarios.md), conforme al [índice de planes y tareas](README.md), y ha autorizado el commit de la documentación. Todas las tareas están pendientes; las decisiones previas se recogen en T1. Esta aprobación no autoriza comenzar la implementación, publicar ni crear una PR.
+El usuario ha aprobado este plan y el [documento TASKS](../../odd/tasks/hu-001-gestion-de-usuarios.md), y ha autorizado la implementación. T1, T2, T3 y T5 están completadas según la evidencia del registro de tareas. El código de T4, T6 y T7 está presente, pero esas tareas siguen abiertas hasta completar la verificación integral; T8 también está pendiente. La autorización no incluye commits de código, publicación ni PR.

@@ -1,5 +1,7 @@
 /* Styles the Button, Field, Panel and Message components using the design tokens. */
-.ui-button { border: 0; border-radius: var(--radius-button); padding: .65rem 1rem; color: white; background: var(--color-primary); cursor: pointer; font: inherit; font-weight: 650; }
+.ui-button, .ui-field, .ui-panel, .ui-message { box-sizing: border-box; font-family: var(--font-family-base); }
+.ui-field input, .ui-field select { box-sizing: border-box; }
+.ui-button { border: 0; border-radius: var(--radius-button); padding: .65rem 1rem; color: white; background: var(--color-primary); cursor: pointer; font: inherit; font-family: var(--font-family-base); font-weight: 650; }
 .ui-button:disabled { cursor: wait; opacity: .6; }
 .ui-button.secondary { color: var(--color-secondary-text); background: var(--color-secondary-bg); }
 .ui-button.danger { background: var(--color-danger); }

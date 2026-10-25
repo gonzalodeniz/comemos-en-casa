@@ -1,0 +1,13 @@
+{
+  "projectId": "5adf115a-da41-450d-a903-89d82dbf9d78",
+  "pkg": "@comemos/ui",
+  "globalName": "ComemosUI",
+  "shape": "package",
+  "buildCmd": "cd .. && npm run build:ui",
+  "cssEntry": "dist/ui.css",
+  "dtsPropsFor": {
+    "Button": "id?: string; style?: React.CSSProperties; children?: React.ReactNode; /** Visual emphasis of the button. Defaults to `primary`. */ variant?: \"primary\" | \"secondary\" | \"danger\" | \"link\"; /** Native button type. Defaults to `button`; use `submit` inside forms. */ type?: \"button\" | \"submit\" | \"reset\"; disabled?: boolean; onClick?: React.MouseEventHandler<HTMLButtonElement>; \"aria-label\"?: string;",
+    "Panel": "id?: string; style?: React.CSSProperties; children?: React.ReactNode; /** Constrains the panel to a centered, narrow column (used by auth forms). */ narrow?: boolean; \"aria-labelledby\"?: string;"
+  },
+  "readmeHeader": ".design-sync/conventions.md"
+}

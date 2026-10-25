@@ -1,0 +1,18 @@
+/* Styles the Button, Field, Panel and Message components using the design tokens. */
+.ui-button { border: 0; border-radius: var(--radius-button); padding: .65rem 1rem; color: white; background: var(--color-primary); cursor: pointer; font: inherit; font-weight: 650; }
+.ui-button:disabled { cursor: wait; opacity: .6; }
+.ui-button.secondary { color: var(--color-secondary-text); background: var(--color-secondary-bg); }
+.ui-button.danger { background: var(--color-danger); }
+.ui-button.link-button { padding: .25rem 0; color: var(--color-primary); background: transparent; text-decoration: underline; }
+
+.ui-field { display: block; margin: .9rem 0; font-weight: 600; }
+.ui-field input, .ui-field select { width: 100%; margin-top: .35rem; padding: .65rem .75rem; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-surface); font: inherit; }
+.ui-field input:focus, .ui-field select:focus { outline: 3px solid var(--color-focus-ring); border-color: var(--color-primary-strong); }
+.ui-field small { display: block; color: var(--color-text-muted); font-weight: 400; }
+
+.ui-panel { padding: 1.4rem; border: 1px solid var(--color-border-subtle); border-radius: var(--radius-panel); background: var(--color-surface); box-shadow: var(--shadow-panel); }
+.ui-panel.narrow { width: min(100%, 460px); margin: 2rem auto; }
+
+.ui-message { padding: .8rem 1rem; border-radius: var(--radius-message); }
+.ui-message.error { color: var(--color-error-text); background: var(--color-error-bg); }
+.ui-message.success { color: var(--color-success-text); background: var(--color-success-bg); }

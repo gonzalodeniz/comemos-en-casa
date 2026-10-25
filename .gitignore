@@ -7,3 +7,4 @@ frontend/dist/
 .env
 .env.*
 !.env.example
+frontend/ui-lib/dist/

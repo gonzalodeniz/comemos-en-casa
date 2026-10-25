@@ -1,0 +1,23 @@
+/* Defines the design tokens shared by the UI components. */
+:root {
+  --color-text: #1e293b;
+  --color-text-muted: #475569;
+  --color-surface: #ffffff;
+  --color-border: #cbd5e1;
+  --color-border-subtle: #e2e8f0;
+  --color-primary: #166534;
+  --color-primary-strong: #15803d;
+  --color-focus-ring: #bbf7d0;
+  --color-secondary-text: #334155;
+  --color-secondary-bg: #e2e8f0;
+  --color-danger: #b91c1c;
+  --color-error-text: #991b1b;
+  --color-error-bg: #fee2e2;
+  --color-success-text: #166534;
+  --color-success-bg: #dcfce7;
+  --radius-control: .5rem;
+  --radius-button: .55rem;
+  --radius-message: .6rem;
+  --radius-panel: .9rem;
+  --shadow-panel: 0 12px 30px rgb(15 23 42 / 5%);
+}

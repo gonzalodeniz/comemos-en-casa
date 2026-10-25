@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": null,
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "allowImportingTsExtensions": false,
+    "rootDir": "../src/ui",
+    "outDir": "./dist/types"
+  },
+  "include": ["../src/ui/index.ts"],
+  "exclude": ["../src/ui/**/*.test.tsx"]
+}

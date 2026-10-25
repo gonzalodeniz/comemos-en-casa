@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:ui": "vite build --config ui-lib/vite.config.ts && tsc -p ui-lib/tsconfig.json"
   },
   "dependencies": {
     "react": "^19.0.0",

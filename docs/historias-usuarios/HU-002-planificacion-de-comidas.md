@@ -3,8 +3,10 @@
 **Producto:** Comemos en casa  
 **Épica:** Planificación de comidas  
 **Prioridad:** Alta  
-**Estado:** Especificación aprobada; implementación pendiente  
+**Estado:** Implementación completada; verificación local T1–T10 completada. No implica publicación.
 **Módulo:** Planificación semanal y mensual
+
+**Estado de verificación (2026-10-25):** funcionalidad implementada y T1–T10 verificadas localmente. Los 22 escenarios se recorrieron en Chrome contra FastAPI real con SQLite temporal; en una ejecución limpia separada también se verificaron bootstrap, registro sin auto-login, login explícito y logout sin usuarios/sesiones sembrados. La suite `make test` pasó fuera de sandbox autorizado (61 backend/15 frontend); los timeouts previos de sandbox y su comparación posterior se registran en TASKS, sin atribuir causa al producto. No se ejecutó navegador contra PostgreSQL ni se probó la URL desplegada. La matriz y las limitaciones observadas están en el [TASKS de HU-002](../../odd/tasks/hu-002-planificacion-de-comidas.md#evidencia-de-t10-y-cobertura-de-escenarios). La evidencia de interfaz simulada, SQLite y PostgreSQL se mantiene diferenciada.
 
 ## 1. Historia de usuario
 

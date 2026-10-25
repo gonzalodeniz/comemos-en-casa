@@ -11,11 +11,13 @@ type RequestOptions = {
 
 export class ApiError extends Error {
   readonly status: number;
+  readonly detail: unknown;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, detail?: unknown) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.detail = detail;
   }
 }
 
@@ -34,11 +36,22 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   if (response.status === 204) return null as T;
   const payload = (await response.json().catch(() => ({}))) as {
-    detail?: string;
+    detail?: unknown;
     message?: string;
   };
   if (!response.ok) {
-    throw new ApiError(response.status, payload.detail ?? payload.message ?? "Request failed");
+    const detailMessage =
+      typeof payload.detail === "string"
+        ? payload.detail
+        : payload.detail && typeof payload.detail === "object" &&
+            "message" in payload.detail && typeof payload.detail.message === "string"
+          ? payload.detail.message
+          : payload.message;
+    throw new ApiError(
+      response.status,
+      detailMessage ?? "Request failed",
+      payload.detail,
+    );
   }
   return payload as T;
 }

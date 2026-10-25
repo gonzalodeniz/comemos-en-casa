@@ -1,13 +1,14 @@
-"""Define las entidades persistentes de autenticación.
+"""Define las entidades persistentes de la aplicación.
 
-Las restricciones e índices respaldan invariantes de cuentas, sesiones, recuperación de contraseñas y limitación de intentos.
+Las restricciones e índices respaldan invariantes de cuentas, planificación, recuperación de contraseñas y limitación de intentos.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -138,3 +139,33 @@ class LoginAttemptEvent(Base):
     scope: Mapped[str] = mapped_column(String(16), nullable=False)
     key_digest: Mapped[str] = mapped_column(String(64), nullable=False)
     attempted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class FoodLabel(Base):
+    __tablename__ = "food_labels"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_food_labels_code"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    code: Mapped[str] = mapped_column(String(32), nullable=False)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+
+
+class MealAssignment(Base):
+    __tablename__ = "meal_assignments"
+    __table_args__ = (
+        UniqueConstraint("date", "slot", name="uq_meal_assignments_date_slot"),
+        CheckConstraint(
+            "slot IN ('lunch', 'dinner')",
+            name="ck_meal_assignments_slot",
+        ),
+        Index("ix_meal_assignments_label_id", "label_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    date: Mapped[date] = mapped_column(Date, nullable=False)
+    slot: Mapped[str] = mapped_column(String(16), nullable=False)
+    label_id: Mapped[UUID] = mapped_column(
+        ForeignKey("food_labels.id", ondelete="RESTRICT"), nullable=False
+    )

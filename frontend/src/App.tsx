@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { apiRequest, ApiError, type User, type UserResponse } from "./api";
+import MealPlanning from "./MealPlanning";
 import "./App.css";
 
 type Screen = "loading" | "register" | "login" | "reset-request" | "reset-confirm" | "app";
@@ -22,6 +23,15 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  const mealSessionExpired = useCallback(() => {
+    setCurrentUser(null);
+    setCsrfToken("");
+    setUsers([]);
+    setScreen("login");
+    setError("La sesión ha caducado. Inicia sesión de nuevo.");
+    setNotice("");
+  }, []);
 
   const loadUsers = useCallback(async () => {
     const result = await apiRequest<{ users: User[] }>("/users");
@@ -295,39 +305,42 @@ export default function App() {
       )}
 
       {screen === "app" && currentUser && (
-        <div className="dashboard">
-          <section className="panel">
-            <h2>Usuarios</h2>
-            <p>Todos los usuarios activos pueden administrar las cuentas familiares.</p>
-            {users.length === 0 ? <p role="status">Cargando usuarios…</p> : (
-              <div className="user-list">
-                {users.map((user) => (
-                  <UserCard
-                    key={user.id}
-                    user={user}
-                    isCurrentUser={user.id === currentUser.id}
-                    loading={loading}
-                    onUpdate={(form) => updateUser(user.id, form)}
-                    onActivation={() => mutateUser(user, changeActivation)}
-                    onDelete={() => mutateUser(user, deleteUser)}
-                    onPassword={(form) => updatePassword(user.id, form)}
-                    onSubmit={submitForm}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
+        <>
+          <MealPlanning csrfToken={csrfToken} onSessionExpired={mealSessionExpired} />
+          <div className="dashboard">
+            <section className="panel">
+              <h2>Usuarios</h2>
+              <p>Todos los usuarios activos pueden administrar las cuentas familiares.</p>
+              {users.length === 0 ? <p role="status">Cargando usuarios…</p> : (
+                <div className="user-list">
+                  {users.map((user) => (
+                    <UserCard
+                      key={user.id}
+                      user={user}
+                      isCurrentUser={user.id === currentUser.id}
+                      loading={loading}
+                      onUpdate={(form) => updateUser(user.id, form)}
+                      onActivation={() => mutateUser(user, changeActivation)}
+                      onDelete={() => mutateUser(user, deleteUser)}
+                      onPassword={(form) => updatePassword(user.id, form)}
+                      onSubmit={submitForm}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
 
-          <section className="panel narrow">
-            <h2>Añadir familiar</h2>
-            <form onSubmit={(event) => submitForm(event, createUser)}>
-              <label>Nombre<input name="name" autoComplete="name" required maxLength={150} /></label>
-              <label>Correo electrónico<input name="email" type="email" autoComplete="email" required maxLength={320} /></label>
-              <label>Contraseña inicial<input name="password" type="password" autoComplete="new-password" required minLength={8} maxLength={128} /></label>
-              <button disabled={loading}>{loading ? "Creando…" : "Crear usuario"}</button>
-            </form>
-          </section>
-        </div>
+            <section className="panel narrow">
+              <h2>Añadir familiar</h2>
+              <form onSubmit={(event) => submitForm(event, createUser)}>
+                <label>Nombre<input name="name" autoComplete="name" required maxLength={150} /></label>
+                <label>Correo electrónico<input name="email" type="email" autoComplete="email" required maxLength={320} /></label>
+                <label>Contraseña inicial<input name="password" type="password" autoComplete="new-password" required minLength={8} maxLength={128} /></label>
+                <button disabled={loading}>{loading ? "Creando…" : "Crear usuario"}</button>
+              </form>
+            </section>
+          </div>
+        </>
       )}
     </main>
   );

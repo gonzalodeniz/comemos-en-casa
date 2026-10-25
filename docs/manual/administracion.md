@@ -78,7 +78,7 @@ docker compose exec -T backend python -m alembic current
 docker compose exec -T backend python -m alembic heads
 ```
 
-Ambas deben indicar `0004_password_reset_rate_scopes (head)`. `heads` por sí solo no demuestra que la base esté migrada. `/ready` comprueba conexión, no la revisión ni la compatibilidad del esquema; confirma también `GET /api/v1/auth/bootstrap` antes de crear la primera cuenta.
+Ambas deben indicar `0005_meal_planning (head)` en una instalación que incluya HU-002. `heads` por sí solo no demuestra que la base esté migrada. `/ready` comprueba conexión, no la revisión ni la compatibilidad del esquema; confirma también `GET /api/v1/auth/bootstrap` antes de crear la primera cuenta. La migración `0005` añade el catálogo predeterminado y las tablas/restricciones de planificación; aplícala únicamente en la base del entorno previsto tras revisar el procedimiento de migración y mantener una copia de seguridad adecuada.
 
 ## Cuentas y seguridad
 
@@ -86,6 +86,10 @@ El alta inicial se cierra después de crear la primera cuenta. Después, cualqui
 
 La aplicación aplica contraseñas de 8–128 caracteres, Argon2id, cookies de sesión revocables (30 minutos de inactividad, 8 horas absolutas), CSRF y verificación de origen para escrituras; limita intentos de inicio de sesión y recuperación. Uvicorn no confía en cabeceras de proxy por defecto. No configures un proxy confiable sin un diseño explícito: la detección de IP afecta a los límites de intentos. La longitud mínima de contraseña y la falta de MFA requieren una evaluación de riesgo antes de uso público.
 
+## Planificación de comidas
+
+La planificación familiar es compartida entre usuarios activos autenticados y no añade un rol de administrador. El catálogo de etiquetas se carga mediante la migración `0005_meal_planning`; la API valida sesión en lectura y CSRF/origen en operaciones de escritura. No se requiere tarea de mantenimiento periódica ni existe una serie recurrente: las repeticiones se materializan como asignaciones independientes. HU-002 completó la verificación local de T1–T10, incluidos escenarios de navegador contra FastAPI/SQLite y el flujo bootstrap/registro/login/logout. No se probó navegador contra PostgreSQL ni la URL publicada; consulta la [evidencia y límites de HU-002](../../odd/tasks/hu-002-planificacion-de-comidas.md#evidencia-de-t10-y-cobertura-de-escenarios) antes de planificar una puesta en producción.
+
 **Mantenimiento del manual:** actualízalo con cualquier cambio de despliegue, secretos, migraciones, seguridad, gestión de usuarios, respaldo o recuperación.
 
-**Referencias:** [README](../../README.md), [README backend](../../backend/README.md), [arquitectura](../arquitectura.md), [historia HU-001](../historias-usuarios/HU-001-gestion-de-usuarios.md).
+**Referencias:** [README](../../README.md), [README backend](../../backend/README.md), [arquitectura](../arquitectura.md), [historia HU-001](../historias-usuarios/HU-001-gestion-de-usuarios.md), [historia HU-002](../historias-usuarios/HU-002-planificacion-de-comidas.md), [estado HU-002](../../odd/tasks/hu-002-planificacion-de-comidas.md).

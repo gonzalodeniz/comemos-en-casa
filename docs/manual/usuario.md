@@ -1,6 +1,6 @@
 # Manual de usuario
 
-> La aplicación ofrece actualmente acceso y gestión de cuentas familiares. La planificación de comidas y las etiquetas todavía no están disponibles.
+> La interfaz incorpora planificación semanal y mensual de comidas con etiquetas del catálogo predeterminado. HU-002 completó su verificación local: escenarios de navegador y registro/login/logout contra FastAPI y SQLite temporal. Esto no indica que la aplicación esté publicada ni sustituye la verificación PostgreSQL aislada.
 
 ## Acceso y cuentas
 
@@ -18,10 +18,20 @@ Cualquier usuario autenticado y activo puede ver, crear y administrar las cuenta
 - La eliminación es definitiva. No hay función de restauración disponible en la interfaz.
 - Si se rechaza el acceso tras varios intentos, espera a que expire el límite temporal (15 minutos) antes de volver a intentarlo.
 
+## Planificación de comidas
+
+En la pantalla autenticada, la planificación abre por defecto la semana actual según la fecha comunicada por el servidor en la zona `Atlantic/Canary`. La semana va de lunes a domingo y cada día presenta almuerzo y cena. Usa las flechas para avanzar o retroceder una semana; cambia a vista mensual para consultar o navegar por meses. Al alternar las vistas se conserva la fecha de referencia.
+
+Selecciona una franja para abrir el editor. Puedes asignar o sustituir una etiqueta del catálogo, o elegir eliminar la etiqueta actual. La repetición está desactivada inicialmente. Si la activas, indica un intervalo entero positivo en semanas y una fecha final válida; la operación afecta únicamente a las fechas calculadas desde la fecha inicial. El final se incluye solo si coincide con una repetición. También se admiten fechas pasadas.
+
+Antes de modificar franjas ocupadas o eliminar asignaciones, revisa la previsualización y confirma para guardar. Cancelar la previsualización o la confirmación no guarda cambios. Cada fecha se guarda como asignación independiente; modificar una copia no cambia las demás. El borrado repetido solo elimina la misma etiqueta. La planificación es compartida: otro usuario activo verá los cambios al volver a consultar o actualizar la vista; no hay actualización en tiempo real.
+
+Estos flujos se recorrieron en Chrome contra la API real en un entorno local efímero con SQLite. Esta comprobación no sustituye la validación PostgreSQL ni cierra la verificación general; consulta los límites y la matriz del [estado de HU-002](../../odd/tasks/hu-002-planificacion-de-comidas.md).
+
 ## Ayuda y alcance
 
-Si no puedes entrar, confirma que la dirección de correo y la contraseña sean correctas; para problemas de acceso o recuperación, contacta a quien administra el servicio. La aplicación no verifica la titularidad del correo. Las funciones de comidas, recetas y listas aún no están implementadas.
+Si no puedes entrar, confirma que la dirección de correo y la contraseña sean correctas; para problemas de acceso o recuperación, contacta a quien administra el servicio. La aplicación no verifica la titularidad del correo. La creación/edición de etiquetas, recetas y listas no forma parte de esta funcionalidad.
 
 **Mantenimiento del manual:** actualízalo junto con cualquier cambio en los flujos de cuenta, permisos, seguridad o funciones visibles.
 
-**Referencias:** [HU-001](../historias-usuarios/HU-001-gestion-de-usuarios.md), [README del proyecto](../../README.md).
+**Referencias:** [HU-001](../historias-usuarios/HU-001-gestion-de-usuarios.md), [HU-002](../historias-usuarios/HU-002-planificacion-de-comidas.md), [estado de HU-002](../../odd/tasks/hu-002-planificacion-de-comidas.md), [README del proyecto](../../README.md).

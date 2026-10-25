@@ -10,6 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.auth import router as auth_router
 from app.database import engine
+from app.meal_planning_api import router as meal_planning_router
 from app.settings import allowed_origins
 
 app = FastAPI(title="Comemos en casa API")
@@ -21,6 +22,7 @@ app.add_middleware(
     allow_headers=["Content-Type", "X-CSRF-Token"],
 )
 app.include_router(auth_router)
+app.include_router(meal_planning_router)
 
 
 def database_is_ready() -> bool:

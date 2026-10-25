@@ -8,7 +8,7 @@
 - `docker-compose.yml`: frontend empaquetado, API y PostgreSQL; Nginx es el único servicio público.
 - `docker-compose.mailhog.yml`: captura local de correo para desarrollo, en la red Docker compartida `comemos-dev`.
 
-La API está bajo `/api/v1`; las comprobaciones operativas son `/health` (proceso HTTP) y `/ready` (también comprueba PostgreSQL). La HU-001 sigue con verificación integral pendiente; planificación de comidas y etiquetas no están implementadas.
+La API está bajo `/api/v1`; las comprobaciones operativas son `/health` (proceso HTTP) y `/ready` (también comprueba PostgreSQL). La HU-001 sigue con verificación integral pendiente. En HU-002, los 22 escenarios se recorrieron en Chrome contra FastAPI real y SQLite efímera; además, una ejecución limpia verificó registro bootstrap sin auto-login, login explícito y logout. `make test` pasó; no se ejecutó navegador contra PostgreSQL ni se probó la URL publicada. Consulta la [matriz de evidencia](../../odd/tasks/hu-002-planificacion-de-comidas.md#evidencia-de-t10-y-cobertura-de-escenarios).
 
 ## Entorno local integrado
 
@@ -63,7 +63,11 @@ Las pruebas de integración de base de datos deben ejecutarse únicamente sobre 
 
 ## Migraciones y convenciones
 
-Con variables de conexión válidas, desde `backend/` ejecuta `alembic upgrade head` y revisa con `alembic current`. Las migraciones versionadas actuales son `0001_baseline`, `0002_user_auth_persistence`, `0003_login_attempt_events` y `0004_password_reset_rate_scopes`. Revisa migraciones contra PostgreSQL aislado; no edites versiones ya aplicadas para cambiar su efecto.
+Con variables de conexión válidas, desde `backend/` ejecuta `alembic upgrade head` y revisa con `alembic current`. Las migraciones versionadas actuales son `0001_baseline`, `0002_user_auth_persistence`, `0003_login_attempt_events`, `0004_password_reset_rate_scopes` y `0005_meal_planning` (planificación y catálogo predeterminado). Revisa migraciones contra PostgreSQL aislado; no edites versiones ya aplicadas para cambiar su efecto.
+
+La API de HU-002 ofrece `GET /api/v1/food-labels`, `GET /api/v1/meal-planning`, `POST /api/v1/meal-planning/preview` y `POST /api/v1/meal-planning/operations`. Todas requieren sesión activa; los POST requieren origen permitido y CSRF. La previsualización no escribe; guardar vuelve a validar y puede responder 409 con una previsualización actualizada si cambió el estado que requiere confirmación. La documentación del [contrato y matriz](../planes/hu-002-planificacion-de-comidas.md) describe solicitudes y respuestas. La prueba PostgreSQL aislada T9 acreditó la migración, la atomicidad y la concurrencia. `make test` pasó fuera de sandbox autorizado: 61 backend y 15 frontend; usa `.venv` y excluye integración PostgreSQL.
+
+Se conservaron los primeros timeouts de `make test` en sandbox (60/240/600 s) y de la prueba de autenticación focalizada (120 s). En comparación controlada, un GET mínimo FastAPI/TestClient se colgó a 15 s en sandbox y respondió HTTP 200 en 0,20 s fuera; la prueba focalizada, limitada a 30 s en sandbox, dio `1 passed` en 0,74 s fuera. Los stacks se detenían en coordinación de portal/hilos de AnyIO antes del trabajo de producto; la restricción interna exacta no quedó aislada y no se atribuye causa al producto. No se requieren cambios de dependencias, seguridad, workflow ni Makefile. La integración PostgreSQL permanece en su tarea aislada T9. T10 está completada localmente; el recorrido autenticado de escenarios usó sesiones sembradas, pero una sesión distinta verificó registro/login/logout sin sembrar usuarios o sesiones. No se probó navegador contra PostgreSQL ni la URL publicada.
 
 Sigue los patrones existentes: Python en `snake_case`, componentes React en `PascalCase`, pruebas Python `test_*.py` y Vitest `*.test.tsx`. Añade pruebas focalizadas con cada cambio. No hay formatter/linter general documentado. Si cambias comportamiento, configuración o seguridad, actualiza los manuales y documentación pertinente.
 

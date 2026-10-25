@@ -1,6 +1,6 @@
 # Propuesta de plan — HU-002: planificación de comidas
 
-**Estado:** pendiente de aprobación; no autoriza implementación.  
+**Estado (2026-10-25):** implementación autorizada; T1–T10 verificadas localmente. Los 22 escenarios se recorrieron en Chrome contra FastAPI real con SQLite efímera; una ejecución limpia separada verificó bootstrap, registro sin auto-login, login explícito y logout sin usuarios/sesiones sembrados. T9 mantiene aparte la evidencia PostgreSQL aislada. `make test` completo pasó fuera de sandbox autorizado (61 backend/15 frontend); build frontend pasó. Las ejecuciones previas en sandbox expiraron a límites de 60/240/600 s y la prueba focalizada de autenticación a 120 s; una comparación controlada posterior reprodujo el bloqueo TestClient/AnyIO solo en sandbox y pasó fuera, sin aislar la restricción interna ni atribuir causa al producto. No se probaron navegador contra PostgreSQL ni la URL publicada. No se han realizado commits ni operaciones remotas.
 **Referencia:** [HU-002](../historias-usuarios/HU-002-planificacion-de-comidas.md), [catálogo predeterminado](../etiquetas-predeterminadas.md) y [arquitectura](../arquitectura.md).  
 **Rama de trabajo:** `feat/hu-002-meal-planning`.
 
@@ -20,7 +20,7 @@ Se preservan CA-01–CA-10 y RN-01–RN-17 de la historia, con estas precisiones
 2. Para una fecha inicial distinta del 29 de febrero, el máximo final es el día anterior a la misma fecha del año siguiente. Para un inicio el **29 de febrero**, el máximo es el **28 de febrero del año siguiente, incluido**.
 3. Se permite consultar y modificar fechas pasadas, incluidas operaciones repetidas cuyo inicio esté en el pasado; el máximo se calcula desde la fecha inicial, no desde hoy.
 
-**Historia sincronizada:** las precisiones están incorporadas a la historia original, incluidos sus criterios, reglas, escenarios y definición de terminado. El [borrador TASKS](../../odd/tasks/hu-002-planificacion-de-comidas.md) se ha creado por petición expresa del usuario; su creación no aprueba el plan ni autoriza la implementación.
+**Historia sincronizada:** las precisiones están incorporadas a la historia original, incluidos sus criterios, reglas, escenarios y definición de terminado. El [borrador TASKS](../../odd/tasks/hu-002-planificacion-de-comidas.md) se creó por petición expresa del usuario. El plan sigue siendo una propuesta; la implementación está autorizada por la solicitud expresa del usuario, no por la mera creación del TASKS.
 
 La repetición estará desactivada inicialmente. Al activarla se propondrá el máximo anual como fecha final, editable dentro del intervalo válido; es una propuesta de interfaz, no una nueva regla de negocio.
 
@@ -32,12 +32,12 @@ La repetición estará desactivada inicialmente. Al activarla se propondrá el m
 - `FoodLabel`: identificador UUID estable, código técnico único y nombre visible. La migración contendrá un mapa explícito de identificadores/códigos y cargará exactamente las **18 etiquetas** del catálogo. «Pescado» y «Sardinas», por ejemplo, son registros distintos. Los grupos orientativos no implican jerarquía ni asignación múltiple.
 - `MealAssignment`: fecha SQL `DATE`, franja técnica `lunch` o `dinner`, y clave foránea obligatoria a `FoodLabel`. Una franja vacía se representa por ausencia de fila, no por una etiqueta nula.
 - Restricción única de base de datos para `(date, slot)`, restricción de valores de franja y clave foránea que impida referencias a etiquetas inexistentes. No introducir tablas de series, ocurrencias pendientes ni reglas de borrado futuras.
-- Crear la migración **prevista** `backend/migrations/versions/0005_meal_planning.py`, enlazada a `0004_password_reset_rate_scopes`, con tablas, restricciones y carga del catálogo. El `downgrade` solo afectará a las tablas de HU-002; probarlo exclusivamente en una base desechable.
+- La migración `backend/migrations/versions/0005_meal_planning.py` crea las tablas, restricciones y carga del catálogo enlazada a `0004_password_reset_rate_scopes`. El `downgrade` solo afectará a las tablas de HU-002; probarlo exclusivamente en una base desechable.
 - La migración es la fuente de carga inicial; consultar el calendario nunca insertará semillas ni asignaciones. Verificar estabilidad de IDs y ausencia de duplicados al volver a ejecutar `upgrade head`.
 
 ### 3.2. Fechas y repetición
 
-Extraer el cálculo a funciones puras en el módulo **previsto** `backend/app/meal_planning.py`, separadas de las rutas HTTP:
+El cálculo puro está implementado en `backend/app/meal_planning.py`, separado de las rutas HTTP:
 
 1. Validar fecha, franja, etiqueta y, si hay repetición, `interval_weeks` entero positivo y `end_date` entre el inicio y el máximo anual, ambos incluidos. Rechazar valores fraccionarios, booleanos, cero, negativos y fechas inválidas.
 2. Calcular cada ocurrencia como `start_date + k × 7 × interval_weeks` días, empezando por `k = 0`. Añadir solo fechas menores o iguales a `end_date`. No usar números de semana del año ni sumar horas UTC.
@@ -65,9 +65,16 @@ Reutilizar `/api/v1`, `get_active_session`, `require_csrf` y `get_database_sessi
 | `POST /meal-planning/preview` | Recibe la operación individual o repetida; devuelve fechas afectadas, asignaciones actuales, sustituciones o borrados efectivos y totales. No modifica datos de planificación. |
 | `POST /meal-planning/operations` | Valida de nuevo y ejecuta una operación individual o repetida en una transacción. Devuelve el resumen efectivo y permite refrescar las vistas. |
 
-El cuerpo de operación propuesto contendrá `action` (`assign` o `delete`), `start_date`, `slot`, `label_id`, repetición opcional con `interval_weeks` y `end_date`, y confirmación explícita cuando corresponda. `assign` sirve tanto para añadir como para sustituir. En un borrado, `label_id` representa exactamente la etiqueta seleccionada, no un grupo ni una coincidencia textual.
+Contrato técnico seleccionado para la implementación:
 
-Respuestas de validación coherentes con la API actual: 401 para sesión no válida, 403 para CSRF/origen, 422 para parámetros o etiquetas no válidos y errores de disponibilidad sin exponer detalles SQL. Un intervalo invertido no es una consulta válida. Precisar los esquemas de respuesta durante la fase de contrato, antes de implementar cliente y servidor por separado.
+- Catálogo: `GET /api/v1/food-labels` devuelve `{"labels":[{"id":"<uuid>","code":"pescado","name":"Pescado"}]}`; incluye el catálogo completo en orden por código.
+- Consulta: `GET /api/v1/meal-planning?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD` usa extremos inclusivos y devuelve `{"start_date":"...","end_date":"...","today":"...","timezone":"Atlantic/Canary","assignments":[{"id":"<uuid>","date":"YYYY-MM-DD","slot":"lunch|dinner","label":{"id":"<uuid>","code":"...","name":"..."}}]}`. Solo aparecen franjas asignadas; una franja ausente está sin planificar.
+- Previsualización y operación aceptan, por ejemplo, `{"action":"assign","start_date":"YYYY-MM-DD","slot":"lunch","label_id":"<uuid>","repeat":null}`; para borrar se usa `"action":"delete"`. La repetición es `null` o `{"interval_weeks":1,"end_date":"YYYY-MM-DD"}`. Una repetición es cada N semanas desde `start_date`; `end_date` es inclusiva y solo aplica en una ocurrencia calculada. `label_id` identifica una etiqueta exacta también para borrar.
+- `POST /api/v1/meal-planning/preview` no escribe y devuelve la operación, las fechas coincidentes, etiqueta actual y resultante por franja, cambios efectivos y `requires_confirmation`. Consultar/previsualizar no crea filas.
+- `POST /api/v1/meal-planning/operations` acepta el mismo cuerpo, más `confirmed` y `preview_token` devueltos por la previsualización. El token es una huella opaca de la operación y del estado de las franjas afectadas; sirve para detectar cambios, no reserva datos ni sustituye autenticación/CSRF. La asignación en una franja vacía no requiere confirmación; una sustitución o eliminación sí. Si se requiere y `confirmed` es falso, falta el token o ya no coincide, no escribe y responde 409 con la previsualización actualizada. El servidor valida de nuevo y recalcula dentro de la transacción; un cambio concurrente desde la previsualización no autoriza una sustitución silenciosa. La respuesta satisfactoria informa las fechas efectivamente cambiadas.
+- Todas las rutas requieren sesión activa. Las dos rutas POST requieren CSRF y origen permitido; las GET autenticadas no requieren token CSRF. Errores: 401 sesión no válida, 403 origen/CSRF, 404 recurso inexistente cuando aplique, 409 confirmación/estado que requiere consentimiento y 422 entrada inválida; nunca exponer SQL ni secretos.
+
+Respuestas de validación coherentes con la API actual: 401 para sesión no válida, 403 para CSRF/origen, 422 para parámetros o etiquetas no válidos y errores de disponibilidad sin exponer detalles SQL. Un intervalo invertido no es una consulta válida.
 
 ### 3.4. Transacciones, concurrencia y confirmaciones
 
@@ -82,7 +89,7 @@ Respuestas de validación coherentes con la API actual: 401 para sesión no vál
 
 Extender la pantalla autenticada de `frontend/src/App.tsx` conservando acceso y administración de usuarios. Reutilizar `apiRequest` y el token CSRF de la sesión. No introducir un framework de rutas o calendario sin necesidad demostrada.
 
-Separar la nueva funcionalidad en los archivos **previstos** `frontend/src/MealPlanning.tsx`, `frontend/src/mealPlanningDates.ts` y `frontend/src/mealPlanningApi.ts`, con pruebas próximas a cada módulo. Son ubicaciones propuestas, no archivos ya existentes.
+La implementación de T6/T7 se separa en `frontend/src/MealPlanning.tsx`, `frontend/src/mealPlanningDates.ts` y `frontend/src/mealPlanningApi.ts`; `frontend/src/mealPlanningDates.test.ts` cubre la aritmética local de fechas. El componente de planificación se integra en la pantalla autenticada sin retirar administración de usuarios.
 
 - Mantener una única fecha de referencia y un estado de vista semanal/mensual. Cambiar de vista conserva esa fecha; la navegación semanal desplaza siete días y la mensual cambia el mes, sin arrastrar accidentalmente los días 29–31 al siguiente. Cubrir explícitamente el ajuste al último día válido del mes destino.
 - Semana de lunes a domingo; mes con lunes como primera columna, fechas inequívocas al cruzar meses/años y almuerzo/cena diferenciados. Construir ambas vistas a partir del mismo conjunto de asignaciones por fecha y franja.
@@ -107,9 +114,9 @@ Estas fases son una propuesta de orden, no un documento TASKS ni autorización d
 ## 6. Estrategia de verificación
 
 - **Reglas puras:** pytest con fechas explícitas y reloj controlable. Probar semanas de 1, 2 y 3 intervalos, año bisiesto, límite anual, fin inclusivo, fin no coincidente, inicio igual a fin, intervalos mayores que la ventana y fechas históricas. Sin esperas ni dependencia de la fecha real de ejecución.
-- **API local:** reutilizar el patrón de base SQLite temporal e inyección de dependencias observado en `backend/tests/test_auth.py`, sin confundir esa evidencia con PostgreSQL. Archivos **previstos** `backend/tests/test_meal_planning.py` y `backend/tests/test_meal_planning_dates.py`: validación, permisos, CSRF, previsualización, confirmación, ausencia de efectos al cancelar, edición independiente y consultas repetidas sin escrituras.
-- **PostgreSQL aislado:** ampliar `backend/tests/test_database_integration.py` para migración nueva, catálogo, restricciones, rollback completo ante fallo y carreras entre altas/sustituciones/borrados, con conexiones independientes. Actualizar su expectativa de revisión Alembic, actualmente fijada a `0004_password_reset_rate_scopes`. Verificar que borrar un usuario no elimina la planificación compartida. No usar SQLite como prueba de bloqueo o concurrencia real.
-- **Frontend:** Vitest para aritmética de calendario, fecha de referencia compartida, estados de carga/error, respuestas fuera de orden y contratos del cliente. Comprobar el soporte de pruebas de interacción antes de añadir herramientas; no presuponer que la configuración actual ejecuta interacciones de navegador. Añadir comprobación integral en navegador de los 22 escenarios de la historia actualizada.
+- **API local:** se reutiliza el patrón de base SQLite temporal e inyección de dependencias observado en `backend/tests/test_auth.py`, sin confundir esa evidencia con PostgreSQL. `backend/tests/test_meal_planning.py` y `backend/tests/test_meal_planning_dates.py` cubren validación, permisos, CSRF, previsualización, confirmación, ausencia de efectos antes del guardado, borrado exacto y consultas sin escrituras de planificación.
+- **PostgreSQL aislado:** la migración 0005 y el catálogo de 18 etiquetas se verificaron en `hu002-t2-1jp59v`, incluyendo la conservación del usuario creado en 0004. En `hu002-t9-bd1hsp`, accesible solo por `127.0.0.1:32771`, `alembic upgrade head` llegó a `0005` y `RUN_DB_INTEGRATION=1 ../.venv/bin/python -m pytest -q tests/test_database_integration.py` dio `15 passed`; tres casos de concurrencia se repitieron 3 veces cada uno y pasaron `9/9`. La prueba incluyó carreras de asignación/borrado y lotes repetidos, estado obsoleto, slots vacíos, rollback con trigger, borrado exacto y eliminación de usuario sin borrar comidas compartidas. Se retiraron solo el contenedor y la red del proyecto; el volumen se conservó. No usar SQLite como prueba de bloqueo o concurrencia real.
+- **Frontend:** Vitest para aritmética de calendario, fecha de referencia compartida, estados de carga/error, respuestas fuera de orden y contratos del cliente. Comprobar el soporte de pruebas de interacción antes de añadir herramientas; no presuponer que la configuración actual ejecuta interacciones de navegador. Añadir comprobación integral en navegador de los 22 escenarios de la historia actualizada. En la verificación registrada para T8, `frontend/src/mealPlanningApi.test.ts` aporta cuatro pruebas del contrato del cliente.
 - **Regresión:** acceso, sesiones, usuarios y recuperación deben conservar su comportamiento. La nueva migración no altera tablas ni datos de autenticación.
 
 Comandos existentes de comprobación local, a ejecutar durante la implementación, no en esta planificación:
@@ -121,21 +128,29 @@ make test
 # Tipos y paquete de producción del frontend.
 make build-frontend
 
-# Prueba de reglas/API local enfocada, cuando existan los archivos previstos.
+# Prueba de reglas/API local enfocada.
 cd backend
 ../.venv/bin/python -m pytest -q tests/test_meal_planning.py tests/test_meal_planning_dates.py
 ```
 
-La integración se ejecutará **aparte** con `RUN_DB_INTEGRATION=1`, apuntando exclusivamente a un proyecto Compose/base nueva y aislada, con las migraciones aplicadas y la configuración reproducible del [README](../../README.md). El comando local del módulo es `cd backend && RUN_DB_INTEGRATION=1 ../.venv/bin/python -m pytest -q tests/test_database_integration.py`, pero **no debe ejecutarse sin preparar primero ese aislamiento**. `make test` no prueba migraciones ni concurrencia PostgreSQL y no sustituye esta verificación.
+La integración PostgreSQL T9 ya se ejecutó **aparte** con `RUN_DB_INTEGRATION=1` en el proyecto Compose aislado `hu002-t9-bd1hsp`: `alembic upgrade head` y el módulo completo dieron `15 passed`; las tres pruebas concurrentes pasaron tres repeticiones cada una (`9/9`). Se retiraron únicamente el contenedor y la red de ese proyecto y se conservó su volumen. Para futuras repeticiones, usar exclusivamente un proyecto/base nuevos y aislados según el [README](../../README.md), con migraciones aplicadas; `make test` no prueba migraciones ni concurrencia PostgreSQL.
+
+La verificación frontend registrada para T8 dio `cd frontend && npm test`: `15 passed`; `make build-frontend` pasó. Las pruebas HU-002 focalizadas dieron 33 backend y 15 frontend. Aunque `make test` había agotado límites de 60, 240 y 600 s dentro de sandbox, una ejecución completa autorizada fuera de sandbox pasó con 61 pruebas backend y 15 frontend; el diagnóstico observó 7,37 s y una repetición independiente del padre 3,40 s, sin advertencias de salida. La prueba focalizada `test_first_account_closes_bootstrap_without_automatic_login`, que agotó 120 s en sandbox, dio `1 passed` en 0,74 s fuera de sandbox. Un GET mínimo FastAPI/TestClient reprodujo la espera de 15 s en sandbox y devolvió HTTP 200 en 0,20 s fuera. Los stacks se detenían en coordinación portal/hilos de AnyIO antes del trabajo de producto; no se aisló la restricción interna ni se afirma causa de producto. T8 está completada. `make test` usa `.venv` y no ejecuta integración PostgreSQL. T10 recorrió los 22 escenarios en navegador con FastAPI y SQLite temporal; esto no sustituye PostgreSQL ni prueba el login, porque las sesiones se sembraron directamente.
+
+### Cierre específico de T6
+
+T6 está completada con comprobación independiente de los escenarios 1–3: semana lunes–domingo, almuerzo/cena y franjas vacías, administración conservada, navegación entre meses/años, ajuste de días 29–31 y año bisiesto, ancla y asignaciones coherentes entre vistas. Chrome local con perfil limpio y API simulada verificó el «hoy» canario frente a `Pacific/Honolulu`, carga/error recuperable, 401 hacia el acceso existente y descarte de éxitos/errores antiguos. Los anchos 320, 390, 760 y 1440 px pasaron legibilidad, contención, cabeceras alineadas y acceso completo al domingo con teclado; se corrigieron el tamaño/desplazamiento mensual y la visibilidad del foco sin cambiar fechas ni API.
+
+Sobre el código final, `cd frontend && npm test` dio `15 passed` (seis pruebas de fechas), `make build-frontend` y `git diff --check` pasaron. La [matriz de T6 en TASKS](../../odd/tasks/hu-002-planificacion-de-comidas.md#verificación-observada-de-t6) conserva condiciones y resultados concretos. Esta evidencia de T6 con API simulada sigue diferenciada del recorrido T10 contra FastAPI real y SQLite temporal. Ninguna implica URL publicada ni sustituye PostgreSQL. Los procesos locales temporales se detuvieron y la DB de prueba se eliminó. T7–T10 están completadas localmente. Se conserva el historial de timeouts de sandbox y su comparación posterior, sin atribución de causa de producto.
 
 ## 7. Riesgos, exclusiones y aprobación
 
 - **Coherencia documental:** mantener la historia ya actualizada, este plan y el TASKS alineados; no resolver contradicciones silenciosamente en el código.
 - **Concurrencia entre previsualizar y guardar:** la confirmación no es una reserva. Probar el estado real al guardar, las franjas inicialmente vacías y las operaciones repetidas solapadas.
-- **Diferencias de base de datos:** SQLite permite pruebas rápidas, pero solo PostgreSQL acredita los bloqueos, restricciones y transacciones previstos.
+- **Diferencias de base de datos:** migración, catálogo, rollback y concurrencia se comprobaron en PostgreSQL aislado (T2/T9); estos resultados no se infieren de SQLite.
 - **Fechas del navegador:** evitar conversiones UTC que desplacen el día y navegación mensual que salte meses; verificar desde zonas de navegador distintas de `Atlantic/Canary`.
 - **HU-001:** reutilizar lo implementado sin dar por cerradas tareas históricas todavía pendientes; un fallo de autenticación preexistente debe quedar registrado como tal.
 
 Quedan fuera recetas concretas, creación/edición/borrado de etiquetas por usuarios, multihogar, nuevos roles, series permanentes, actualizaciones en tiempo real, importaciones, despliegue remoto y cambios de credenciales. No se introduce una biblioteca de calendario, un nuevo almacén de estado ni una reestructuración global de la aplicación como condición de esta historia.
 
-Este documento queda **pendiente de aprobación**. El usuario ha solicitado expresamente el [borrador TASKS de HU-002](../../odd/tasks/hu-002-planificacion-de-comidas.md), también pendiente de aprobación. Ninguno autoriza cambios de código, migraciones en una base real, commits, fusiones, tags, publicación o PR; la implementación requiere autorización posterior, según el [índice de planes y tareas](README.md).
+El usuario ha autorizado explícitamente comenzar la implementación. El [TASKS de HU-002](../../odd/tasks/hu-002-planificacion-de-comidas.md) registra el avance por evidencia; la autorización no implica commit, fusión, tag, publicación o PR. T1–T10 están verificadas localmente; no se probó la URL publicada ni el navegador contra PostgreSQL.

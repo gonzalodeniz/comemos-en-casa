@@ -39,6 +39,31 @@ describe("apiRequest", () => {
     } satisfies Partial<ApiError>);
   });
 
+  it("preserves structured stale-preview details for confirmation flows", async () => {
+    const detail = {
+      message: "Planning changed since the preview",
+      preview: { preview_token: "fresh-token", requires_confirmation: true },
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ detail }), { status: 409 }),
+      ),
+    );
+
+    try {
+      await apiRequest("/meal-planning/operations", { method: "POST", body: {} });
+      throw new Error("Expected the API request to fail");
+    } catch (cause) {
+      expect(cause).toBeInstanceOf(ApiError);
+      expect(cause).toMatchObject({
+        status: 409,
+        message: "Planning changed since the preview",
+        detail,
+      });
+    }
+  });
+
   it("accepts empty logout responses", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
     await expect(apiRequest<null>("/auth/logout", { method: "POST" })).resolves.toBeNull();

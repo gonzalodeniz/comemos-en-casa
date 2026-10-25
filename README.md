@@ -1,6 +1,6 @@
 # Comemos en casa — base local
 
-Esta rama prepara React/TypeScript, FastAPI y PostgreSQL. El código backend y frontend incluye flujos de cuenta, gestión de usuarios y recuperación; la verificación integral de T4/T6/T7 sigue abierta. Etiquetas y planificación también están pendientes. Consultá el [plan aprobado](docs/planes/arquitectura-base.md) y el [estado de HU-001](odd/tasks/hu-001-gestion-de-usuarios.md).
+Esta rama contiene React/TypeScript, FastAPI y PostgreSQL. El código incluye flujos de cuenta, gestión de usuarios, recuperación y planificación semanal/mensual de comidas con etiquetas predeterminadas. En HU-002, T1–T10 están verificadas localmente: 22 escenarios de navegador contra FastAPI/Vite y SQLite temporal, además de registro bootstrap, login explícito y logout en una sesión limpia sin usuarios/sesiones sembrados. Esto no sustituye la evidencia PostgreSQL aislada de T9 ni prueba la URL publicada. `make test` pasó fuera de sandbox autorizado: 61 pruebas backend y 15 frontend. Consulta el [plan de arquitectura](docs/planes/arquitectura-base.md), [estado de HU-001](odd/tasks/hu-001-gestion-de-usuarios.md) y [evidencia de HU-002](odd/tasks/hu-002-planificacion-de-comidas.md#evidencia-de-t10-y-cobertura-de-escenarios).
 
 ## Arranque local
 
@@ -19,7 +19,7 @@ La interfaz local empaquetada está en <http://localhost:5173/comemos/> (solo lo
 
 Compose usa PostgreSQL 16. Para reutilizar un volumen con una base heredada incompatible, consulta el [procedimiento seguro de separación](docs/manual/administracion.md#volúmenes-existentes-y-bases-heredadas); no borres datos ni apliques migraciones a un esquema ajeno.
 
-La API de autenticación usa `/api/v1`: `GET /auth/bootstrap`, `POST /auth/register-initial`, `POST /auth/login`, `GET /auth/session`, `POST /auth/logout` y `POST /users` (creación privada). Las escrituras requieren un `Origin` permitido; logout y creación privada requieren además el token CSRF devuelto por la sesión. El registro inicial no inicia sesión automáticamente.
+La API usa `/api/v1`. Autenticación: `GET /auth/bootstrap`, `POST /auth/register-initial`, `POST /auth/login`, `GET /auth/session`, `POST /auth/logout` y `POST /users` (creación privada). HU-002 añade `GET /food-labels`, `GET /meal-planning`, `POST /meal-planning/preview` y `POST /meal-planning/operations`. Las escrituras requieren un `Origin` permitido; los POST de planificación requieren además el token CSRF de la sesión. El registro inicial no inicia sesión automáticamente. Consulta los manuales para detalles y el estado HU-002 para las limitaciones de verificación actuales.
 
 ## Pruebas
 

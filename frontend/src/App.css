@@ -12,6 +12,7 @@ Establece la disposición y los estilos de los formularios, mensajes y vistas de
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; min-height: 100vh; }
 button, input { font: inherit; }
+select { width: 100%; margin-top: .35rem; padding: .65rem .75rem; border: 1px solid #cbd5e1; border-radius: .5rem; background: white; font: inherit; }
 button {
   border: 0;
   border-radius: .55rem;
@@ -57,8 +58,54 @@ h1, h2, h3, p { margin-top: 0; }
 .message.error { color: #991b1b; background: #fee2e2; }
 .message.success { color: #166534; background: #dcfce7; }
 
+.meal-planning { margin-bottom: 1.2rem; }
+.meal-heading, .meal-editor-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.meal-heading h2 { margin-bottom: .35rem; }
+.meal-date-context { margin-bottom: 0; font-size: .9rem; }
+.meal-view-switch { display: flex; gap: .5rem; }
+.calendar-navigation { display: flex; align-items: center; gap: .7rem; margin: 1.2rem 0; }
+.calendar-navigation h3 { flex: 1; margin: 0; text-align: center; font-size: 1.05rem; }
+.today-button { margin-left: .4rem; }
+.week-grid { display: grid; grid-template-columns: repeat(7, minmax(130px, 1fr)); gap: .5rem; overflow-x: auto; padding-bottom: .35rem; }
+.calendar-day { min-width: 0; padding: .65rem; border: 1px solid #e2e8f0; border-radius: .65rem; background: #fff; }
+.calendar-day.is-today { border-color: #16a34a; box-shadow: inset 0 0 0 1px #16a34a; }
+.calendar-day.outside-month { background: #f8fafc; color: #64748b; }
+.calendar-day h4 { display: flex; flex-direction: column; margin: 0 0 .5rem; font-size: .85rem; }
+.calendar-day h4 time { font-size: 1.05rem; }
+.meal-slot { display: flex; flex-direction: column; width: 100%; min-height: 3.4rem; margin-top: .4rem; padding: .45rem; color: #334155; text-align: left; background: #f1f5f9; font-size: .78rem; }
+.meal-slot strong { overflow-wrap: anywhere; }
+.meal-slot.planned { color: #14532d; background: #dcfce7; }
+.meal-slot.unplanned { color: #475569; background: #f1f5f9; }
+.month-calendar { position: relative; display: grid; grid-template-columns: repeat(7, minmax(140px, 1fr)); gap: .3rem; overflow-x: auto; padding-bottom: .35rem; }
+.month-calendar:focus-visible { outline: 3px solid #15803d; outline-offset: 3px; }
+.month-weekday { padding: .25rem; color: #475569; text-align: center; font-size: .8rem; font-weight: 700; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
+.compact-day { padding: .35rem; }
+.compact-day h4 { flex-direction: row; justify-content: space-between; gap: .25rem; font-size: .8rem; }
+.compact-day h4 span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compact-day h4 time { font-size: .85rem; }
+.compact-day .meal-slot { min-height: 3.4rem; padding: .45rem; font-size: .8rem; }
+.meal-editor { margin-top: 1.2rem; padding: 1rem; border: 1px solid #cbd5e1; border-radius: .7rem; background: #f8fafc; }
+.meal-editor h3 { margin-bottom: .3rem; }
+.meal-editor-heading p { margin-bottom: .3rem; }
+.meal-editor label { margin: .7rem 0; }
+.repeat-toggle { display: flex; align-items: center; gap: .55rem; }
+.repeat-toggle input { width: auto; margin: 0; accent-color: #166534; }
+.repeat-fields { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
+.meal-preview { margin-top: 1rem; padding: .9rem; border: 1px solid #cbd5e1; border-radius: .6rem; background: white; }
+.meal-preview h4 { margin: 0 0 .6rem; }
+.meal-preview ul { display: grid; gap: .4rem; max-height: 18rem; overflow: auto; padding-left: 1.3rem; }
+.meal-preview li span { display: block; color: #475569; font-size: .9rem; }
+.confirmation-note { padding: .6rem; border-radius: .45rem; color: #854d0e; background: #fef3c7; }
+
 @media (max-width: 760px) {
   .dashboard { grid-template-columns: 1fr; }
   .app-header { align-items: flex-start; flex-direction: column; }
   .session-tools { width: 100%; justify-content: space-between; }
+  .meal-heading { flex-direction: column; }
+  .week-grid { grid-template-columns: repeat(7, minmax(140px, 1fr)); }
+  .repeat-fields { grid-template-columns: 1fr; gap: 0; }
+  .calendar-navigation { flex-wrap: wrap; }
+  .calendar-navigation h3 { min-width: 60%; order: 1; }
+  .today-button { margin-left: auto; }
 }

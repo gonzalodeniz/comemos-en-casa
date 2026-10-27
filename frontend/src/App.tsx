@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { apiRequest, ApiError, type User, type UserResponse } from "./api";
 import MealPlanning from "./MealPlanning";
+import AppWorkspace, { type AppView } from "./AppWorkspace";
 import "./App.css";
 
 type Screen = "loading" | "register" | "login" | "reset-request" | "reset-confirm" | "app";
@@ -16,6 +17,7 @@ function field(form: FormData, name: string): string {
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("loading");
+  const [view, setView] = useState<AppView>("meal-planning");
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [csrfToken, setCsrfToken] = useState("");
   const [users, setUsers] = useState<User[]>([]);
@@ -43,6 +45,7 @@ export default function App() {
     const session = await apiRequest<SessionResponse>("/auth/session");
     setCurrentUser({ ...session.user, is_active: true });
     setCsrfToken(session.csrf_token);
+    setView("meal-planning");
     setScreen("app");
     await loadUsers();
   }, [loadUsers]);
@@ -305,9 +308,12 @@ export default function App() {
       )}
 
       {screen === "app" && currentUser && (
-        <>
-          <MealPlanning csrfToken={csrfToken} onSessionExpired={mealSessionExpired} />
-          <div className="dashboard">
+        <AppWorkspace
+          view={view}
+          onViewChange={(nextView) => { setView(nextView); setError(""); setNotice(""); }}
+          disabled={loading}
+          mealPlanning={<MealPlanning csrfToken={csrfToken} onSessionExpired={mealSessionExpired} />}
+          userManagement={<div className="dashboard">
             <section className="panel">
               <h2>Usuarios</h2>
               <p>Todos los usuarios activos pueden administrar las cuentas familiares.</p>
@@ -339,8 +345,8 @@ export default function App() {
                 <button disabled={loading}>{loading ? "Creando…" : "Crear usuario"}</button>
               </form>
             </section>
-          </div>
-        </>
+          </div>}
+        />
       )}
     </main>
   );

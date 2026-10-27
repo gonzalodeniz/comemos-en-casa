@@ -9,6 +9,8 @@
 3. En adelante, inicia sesión con correo y contraseña. Usa **¿Olvidaste tu contraseña?** para solicitar un enlace; el sistema muestra el mismo aviso exista o no la cuenta. Si el correo está configurado y la cuenta existe, recibirás un enlace de un solo uso que caduca a los 30 minutos.
 4. Para salir, pulsa **Cerrar sesión**. Una sesión también caduca tras 30 minutos de inactividad o 8 horas como máximo.
 
+Al iniciar sesión se abre **Plan semanal**. Usa el menú lateral izquierdo para alternar entre **Plan semanal** y **Gestión de usuarios**, que se muestran como vistas independientes. En pantallas pequeñas, el menú aparece encima del contenido.
+
 ## Gestión familiar
 
 Cualquier usuario autenticado y activo puede ver, crear y administrar las cuentas familiares: editar nombre/correo, cambiar contraseñas, activar/desactivar cuentas y eliminarlas. No hay un rol administrador separado: los permisos de gestión son iguales para los usuarios activos.

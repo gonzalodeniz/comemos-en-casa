@@ -17,7 +17,7 @@ describe("CalendarDay", () => {
     expect(markup).toContain('aria-current="date"');
     expect(markup).toContain('dateTime="2026-10-27"');
     expect(markup).toContain("Arroz");
-    expect(markup).toContain("Almuerzo");
+    expect(markup).not.toContain('meal-card-status lunch');
     expect(markup).toContain("Sin planificar");
     expect(markup).toContain("Editar almuerzo del martes, 27 de octubre de 2026: Arroz");
     expect(markup).toContain("Planificar cena del martes, 27 de octubre de 2026");
@@ -36,7 +36,7 @@ describe("CalendarDay", () => {
 
   it("disables all controls while loading or saving", () => {
     const markup = renderToStaticMarkup(day([], { disabled: true }));
-    expect(markup.match(/disabled=""/g)).toHaveLength(2);
+    expect(markup.match(/disabled=""/g)).toHaveLength(4);
   });
 
   it("keeps month cells compact and excludes redundant day-level actions", () => {

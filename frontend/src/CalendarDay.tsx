@@ -32,11 +32,22 @@ export default function CalendarDay({ date, weekday, today, outsideMonth = false
               onClick={() => onEdit(date, slot)}
             >
               <span className="meal-thumbnail"><AppIcon name="utensils" /></span>
-              <span className="meal-details"><strong>{assignment?.label.name ?? "Sin planificar"}</strong>{assignment && <span className={`meal-card-status ${slot}`}>{SLOT_LABELS[slot]}</span>}</span>
+              <span className="meal-details"><strong>{assignment?.label.name ?? "Sin planificar"}</strong>{compact && assignment && <span className={`meal-card-status ${slot}`}>{SLOT_LABELS[slot]}</span>}</span>
             </button>
           );
         })}
       </div>
+      {!compact && <details className="day-actions">
+        <summary aria-label={`Acciones del ${formatDateLabel(date, { dateStyle: "full" })}`}>⋮</summary>
+        <div className="day-actions-menu">
+          {(Object.keys(SLOT_LABELS) as MealSlot[]).map((slot) => (
+            <button key={slot} type="button" disabled={disabled} onClick={(event) => {
+              event.currentTarget.closest("details")?.removeAttribute("open");
+              onEdit(date, slot);
+            }}>{assignments.has(`${date}:${slot}`) ? "Editar" : "Planificar"} {SLOT_LABELS[slot].toLowerCase()}</button>
+          ))}
+        </div>
+      </details>}
     </article>
   );
 }

@@ -16,6 +16,8 @@ describe("MealPlanning presentation", () => {
     expect(markup).toContain("Volver a hoy");
     expect(markup.match(/<article/g)).toHaveLength(7);
     expect(markup.match(/class="meal-slot /g)).toHaveLength(14);
+    expect(markup.match(/week-heading-label/g)).toHaveLength(2);
+    expect(markup.match(/class="day-actions"/g)).toHaveLength(7);
     expect(markup).toContain("Cargando planificación");
   });
 });

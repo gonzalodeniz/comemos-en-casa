@@ -262,6 +262,14 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
 
       {view === "week" ? (
         <div className="week-grid" aria-label="Planificación semanal">
+          <div className="week-meal-headings">
+            <span className="week-heading-spacer" aria-hidden="true" />
+            <div className="week-heading-meals">
+              <span><span aria-hidden="true">☀️</span><span className="week-heading-label" aria-hidden="true">Almuerzo</span><span className="visually-hidden">Almuerzo</span></span>
+              <span><span aria-hidden="true">🌙</span><span className="week-heading-label" aria-hidden="true">Cena</span><span className="visually-hidden">Cena</span></span>
+            </div>
+            <span className="week-heading-spacer" aria-hidden="true" />
+          </div>
           {range.dates.map((date, index) => (
             <CalendarDay
               key={date}

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ApiError } from "./api";
+import AppIcon from "./AppIcon";
+import CalendarDay from "./CalendarDay";
 import {
   addCalendarDays,
   annualMaximumEndDate,
@@ -55,6 +57,17 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
   const [revision, setRevision] = useState(0);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const editorRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(""), 4000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  useEffect(() => {
+    if (editorDate && editorSlot) editorRef.current?.focus();
+  }, [editorDate, editorSlot]);
 
   useEffect(() => {
     let cancelled = false;
@@ -216,32 +229,35 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
   }
 
   const title = view === "week"
-    ? `${formatDateLabel(range.start, { day: "numeric", month: "long" })} – ${formatDateLabel(range.end, { day: "numeric", month: "long", year: "numeric" })}`
+    ? `${formatDateLabel(range.start, { day: "numeric", month: "short", ...(range.start.slice(0, 4) !== range.end.slice(0, 4) ? { year: "numeric" } : {}) })} – ${formatDateLabel(range.end, { day: "numeric", month: "short", year: "numeric" })}`
     : formatDateLabel(queryDate, { month: "long", year: "numeric" });
 
   return (
-    <section className="panel meal-planning" aria-labelledby="meal-planning-title">
+    <section className="meal-planning" aria-labelledby="meal-planning-title">
       <div className="meal-heading">
-        <div>
-          <p className="eyebrow">Planificación familiar</p>
-          <h2 id="meal-planning-title">Comidas</h2>
-          <p className="meal-date-context">Hoy: {today ?? "…"} · Atlantic/Canary</p>
+        <div className="meal-title">
+          <h2 id="meal-planning-title">Planificación de comidas</h2>
+          <p className="meal-subtitle">{view === "week" ? `Semana del ${title}` : "Vista mensual"}</p>
         </div>
-        <div className="meal-view-switch" role="group" aria-label="Vista del calendario">
-          <button type="button" className={view === "week" ? "" : "secondary"} aria-pressed={view === "week"} disabled={calendarLoading || busy} onClick={() => setView("week")}>Semana</button>
-          <button type="button" className={view === "month" ? "" : "secondary"} aria-pressed={view === "month"} disabled={calendarLoading || busy} onClick={() => setView("month")}>Mes</button>
+        <div className="calendar-toolbar">
+          <div className="calendar-navigation">
+            <button type="button" className="secondary" aria-label={view === "week" ? "Semana anterior" : "Mes anterior"} disabled={calendarLoading || busy} onClick={() => moveRange(-1)}><AppIcon name="chevron-left" /></button>
+            <h3 aria-live="polite">{title}</h3>
+            <button type="button" className="secondary" aria-label={view === "week" ? "Semana siguiente" : "Mes siguiente"} disabled={calendarLoading || busy} onClick={() => moveRange(1)}><AppIcon name="chevron-right" /></button>
+          </div>
+          <div className="meal-view-switch" role="group" aria-label="Vista del calendario">
+            <button type="button" aria-pressed={view === "week"} disabled={calendarLoading || busy} onClick={() => setView("week")}>Semana</button>
+            <button type="button" aria-pressed={view === "month"} disabled={calendarLoading || busy} onClick={() => setView("month")}>Mes</button>
+          </div>
         </div>
       </div>
-
-      <div className="calendar-navigation">
-        <button type="button" className="secondary" aria-label={view === "week" ? "Semana anterior" : "Mes anterior"} disabled={calendarLoading || busy} onClick={() => moveRange(-1)}>←</button>
-        <h3 aria-live="polite">{title}</h3>
-        <button type="button" className="secondary" aria-label={view === "week" ? "Semana siguiente" : "Mes siguiente"} disabled={calendarLoading || busy} onClick={() => moveRange(1)}>→</button>
-        <button type="button" className="secondary today-button" disabled={calendarLoading || busy} onClick={() => { setReferenceDate((today ?? localToday()) as CalendarDate); closeEditor(); }}>Hoy</button>
+      <div className="calendar-context">
+        <p className="meal-date-context">Tu menú, día a día <span aria-hidden="true">·</span> <span>Atlantic/Canary</span></p>
+        <button type="button" className="secondary today-button" disabled={calendarLoading || busy} onClick={() => { setReferenceDate((today ?? localToday()) as CalendarDate); closeEditor(); }}>Volver a hoy</button>
       </div>
 
       {error && <p className="message error" role="alert">{error}</p>}
-      {notice && <p className="message success" role="status">{notice}</p>}
+      {notice && <p className="message success toast" role="status">{notice}</p>}
       {calendarLoading && <p role="status">Cargando planificación…</p>}
 
       {view === "week" ? (
@@ -297,7 +313,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
       )}
 
       {editorDate && editorSlot && draft && (
-        <form className="meal-editor" onSubmit={submitPreview} aria-labelledby="meal-editor-title">
+        <form className="meal-editor" ref={editorRef} tabIndex={-1} onSubmit={submitPreview} aria-labelledby="meal-editor-title">
           <div className="meal-editor-heading">
             <div>
               <h3 id="meal-editor-title">{SLOT_LABELS[editorSlot]} · {formatDateLabel(editorDate, { dateStyle: "full" })}</h3>
@@ -366,49 +382,6 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
         </form>
       )}
     </section>
-  );
-}
-
-function CalendarDay({
-  date,
-  weekday,
-  today,
-  outsideMonth = false,
-  compact = false,
-  assignments,
-  disabled,
-  onEdit,
-}: {
-  date: CalendarDate;
-  weekday: string;
-  today: boolean;
-  outsideMonth?: boolean;
-  compact?: boolean;
-  assignments: Map<string, MealAssignment>;
-  disabled: boolean;
-  onEdit: (date: CalendarDate, slot: MealSlot) => void;
-}) {
-  return (
-    <article className={`calendar-day${today ? " is-today" : ""}${outsideMonth ? " outside-month" : ""}${compact ? " compact-day" : ""}`}>
-      <h4><span>{weekday}</span><time dateTime={date}>{formatDateLabel(date, { day: "numeric", month: compact ? undefined : "short" })}</time></h4>
-      {(Object.keys(SLOT_LABELS) as MealSlot[]).map((slot) => {
-        const assignment = assignments.get(`${date}:${slot}`);
-        const action = assignment ? "Editar" : "Planificar";
-        return (
-          <button
-            key={slot}
-            type="button"
-            className={`meal-slot ${assignment ? "planned" : "unplanned"}`}
-            aria-label={`${action} ${SLOT_LABELS[slot].toLowerCase()} del ${formatDateLabel(date, { dateStyle: "full" })}${assignment ? `: ${assignment.label.name}` : ""}`}
-            disabled={disabled}
-            onClick={() => onEdit(date, slot)}
-          >
-            <span>{SLOT_LABELS[slot]}</span>
-            <strong>{assignment?.label.name ?? "Sin planificar"}</strong>
-          </button>
-        );
-      })}
-    </article>
   );
 }
 

@@ -11,6 +11,8 @@
 
 Al iniciar sesión se abre **Plan semanal**. Usa el menú lateral izquierdo para alternar entre **Plan semanal** y **Gestión de usuarios**, que se muestran como vistas independientes. En pantallas pequeñas, el menú aparece encima del contenido.
 
+El calendario semanal muestra columnas por día en escritorio y tarjetas adaptadas al ancho de la pantalla en móviles y tabletas. El día actual se destaca en verde. Pulsa una tarjeta de almuerzo o cena para editarla, o **Añadir comida** para abrir la primera franja libre del día. Si ambas franjas están ocupadas, el botón se llama **Editar comidas** y abre el almuerzo; también puedes seleccionar directamente la cena. **Volver a hoy** regresa al periodo actual. En la vista mensual, desplaza horizontalmente solo el calendario para consultar todos los días sin estrechar las tarjetas; el resto de la pantalla no requiere desplazamiento horizontal. El calendario mensual admite enfoque y desplazamiento con el teclado.
+
 ## Gestión familiar
 
 Cualquier usuario autenticado y activo puede ver, crear y administrar las cuentas familiares: editar nombre/correo, cambiar contraseñas, activar/desactivar cuentas y eliminarlas. No hay un rol administrador separado: los permisos de gestión son iguales para los usuarios activos.

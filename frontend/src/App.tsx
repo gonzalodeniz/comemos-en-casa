@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { apiRequest, ApiError, type User, type UserResponse } from "./api";
 import MealPlanning from "./MealPlanning";
 import AppWorkspace, { type AppView } from "./AppWorkspace";
+import AppBrand from "./AppBrand";
+import AppIcon from "./AppIcon";
 import "./App.css";
 
 type Screen = "loading" | "register" | "login" | "reset-request" | "reset-confirm" | "app";
@@ -128,7 +130,7 @@ export default function App() {
       body: { email: field(form, "email"), password: field(form, "password") },
     });
     await refreshSession();
-    setNotice("Sesión iniciada.");
+    setNotice("");
   }
 
   async function signOut() {
@@ -235,24 +237,11 @@ export default function App() {
   }
 
   return (
-    <main className="app-shell">
-      <header className="app-header">
-        <div>
-          <p className="eyebrow">Gestión familiar</p>
-          <h1>Comemos en casa</h1>
-        </div>
-        {screen === "app" && currentUser && (
-          <div className="session-tools">
-            <span>{currentUser.name}</span>
-            <button type="button" className="secondary" disabled={loading} onClick={() => void perform(signOut)}>
-              Cerrar sesión
-            </button>
-          </div>
-        )}
-      </header>
+    <main className={`app-shell ${screen === "app" ? "authenticated" : "auth-shell"}`}>
+      {screen !== "app" && <header className="app-header"><AppBrand /><p>Organiza tu semana. Disfruta en familia.</p></header>}
 
-      {error && <p className="message error" role="alert">{error}</p>}
-      {notice && <p className="message success" role="status">{notice}</p>}
+      {screen !== "app" && error && <p className="message error" role="alert">{error}</p>}
+      {screen !== "app" && notice && <p className="message success" role="status">{notice}</p>}
 
       {screen === "loading" && <p role="status">Comprobando la sesión…</p>}
 
@@ -312,10 +301,13 @@ export default function App() {
           view={view}
           onViewChange={(nextView) => { setView(nextView); setError(""); setNotice(""); }}
           disabled={loading}
+          sessionTools={<div className="session-tools"><div className="session-identity"><span className="session-avatar" aria-hidden="true">{currentUser.name.trim().charAt(0).toLocaleUpperCase("es")}</span><div><small>Tu cuenta</small><strong>{currentUser.name}</strong></div></div><button type="button" className="secondary sign-out" disabled={loading} onClick={() => void perform(signOut)}><AppIcon name="logout" />Cerrar sesión</button></div>}
+          notifications={<>{error && <p className="message error" role="alert">{error}</p>}{notice && <p className="message success" role="status">{notice}</p>}</>}
           mealPlanning={<MealPlanning csrfToken={csrfToken} onSessionExpired={mealSessionExpired} />}
           userManagement={<div className="dashboard">
             <section className="panel">
-              <h2>Usuarios</h2>
+              <p className="eyebrow">Tu familia</p>
+              <h2>Gestión de usuarios</h2>
               <p>Todos los usuarios activos pueden administrar las cuentas familiares.</p>
               {users.length === 0 ? <p role="status">Cargando usuarios…</p> : (
                 <div className="user-list">

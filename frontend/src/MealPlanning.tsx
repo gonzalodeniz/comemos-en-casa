@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { ApiError } from "./api";
 import AppIcon from "./AppIcon";
 import CalendarDay from "./CalendarDay";
@@ -51,6 +51,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
   const [editorSlot, setEditorSlot] = useState<MealSlot | null>(null);
   const [draft, setDraft] = useState<EditorDraft | null>(null);
   const [preview, setPreview] = useState<MealPlanningPreview | null>(null);
+  const previewOperationRef = useRef<MealPlanningOperation | null>(null);
   const [forceReconfirmation, setForceReconfirmation] = useState(false);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
@@ -58,6 +59,13 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const editorRef = useRef<HTMLFormElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+  const initialDraftRef = useRef("");
+  const [search, setSearch] = useState("");
+  const [hadAssignment, setHadAssignment] = useState(false);
+  const editorOpen = editorDate !== null && editorSlot !== null && draft !== null;
+  const dirty = draft !== null && JSON.stringify({ date: editorDate, draft }) !== initialDraftRef.current;
+  const filteredLabels = filterFoodLabels(labels, search);
 
   useEffect(() => {
     if (!notice) return;
@@ -66,8 +74,19 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
   }, [notice]);
 
   useEffect(() => {
-    if (editorDate && editorSlot) editorRef.current?.focus();
-  }, [editorDate, editorSlot]);
+    if (!editorOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    editorRef.current?.focus();
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      openerRef.current?.focus();
+    };
+  }, [editorOpen]);
+
+  useEffect(() => {
+    if (editorOpen && (preview || busy)) editorRef.current?.focus();
+  }, [editorOpen, preview, busy]);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,15 +145,19 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
   function openEditor(date: CalendarDate, slot: MealSlot) {
     const current = assignmentMap.get(`${date}:${slot}`);
     const labelId = current?.label.id ?? labels[0]?.id ?? "";
+    const nextDraft: EditorDraft = {
+      action: "assign", labelId, repeat: false, intervalWeeks: "1",
+      endDate: annualMaximumEndDate(date),
+    };
+    const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const closedDetails = active?.closest("details:not([open])");
+    openerRef.current = closedDetails?.querySelector<HTMLElement>("summary") ?? active;
+    initialDraftRef.current = JSON.stringify({ date, draft: nextDraft });
+    setHadAssignment(Boolean(current));
+    setSearch("");
     setEditorDate(date);
     setEditorSlot(slot);
-    setDraft({
-      action: "assign",
-      labelId,
-      repeat: false,
-      intervalWeeks: "1",
-      endDate: annualMaximumEndDate(date),
-    });
+    setDraft(nextDraft);
     setPreview(null);
     setForceReconfirmation(false);
     setError("");
@@ -147,6 +170,33 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
     setDraft(null);
     setPreview(null);
     setForceReconfirmation(false);
+  }
+
+  function requestClose() {
+    if (busyRef.current) return;
+    if (dirty && !window.confirm("¿Descartar los cambios sin guardar?")) return;
+    setError("");
+    closeEditor();
+  }
+
+  function handleDrawerKeyDown(event: KeyboardEvent<HTMLFormElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      requestClose();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const items = Array.from(editorRef.current?.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"]):not(:disabled)',
+    ) ?? []);
+    if (!items.length) { event.preventDefault(); editorRef.current?.focus(); return; }
+    const first = items[0];
+    const last = items[items.length - 1];
+    if (event.shiftKey && (document.activeElement === first || document.activeElement === editorRef.current)) {
+      event.preventDefault(); last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault(); first.focus();
+    }
   }
 
   function changeStartDate(value: string) {
@@ -198,15 +248,17 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
     event.preventDefault();
     const operation = operationFromDraft();
     if (!operation) return;
+    const snapshot = snapshotOperation(operation);
     void runExclusive(async () => {
-      const result = await previewMealPlanning(operation, csrfToken);
+      const result = await previewMealPlanning(snapshot, csrfToken);
+      previewOperationRef.current = snapshot;
       setPreview(result);
       setForceReconfirmation(false);
     });
   }
 
   function saveOperation() {
-    const operation = operationFromDraft();
+    const operation = previewOperationRef.current;
     if (!operation || !preview) return;
     void runExclusive(async () => {
       try {
@@ -256,7 +308,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
         <button type="button" className="secondary today-button" disabled={calendarLoading || busy} onClick={() => { setReferenceDate((today ?? localToday()) as CalendarDate); closeEditor(); }}>Volver a hoy</button>
       </div>
 
-      {error && <p className="message error" role="alert">{error}</p>}
+      {error && !editorOpen && <p className="message error" role="alert">{error}</p>}
       {notice && <p className="message success toast" role="status">{notice}</p>}
       {calendarLoading && <p role="status">Cargando planificación…</p>}
 
@@ -321,73 +373,84 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
       )}
 
       {editorDate && editorSlot && draft && (
-        <form className="meal-editor" ref={editorRef} tabIndex={-1} onSubmit={submitPreview} aria-labelledby="meal-editor-title">
-          <div className="meal-editor-heading">
-            <div>
-              <h3 id="meal-editor-title">{SLOT_LABELS[editorSlot]} · {formatDateLabel(editorDate, { dateStyle: "full" })}</h3>
-              <p>La repetición está desactivada inicialmente. Las fechas pasadas también se pueden modificar.</p>
-            </div>
-            <button type="button" className="secondary" onClick={closeEditor} disabled={busy}>Cerrar</button>
-          </div>
-
-          <label>Operación
-            <select value={draft.action} onChange={(event) => { setDraft({ ...draft, action: event.target.value as EditorDraft["action"] }); setPreview(null); }}>
-              <option value="assign">Asignar o sustituir</option>
-              <option value="delete">Eliminar esta etiqueta</option>
-            </select>
-          </label>
-          <label>Etiqueta
-            <select value={draft.labelId} onChange={(event) => { setDraft({ ...draft, labelId: event.target.value }); setPreview(null); }} required>
-              {labels.map((label) => <option key={label.id} value={label.id}>{label.name}</option>)}
-            </select>
-          </label>
-          <label>Fecha inicial
-            <input type="date" value={editorDate} onChange={(event) => changeStartDate(event.target.value)} required />
-          </label>
-          <label className="repeat-toggle">
-            <input type="checkbox" checked={draft.repeat} onChange={(event) => { setDraft({ ...draft, repeat: event.target.checked }); setPreview(null); }} />
-            Repetir cada cierto número de semanas
-          </label>
-          {draft.repeat && (
-            <div className="repeat-fields">
-              <label>Intervalo en semanas
-                <input type="number" min={1} step={1} value={draft.intervalWeeks} onChange={(event) => { setDraft({ ...draft, intervalWeeks: event.target.value }); setPreview(null); }} required />
-              </label>
-              <label>Fecha final (incluida si coincide)
-                <input type="date" min={editorDate} max={annualMaximumEndDate(editorDate)} value={draft.endDate} onChange={(event) => { setDraft({ ...draft, endDate: event.target.value }); setPreview(null); }} required />
-              </label>
-            </div>
-          )}
-          <div className="button-row">
-            <button type="submit" disabled={busy || labels.length === 0}>{busy ? "Calculando…" : "Previsualizar cambios"}</button>
-            <button type="button" className="secondary" onClick={closeEditor} disabled={busy}>Cancelar</button>
-          </div>
-
-          {preview && (
-            <div className="meal-preview" aria-live="polite">
-              <h4>Revisa los cambios</h4>
-              {preview.requires_confirmation && <p className="confirmation-note">Esta operación sustituye o elimina asignaciones existentes y requiere tu confirmación.</p>}
-              {forceReconfirmation && <p className="confirmation-note">El estado cambió desde la vista previa anterior. Esta es la versión actualizada; vuelve a confirmar si estás de acuerdo.</p>}
-              {preview.dates.length === 0 ? <p>No hay fechas que modificar.</p> : (
-                <ul>
-                  {preview.dates.map((entry) => (
-                    <li key={`${entry.date}:${entry.slot}`}>
-                      <strong>{formatDateLabel(entry.date, { dateStyle: "medium" })} · {SLOT_LABELS[entry.slot]}</strong>
-                      <span>{previewChangeLabel(entry.change, entry.current_label, entry.resulting_label)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p>{preview.changed_count} cambio{preview.changed_count === 1 ? "" : "s"} previsto{preview.changed_count === 1 ? "" : "s"}.</p>
-              <div className="button-row">
-                <button type="button" disabled={busy} onClick={saveOperation}>
-                  {preview.requires_confirmation || forceReconfirmation ? "Confirmar y guardar" : "Guardar cambios"}
-                </button>
-                <button type="button" className="secondary" disabled={busy} onClick={closeEditor}>Cancelar sin guardar</button>
+        <div className="drawer-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) requestClose(); }}>
+          <form className="meal-editor" ref={editorRef} tabIndex={-1} onSubmit={submitPreview}
+            onKeyDown={handleDrawerKeyDown} role="dialog" aria-modal="true" aria-labelledby="meal-editor-title" aria-describedby="meal-editor-subtitle">
+            <div className="meal-editor-heading">
+              <div>
+                <h3 id="meal-editor-title">{hadAssignment ? "Editar comida" : "Añadir comida"}</h3>
+                <p id="meal-editor-subtitle">{formatDateLabel(editorDate, { dateStyle: "full" })} · {SLOT_LABELS[editorSlot]}</p>
               </div>
+              <button type="button" className="drawer-close secondary" onClick={requestClose} disabled={busy} aria-label="Cerrar editor">×</button>
             </div>
-          )}
-        </form>
+            <div className="drawer-content">
+              {error && <p className="message error" role="alert">{error}</p>}
+              {preview ? (
+                <div className="meal-preview" aria-live="polite">
+                  <h4>Revisa los cambios</h4>
+                  {preview.requires_confirmation && <p className="confirmation-note">Esta operación sustituye o elimina asignaciones existentes y requiere tu confirmación.</p>}
+                  {forceReconfirmation && <p className="confirmation-note">El estado cambió desde la vista previa anterior. Esta es la versión actualizada; vuelve a confirmar si estás de acuerdo.</p>}
+                  {preview.dates.length === 0 ? <p>No hay fechas que modificar.</p> : (
+                    <ul>{preview.dates.map((entry) => (
+                      <li key={`${entry.date}:${entry.slot}`}>
+                        <strong>{formatDateLabel(entry.date, { dateStyle: "medium" })} · {SLOT_LABELS[entry.slot]}</strong>
+                        <span>{previewChangeLabel(entry.change, entry.current_label, entry.resulting_label)}</span>
+                      </li>
+                    ))}</ul>
+                  )}
+                  <p>{preview.changed_count} cambio{preview.changed_count === 1 ? "" : "s"} previsto{preview.changed_count === 1 ? "" : "s"}.</p>
+                </div>
+              ) : <fieldset className="drawer-edit-fields" disabled={busy}>
+                <label>Operación
+                  <select value={draft.action} onChange={(event) => { setDraft({ ...draft, action: event.target.value as EditorDraft["action"] }); setPreview(null); }}>
+                    <option value="assign">Asignar o sustituir</option>
+                    <option value="delete">Eliminar esta etiqueta</option>
+                  </select>
+                </label>
+                <label className="dish-search">Buscar plato
+                  <span><span aria-hidden="true">⌕</span><input type="search" placeholder="Buscar plato..." value={search} onChange={(event) => setSearch(event.target.value)} /></span>
+                </label>
+                <fieldset className="dish-selector">
+                  <legend>Plato</legend>
+                  {filteredLabels.length === 0 ? <p>No se encontraron platos.</p> : <div className="dish-grid">
+                    {filteredLabels.map((label) => (
+                      <button type="button" key={label.id} className={`dish-card${draft.labelId === label.id ? " selected" : ""}`}
+                        aria-pressed={draft.labelId === label.id} onClick={() => { setDraft({ ...draft, labelId: label.id }); setPreview(null); }}>
+                        <span className="dish-image" aria-hidden="true"><AppIcon name="utensils" /></span>
+                        <strong>{label.name}</strong>
+                        {draft.labelId === label.id && <span className="dish-check" aria-hidden="true">✓</span>}
+                      </button>
+                    ))}
+                  </div>}
+                </fieldset>
+                <label>Fecha
+                  <input type="date" value={editorDate} onChange={(event) => changeStartDate(event.target.value)} required />
+                </label>
+                <label className="repeat-toggle">
+                  <input type="checkbox" role="switch" checked={draft.repeat} onChange={(event) => { setDraft({ ...draft, repeat: event.target.checked }); setPreview(null); }} />
+                  <span>Repetir cada cierto número de semanas</span>
+                </label>
+                {draft.repeat && <div className="repeat-fields">
+                  <label>Intervalo en semanas
+                    <input type="number" min={1} step={1} value={draft.intervalWeeks} onChange={(event) => { setDraft({ ...draft, intervalWeeks: event.target.value }); setPreview(null); }} required />
+                  </label>
+                  <label>Fecha final (incluida si coincide)
+                    <input type="date" min={editorDate} max={annualMaximumEndDate(editorDate)} value={draft.endDate} onChange={(event) => { setDraft({ ...draft, endDate: event.target.value }); setPreview(null); }} required />
+                  </label>
+                </div>}
+              </fieldset>}
+            </div>
+            <div className="drawer-actions">
+              {preview ? <>
+                <button type="button" className="secondary" disabled={busy} onClick={() => setPreview(null)}>Volver a editar</button>
+                <button type="button" disabled={busy} onClick={saveOperation}>{busy ? "Guardando…" : "Confirmar y guardar"}</button>
+              </> : <>
+                <button type="button" className="secondary" onClick={requestClose} disabled={busy}>Cancelar</button>
+                <button type="submit" disabled={busy || labels.length === 0}>{busy ? "Calculando…" : "Previsualizar cambios"}</button>
+              </>}
+            </div>
+          </form>
+        </div>
       )}
     </section>
   );
@@ -408,4 +471,13 @@ function previewChangeLabel(
 function errorMessage(cause: unknown): string {
   if (cause instanceof Error) return cause.message;
   return "No se pudo completar la operación. Inténtalo de nuevo.";
+}
+
+export function filterFoodLabels(labels: FoodLabel[], search: string): FoodLabel[] {
+  const query = search.trim().toLocaleLowerCase("es");
+  return labels.filter((label) => label.name.toLocaleLowerCase("es").includes(query));
+}
+
+export function snapshotOperation(operation: MealPlanningOperation): MealPlanningOperation {
+  return { ...operation, repeat: operation.repeat ? { ...operation.repeat } : null };
 }

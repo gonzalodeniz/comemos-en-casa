@@ -276,3 +276,37 @@ button.today-button { min-height: 36px; padding: .3rem .7rem; color: #007346; ba
   .week-heading-label { display: none; }
   .week-grid .meal-thumbnail { width: 36px; height: 36px; }
 }
+
+/* Meal editor: modal drawer keeps the calendar in context. */
+.drawer-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; justify-content: flex-end; background: rgba(18, 40, 52, .48); }
+.meal-editor { box-sizing: border-box; width: min(460px, 100%); height: 100dvh; margin: 0; padding: 0; display: flex; flex-direction: column; overflow: hidden; border: 0; border-radius: 0; background: #fff; box-shadow: -8px 0 24px rgba(18, 51, 74, .14); animation: drawer-enter 250ms ease-out; }
+.meal-editor:focus { outline: none; }
+.meal-editor-heading { flex: 0 0 auto; padding: 1.2rem 1.25rem; border-bottom: 1px solid #dce8ec; }
+.meal-editor-heading h3 { margin: 0; font-size: 1.2rem; }
+.meal-editor-heading p { margin: .3rem 0 0; color: #54758a; }
+.meal-editor-heading .drawer-close { flex: 0 0 auto; min-width: 44px; min-height: 44px; padding: 0; font-size: 1.5rem; }
+.drawer-content { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 1.25rem 1.25rem; }
+.drawer-actions { flex: 0 0 auto; display: flex; justify-content: flex-end; gap: .7rem; padding: 1rem 1.25rem max(1rem, env(safe-area-inset-bottom)); border-top: 1px solid #dce8ec; background: white; }
+.drawer-actions button { min-height: 44px; }
+.dish-search > span { display: flex; align-items: center; gap: .5rem; padding-left: .8rem; border: 1px solid #dce8ec; border-radius: .7rem; color: #54758a; }
+.dish-search input { border: 0; min-width: 0; }
+.dish-selector { min-width: 0; border: 0; margin: 1rem 0; padding: 0; }
+.dish-selector legend { margin-bottom: .5rem; font-weight: 700; }
+.dish-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; }
+.dish-card { position: relative; display: flex; flex-direction: column; align-items: stretch; gap: .45rem; min-width: 0; padding: .45rem; color: #12334a; background: white; border: 1px solid #dce8ec; border-radius: .75rem; text-align: center; }
+.dish-card:hover { background: #f3faf6; }
+.dish-card.selected { border: 2px solid #00854a; padding: calc(.45rem - 1px); background: #e8f7ef; }
+.dish-card strong { overflow-wrap: anywhere; }
+.dish-image { display: flex; height: 90px; justify-content: center; align-items: center; border-radius: .5rem; background: #f1f5f5; color: #8da4aa; }
+.dish-image svg { width: 32px; height: 32px; }
+.dish-check { position: absolute; top: .7rem; right: .7rem; display: grid; place-items: center; width: 23px; height: 23px; border-radius: 50%; color: white; background: #00854a; }
+.meal-editor .repeat-toggle input { appearance: none; width: 40px; height: 24px; border: 0; border-radius: 20px; background: #a8bbc1; cursor: pointer; position: relative; }
+.meal-editor .repeat-toggle input::before { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: white; transition: transform 180ms; }
+.meal-editor .repeat-toggle input:checked { background: #00854a; }
+.meal-editor .repeat-toggle input:checked::before { transform: translateX(16px); }
+.meal-editor .meal-preview { margin-top: 1rem; }
+@keyframes drawer-enter { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@media (max-width: 600px) { .meal-editor { width: 100%; padding: 0; } .meal-editor-heading { flex-wrap: nowrap; padding-top: max(1rem, env(safe-area-inset-top)); } .drawer-actions button { flex: 1; } }
+@media (prefers-reduced-motion: reduce) { .meal-editor { animation: none; } .meal-editor .repeat-toggle input::before { transition: none; } }
+
+.drawer-edit-fields { min-width: 0; margin: 0; padding: 0; border: 0; }

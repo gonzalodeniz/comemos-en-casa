@@ -8,6 +8,7 @@ import FoodCatalog from "./FoodCatalog";
 import AppWorkspace, { type AppView } from "./AppWorkspace";
 import AppBrand from "./AppBrand";
 import AppIcon from "./AppIcon";
+import { persistAppView, restoreAppView } from "./appViewPersistence";
 import "./App.css";
 
 type Screen = "loading" | "register" | "login" | "reset-request" | "reset-confirm" | "app";
@@ -20,7 +21,7 @@ function field(form: FormData, name: string): string {
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("loading");
-  const [view, setView] = useState<AppView>("meal-planning");
+  const [view, setView] = useState<AppView>(restoreAppView);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [csrfToken, setCsrfToken] = useState("");
   const [users, setUsers] = useState<User[]>([]);
@@ -48,7 +49,6 @@ export default function App() {
     const session = await apiRequest<SessionResponse>("/auth/session");
     setCurrentUser({ ...session.user, is_active: true });
     setCsrfToken(session.csrf_token);
-    setView("meal-planning");
     setScreen("app");
     await loadUsers();
   }, [loadUsers]);
@@ -300,7 +300,7 @@ export default function App() {
       {screen === "app" && currentUser && (
         <AppWorkspace
           view={view}
-          onViewChange={(nextView) => { setView(nextView); setError(""); setNotice(""); }}
+          onViewChange={(nextView) => { setView(nextView); persistAppView(nextView); setError(""); setNotice(""); }}
           disabled={loading}
           sessionTools={<div className="session-tools"><div className="session-identity"><span className="session-avatar" aria-hidden="true">{currentUser.name.trim().charAt(0).toLocaleUpperCase("es")}</span><div><small>Tu cuenta</small><strong>{currentUser.name}</strong></div></div><button type="button" className="secondary sign-out" disabled={loading} onClick={() => void perform(signOut)}><AppIcon name="logout" />Cerrar sesión</button></div>}
           notifications={<>{error && <p className="message error" role="alert">{error}</p>}{notice && <p className="message success" role="status">{notice}</p>}</>}

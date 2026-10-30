@@ -115,7 +115,7 @@ button.today-button { min-height: 36px; padding: .3rem .7rem; color: #007346; ba
 .calendar-day h4 time { color: #4b7383; font-size: .95rem; font-weight: 600; }
 .calendar-day.is-today h4, .calendar-day.is-today h4 time { color: #007c46; }
 .day-meals { display: grid; gap: .75rem; }
-.meal-slot { display: flex; flex-direction: column; align-items: flex-start; gap: .85rem; width: 100%; min-width: 0; min-height: 157px; padding: .9rem .75rem; border: 1px solid #e0ebef; border-radius: .65rem; color: #123a46; text-align: left; background: #fff; font-size: .8rem; font-weight: 500; }
+.meal-slot { display: flex; flex-direction: column; align-items: center; gap: .55rem; width: 100%; min-width: 0; min-height: 157px; padding: .9rem .75rem; border: 1px solid #e0ebef; border-radius: .65rem; color: #123a46; text-align: center; background: #fff; font-size: .8rem; font-weight: 500; }
 .meal-slot-heading { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; color: #577d8c; font-size: .77rem; }
 .meal-slot-heading .app-icon { width: 17px; height: 17px; }
 .meal-slot strong { max-width: 100%; line-height: 1.6; font-weight: 650; overflow-wrap: anywhere; }
@@ -127,7 +127,14 @@ button.today-button { min-height: 36px; padding: .3rem .7rem; color: #007346; ba
 .add-meal { display: flex; align-items: center; justify-content: center; gap: .4rem; width: 100%; min-height: 44px; margin-top: 1.2rem; padding: .6rem .3rem; border: 1px solid #deeeea; border-radius: .65rem; color: #007c46; background: #f0f9f5; font-size: .7rem; font-weight: 600; }
 .add-meal .app-icon { width: 17px; height: 17px; }
 .add-meal:hover:not(:disabled) { background: #def2e7; }
-.month-calendar { position: relative; display: grid; grid-template-columns: repeat(7, minmax(150px, 1fr)); gap: .4rem; overflow-x: auto; padding: .25rem .2rem .8rem; scrollbar-color: #9fc9b6 #edf4f5; }
+.month-calendar { position: relative; display: grid; grid-template-columns: repeat(7, minmax(150px, 1fr)); gap: 0; overflow-x: auto; padding: .25rem .2rem .8rem; scrollbar-color: #9fc9b6 #edf4f5; }
+.month-calendar > :not(:nth-child(7n)) { border-right: 1px solid #dae7ec; }
+.month-calendar > * { border-bottom: 1px solid #dae7ec; }
+.month-calendar > :nth-last-child(-n + 7) { border-bottom: 0; }
+.month-calendar > .calendar-day { border-top: 0; border-left: 0; border-right: 0; border-radius: 0; background: transparent; }
+.month-calendar > .calendar-day.outside-month { background: #f5f8f9; }
+.month-calendar > .calendar-day.is-today { box-shadow: inset 0 0 0 1px #159c61; background: #f1faf5; }
+.month-calendar > :not(:nth-child(7n)) { border-right: 1px solid #dae7ec; }
 .month-weekday { padding: .65rem; color: #517586; text-align: center; font-size: .8rem; font-weight: 650; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
 .compact-day { padding: .45rem; }
@@ -249,12 +256,13 @@ button.today-button { min-height: 36px; padding: .3rem .7rem; color: #007346; ba
 .week-grid .calendar-day h4 { display: flex; flex-direction: column; justify-content: center; min-height: 0; margin: 0; padding: .8rem 1rem; gap: .2rem; background: #fff8e5; }
 .week-grid .calendar-day.is-today h4 { background: #e8f7ef; }
 .week-grid .day-meals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; align-items: stretch; }
-.week-grid .meal-slot { display: flex; flex-direction: row; align-items: center; gap: .85rem; min-height: 78px; padding: .65rem 1rem; border: 0; border-radius: 0; background: transparent; }
+.week-grid .meal-slot { min-height: 157px; padding: .65rem .5rem; border: 0; border-radius: 0; background: transparent; }
 .week-grid .meal-slot + .meal-slot { border-left: 1px solid #e0ebef; }
 .week-grid .meal-slot:hover:not(:disabled) { background: #edf9f2; }
-.meal-thumbnail { display: grid; flex: 0 0 auto; place-items: center; width: 42px; height: 42px; border-radius: 50%; color: #7897a8; background: #edf3f5; }
+.meal-thumbnail { display: grid; flex: 0 0 auto; place-items: center; width: min(100%, 7rem); aspect-ratio: 1; overflow: hidden; border-radius: .6rem; color: #638879; background: #f0f8f4; }
+.meal-thumbnail .app-icon { width: 30px; height: 30px; }
 .meal-thumbnail img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
-.meal-details { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: .25rem; }
+.meal-details { display: flex; min-width: 0; flex-direction: column; align-items: center; gap: .25rem; }
 .meal-card-status.lunch { color: #604900; background: #fff0b8; }
 .meal-card-status.dinner { color: #4d3184; background: #eee3ff; }
 .toast { position: fixed; right: 1rem; bottom: 1rem; z-index: 5; box-shadow: 0 4px 20px #12334a22; }
@@ -275,7 +283,7 @@ button.today-button { min-height: 36px; padding: .3rem .7rem; color: #007346; ba
   .week-grid .meal-details { align-items: center; }
   .week-grid .meal-slot.unplanned .meal-details { display: none; }
   .week-heading-label { display: none; }
-  .week-grid .meal-thumbnail { width: 36px; height: 36px; }
+  .week-grid .meal-thumbnail { width: min(100%, 5rem); }
 }
 
 /* Meal editor: modal drawer keeps the calendar in context. */

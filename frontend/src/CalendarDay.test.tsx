@@ -41,7 +41,21 @@ describe("CalendarDay", () => {
     }]]);
     const markup = renderToStaticMarkup(CalendarDay({ date, weekday: "Martes", today: false, assignments, disabled: false, onEdit: vi.fn() }));
     expect(markup).toContain('src="/comemos/api/v1/food-labels/rice/image"');
+    expect(markup).toContain('class="meal-thumbnail"');
     expect(markup).toContain("Arroz");
+  });
+
+  it("keeps the utensil fallback and month status alongside the dish name", () => {
+    const assignments = new Map<string, MealAssignment>([[`${date}:lunch`, {
+      id: "assignment", date, slot: "lunch",
+      label: { id: "rice", code: "arroz", name: "Arroz" },
+    }]]);
+    const markup = renderToStaticMarkup(CalendarDay({ date, weekday: "Martes", today: false, compact: true, assignments, disabled: false, onEdit: vi.fn() }));
+
+    expect(markup).toContain('class="meal-thumbnail"');
+    expect(markup).toContain('class="app-icon "');
+    expect(markup).toContain("Arroz");
+    expect(markup).toContain('class="meal-card-status lunch"');
   });
 
   it("disables all controls while loading or saving", () => {

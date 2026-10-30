@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { apiRequest, ApiError, type User, type UserResponse } from "./api";
 import MealPlanning from "./MealPlanning";
+import FoodCatalog from "./FoodCatalog";
 import AppWorkspace, { type AppView } from "./AppWorkspace";
 import AppBrand from "./AppBrand";
 import AppIcon from "./AppIcon";
@@ -304,6 +305,7 @@ export default function App() {
           sessionTools={<div className="session-tools"><div className="session-identity"><span className="session-avatar" aria-hidden="true">{currentUser.name.trim().charAt(0).toLocaleUpperCase("es")}</span><div><small>Tu cuenta</small><strong>{currentUser.name}</strong></div></div><button type="button" className="secondary sign-out" disabled={loading} onClick={() => void perform(signOut)}><AppIcon name="logout" />Cerrar sesión</button></div>}
           notifications={<>{error && <p className="message error" role="alert">{error}</p>}{notice && <p className="message success" role="status">{notice}</p>}</>}
           mealPlanning={<MealPlanning csrfToken={csrfToken} onSessionExpired={mealSessionExpired} />}
+          foodCatalog={<FoodCatalog csrfToken={csrfToken} onSessionExpired={mealSessionExpired} />}
           userManagement={<div className="dashboard">
             <section className="panel">
               <p className="eyebrow">Tu familia</p>

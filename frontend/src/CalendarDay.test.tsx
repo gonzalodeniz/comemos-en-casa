@@ -34,6 +34,16 @@ describe("CalendarDay", () => {
     expect(onEdit.mock.calls).toEqual([[date, "lunch"], [date, "dinner"]]);
   });
 
+  it("renders the catalog image in the planning card when available", () => {
+    const assignments = new Map<string, MealAssignment>([[`${date}:lunch`, {
+      id: "assignment", date, slot: "lunch",
+      label: { id: "rice", code: "arroz", name: "Arroz", image_url: "/food-labels/rice/image" },
+    }]]);
+    const markup = renderToStaticMarkup(CalendarDay({ date, weekday: "Martes", today: false, assignments, disabled: false, onEdit: vi.fn() }));
+    expect(markup).toContain('src="/comemos/api/v1/food-labels/rice/image"');
+    expect(markup).toContain("Arroz");
+  });
+
   it("disables all controls while loading or saving", () => {
     const markup = renderToStaticMarkup(day([], { disabled: true }));
     expect(markup.match(/disabled=""/g)).toHaveLength(4);

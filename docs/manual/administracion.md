@@ -56,7 +56,82 @@ La renovación se ejecuta con `make cert-renew`; Certbot reutiliza el webroot y 
 
 ## Esquema, persistencia y copias
 
-Aplica migraciones con `make migrate`; inspecciona la versión con `docker compose exec backend python -m alembic current`. No hay procedimiento de copia de seguridad, restauración ni retención definido en el repositorio. El volumen `postgres_data` solo conserva datos locales entre reinicios: no equivale a una copia de seguridad. Antes de operar datos reales, establece y prueba una política de copias fuera del contenedor, restauración y control de acceso; no borres el volumen para resolver errores.
+Aplica migraciones con `make migrate`; inspecciona la versión con `docker compose exec backend python -m alembic current`. El volumen `postgres_data` solo conserva datos locales entre reinicios: no equivale a una copia de seguridad. Las imágenes de comidas viven en `data/`, por lo que una copia válida incluye **la base PostgreSQL y todo `data/` en una misma ventana sin escrituras**. No guardes la copia dentro de `data/` ni en el repositorio.
+
+### Copia coherente de base de datos e imágenes
+
+Ejecuta desde la raíz del proyecto, en una ventana de mantenimiento. Detén el backend y confirma que no hay escritores directos a PostgreSQL; detener solo la interfaz no es suficiente. La carpeta de copias debe estar en almacenamiento protegido, fuera de `data/`, y disponer de espacio suficiente. El ejemplo conserva una carpeta temporal si falla para permitir diagnóstico; solo publica el directorio final después de validar ambos archivos.
+
+```sh
+set -eu
+umask 077
+: "${BACKUP_ROOT:?Define una carpeta de copias protegida fuera de data/}"
+DATA_ROOT=${DATA_ROOT:-data}
+mkdir -p "$BACKUP_ROOT"
+data_real=$(realpath "$DATA_ROOT")
+backup_real=$(realpath "$BACKUP_ROOT")
+case "$backup_real/" in "$data_real/"*) echo 'BACKUP_ROOT no puede estar dentro de data/' >&2; exit 1;; esac
+test -d "$data_real"
+stamp=$(date -u +%Y%m%dT%H%M%SZ)
+stage=$(mktemp -d "$BACKUP_ROOT/.comemos-$stamp.XXXXXX")
+final="$BACKUP_ROOT/comemos-$stamp"
+test ! -e "$final"
+restore_backend() { docker compose start backend; }
+trap 'docker compose start backend || true' EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+docker compose stop backend
+
+docker compose exec -T postgres sh -ec \
+  'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom' \
+  > "$stage/database.dump"
+tar -C "$DATA_ROOT" -czf "$stage/data.tar.gz" .
+docker compose exec -T postgres pg_restore --list \
+  < "$stage/database.dump" > "$stage/database.contents"
+tar -tzf "$stage/data.tar.gz" > "$stage/data.contents"
+test -s "$stage/database.dump"
+(cd "$stage" && sha256sum database.dump data.tar.gz > SHA256SUMS && sha256sum -c SHA256SUMS)
+mv "$stage" "$final"
+printf 'Backup created: %s\n' "$final"
+```
+
+Si falla cualquier paso, el `trap` vuelve a iniciar el backend y la copia no se publica como final. Investiga y elimina manualmente solo el directorio temporal exacto después de preservar la evidencia necesaria. Protege las copias con permisos/acceso equivalentes a la base de datos; el formato comprimido no cifra los datos.
+
+### Verificación de restauración sin sobrescribir datos
+
+Prueba cada copia en un proyecto Compose y almacenamiento **nuevos y aislados**, nunca en el proyecto o `data/` reales. Verifica primero integridad y contenido; restaura PostgreSQL en una base vacía de validación y extrae las imágenes en un directorio temporal vacío. No uses `--clean`, no elimines volúmenes y no conectes una restauración parcial a usuarios.
+
+```sh
+set -eu
+BACKUP_DIR=${1:?Uso: BACKUP_DIR=/ruta/completa/de/copia}
+(cd "$BACKUP_DIR" && sha256sum -c SHA256SUMS)
+docker compose exec -T postgres pg_restore --list \
+  < "$BACKUP_DIR/database.dump" > /dev/null
+tar -tzf "$BACKUP_DIR/data.tar.gz" | while IFS= read -r member; do
+  case "$member" in /*|../*|*/../*|*/..) echo "Ruta insegura en archivo: $member" >&2; exit 1;; esac
+done
+restore_data=$(mktemp -d "${TMPDIR:-/tmp}/comemos-restore-data.XXXXXX")
+tar -xzf "$BACKUP_DIR/data.tar.gz" -C "$restore_data" --no-same-owner
+```
+
+En el PostgreSQL aislado crea una base vacía de validación con el usuario configurado y restaura el dump sin cambiar propietarios:
+
+```sh
+docker compose exec -T postgres sh -ec \
+  'createdb -U "$POSTGRES_USER" -O "$POSTGRES_USER" hu003_restore_check'
+docker compose exec -T postgres sh -ec \
+  'pg_restore --exit-on-error --no-owner -U "$POSTGRES_USER" -d hu003_restore_check' \
+  < "$BACKUP_DIR/database.dump"
+test "$(docker compose exec -T postgres sh -ec \
+  'psql -U "$POSTGRES_USER" -d hu003_restore_check -Atc "SELECT version_num FROM alembic_version"')" \
+  = '0006_food_catalog_images'
+docker compose exec -T postgres sh -ec \
+  'psql -U "$POSTGRES_USER" -d hu003_restore_check -Atc "SELECT image_path FROM food_labels WHERE image_path IS NOT NULL"' \
+  | RESTORE_DATA="$restore_data" python3 -c 'import os,re,sys; from pathlib import Path; root=(Path(os.environ["RESTORE_DATA"])/"comidas").resolve(); paths=[line.strip() for line in sys.stdin if line.strip()]; bad=[p for p in paths if not re.fullmatch(r"comidas/[0-9a-f]{32}\.webp",p) or not (root/Path(p).name).is_file()]; print(f"image references={len(paths)} invalid={len(bad)}"); sys.exit(bool(bad))'
+```
+
+La validación falla si la revisión no es la esperada o hay referencias de imagen ausentes/fuera de `comidas/`. Para que la API de validación vea los bytes extraídos, configura el proyecto Compose temporal para montar `$restore_data` en `/app/data`; configura también su `POSTGRES_DB` con la base restaurada. Restaura únicamente copias protegidas creadas por este procedimiento; no extraigas archivos no confiables. Abre el servicio de validación contra esa base y ese directorio temporal, prueba lectura de comidas e imágenes y registra resultados antes de cualquier cutover. El cutover a datos reales requiere una ventana sin escritores y una decisión operativa separada; esta guía no borra, reemplaza ni promueve automáticamente bases, volúmenes o directorios.
 
 ### Volúmenes existentes y bases heredadas
 
@@ -78,7 +153,7 @@ docker compose exec -T backend python -m alembic current
 docker compose exec -T backend python -m alembic heads
 ```
 
-Ambas deben indicar `0005_meal_planning (head)` en una instalación que incluya HU-002. `heads` por sí solo no demuestra que la base esté migrada. `/ready` comprueba conexión, no la revisión ni la compatibilidad del esquema; confirma también `GET /api/v1/auth/bootstrap` antes de crear la primera cuenta. La migración `0005` añade el catálogo predeterminado y las tablas/restricciones de planificación; aplícala únicamente en la base del entorno previsto tras revisar el procedimiento de migración y mantener una copia de seguridad adecuada.
+Ambas deben indicar `0005_meal_planning (head)` en una instalación que incluya HU-002, o `0006_food_catalog_images (head)` si también incluye HU-003. `heads` por sí solo no demuestra que la base esté migrada. `/ready` comprueba conexión, no la revisión ni la compatibilidad del esquema; confirma también `GET /api/v1/auth/bootstrap` antes de crear la primera cuenta. La migración `0005` añade el catálogo predeterminado y las tablas/restricciones de planificación; `0006` añade nombres normalizados e imágenes de comidas. Aplícalas únicamente en la base del entorno previsto tras revisar el procedimiento de migración y mantener una copia de seguridad adecuada.
 
 ## Cuentas y seguridad
 

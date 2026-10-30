@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import AppBrand from "./AppBrand";
 import AppIcon from "./AppIcon";
 
-export type AppView = "meal-planning" | "users";
+export type AppView = "meal-planning" | "food-catalog" | "users";
 
 type Props = {
   view: AppView;
@@ -10,11 +10,12 @@ type Props = {
   disabled: boolean;
   mealPlanning: ReactNode;
   userManagement: ReactNode;
+  foodCatalog?: ReactNode;
   sessionTools?: ReactNode;
   notifications?: ReactNode;
 };
 
-export default function AppWorkspace({ view, onViewChange, disabled, mealPlanning, userManagement, sessionTools, notifications }: Props) {
+export default function AppWorkspace({ view, onViewChange, disabled, mealPlanning, userManagement, foodCatalog, sessionTools, notifications }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div className="app-workspace">
@@ -32,6 +33,14 @@ export default function AppWorkspace({ view, onViewChange, disabled, mealPlannin
         </button>
         <button
           type="button"
+          aria-current={view === "food-catalog" ? "page" : undefined}
+          disabled={disabled}
+          onClick={() => { onViewChange("food-catalog"); setMenuOpen(false); }}
+        >
+          <AppIcon name="utensils" /><span>Comidas</span>
+        </button>
+        <button
+          type="button"
           aria-current={view === "users" ? "page" : undefined}
           disabled={disabled}
           onClick={() => { onViewChange("users"); setMenuOpen(false); }}
@@ -44,7 +53,7 @@ export default function AppWorkspace({ view, onViewChange, disabled, mealPlannin
       </aside>
       <div className="workspace-content" id="workspace-content" tabIndex={-1}>
         {notifications}
-        {view === "meal-planning" ? mealPlanning : userManagement}
+        {view === "meal-planning" ? mealPlanning : view === "food-catalog" ? foodCatalog : userManagement}
       </div>
     </div>
   );

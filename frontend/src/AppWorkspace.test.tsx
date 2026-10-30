@@ -17,7 +17,9 @@ describe("AppWorkspace", () => {
     const markup = renderToStaticMarkup(workspace("meal-planning"));
 
     expect(markup).toContain('aria-label="Menú principal"');
-    expect(markup.indexOf("Plan semanal")).toBeLessThan(markup.indexOf("Gestión de usuarios"));
+    const navigation = markup.match(/<nav[\s\S]*?<\/nav>/)?.[0] ?? "";
+    expect(navigation.indexOf("Plan semanal")).toBeLessThan(navigation.indexOf("Comidas"));
+    expect(navigation.indexOf("Comidas")).toBeLessThan(navigation.indexOf("Gestión de usuarios"));
     expect(markup).toMatch(/aria-current="page"[\s\S]*?<span>Plan semanal<\/span>/);
     expect(markup).toContain("Weekly calendar content");
     expect(markup).not.toContain("User management content");
@@ -34,7 +36,7 @@ describe("AppWorkspace", () => {
   it("disables navigation while an account operation is pending", () => {
     const markup = renderToStaticMarkup(workspace("users", true));
 
-    expect(markup.match(/disabled=""/g)).toHaveLength(2);
+    expect(markup.match(/disabled=""/g)).toHaveLength(3);
   });
 
   it("provides branded navigation, a working skip-link target and only supported views", () => {
@@ -43,7 +45,7 @@ describe("AppWorkspace", () => {
     expect(markup).toContain("Comemos en casa");
     expect(markup).toContain('href="#workspace-content"');
     expect(markup).toContain('id="workspace-content" tabindex="-1"');
-    expect(markup.match(/<button/g)).toHaveLength(3);
+    expect(markup.match(/<button/g)).toHaveLength(4);
     expect(markup).toContain('aria-expanded="false"');
     expect(markup).not.toContain("Recetas");
     expect(markup).not.toContain("Lista de la compra");

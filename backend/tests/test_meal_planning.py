@@ -71,6 +71,15 @@ def api_post(path: str, *, payload: dict, cookies=None, csrf_token=None, origin=
     return asyncio.run(send_request())
 
 
+def api_patch(path: str, *, payload: dict, cookies=None, csrf_token=None):
+    async def send_request():
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+            if cookies:
+                client.cookies.update(cookies)
+            return await client.patch(path, json=payload, headers={"Origin":"http://localhost:5173", "X-CSRF-Token":csrf_token or ""})
+    return asyncio.run(send_request())
+
+
 def authenticate(factory, *, active: bool = True) -> dict[str, str]:
     token = f"session-{uuid4().hex}"
     csrf_token = f"csrf-{uuid4().hex}"
@@ -162,6 +171,74 @@ def test_food_labels_are_sorted_and_read_does_not_create_meal_assignments(
     ]
     with meal_database() as db:
         assert db.scalar(select(MealAssignment.id)) is None
+
+
+def test_food_label_casefold_expansion_keeps_valid_visible_name(meal_database):
+    from app.meal_planning_api import canonical_label_name
+
+    name, canonical = canonical_label_name("ß" * 50 + "a" * 50)
+    assert len(name) == 100
+    assert len(canonical) == 150
+    assert canonical == "ss" * 50 + "a" * 50
+
+
+def test_duplicate_integrity_error_is_classified_narrowly():
+    from sqlalchemy.exc import IntegrityError
+    from app.meal_planning_api import _is_duplicate_label_error
+
+    duplicate = IntegrityError("insert", {}, Exception("UNIQUE constraint failed: food_labels.name_canonical"))
+    unrelated = IntegrityError("insert", {}, Exception("UNIQUE constraint failed: users.email"))
+    assert _is_duplicate_label_error(duplicate)
+    assert not _is_duplicate_label_error(unrelated)
+
+
+def test_create_food_label_reports_duplicate_name(meal_database):
+    cookies = authenticate(meal_database)
+    seed_labels(meal_database)
+    response = post_with_session("/api/v1/food-labels", {"name":"  ARROZ "}, cookies)
+    assert response.status_code == 409
+
+
+def test_update_food_label_reports_duplicate_name(meal_database):
+    cookies = authenticate(meal_database)
+    pescado, arroz = seed_labels(meal_database)
+    response = api_patch(f"/api/v1/food-labels/{pescado.id}", payload={"name":" arroz "}, cookies=cookies, csrf_token=cookies["csrf_token"])
+    assert response.status_code == 409
+
+
+def test_create_commit_failure_removes_published_image(meal_database, tmp_path, monkeypatch):
+    import app.meal_planning_api as api
+    from app.food_images import save_temporary
+    from sqlalchemy.orm import Session
+
+    cookies = authenticate(meal_database)
+    monkeypatch.setattr(api, "DATA_ROOT", tmp_path)
+    # The endpoint uses the authenticated session's ID, so seed the temp under it.
+    with meal_database() as db:
+        session = db.scalar(select(UserSession).where(UserSession.token_digest == digest_token(cookies[SESSION_COOKIE])))
+        token = save_temporary(tmp_path, session.id, b"webp")
+    original_commit = Session.commit
+    def failing_commit(self):
+        raise RuntimeError("simulated database failure")
+    monkeypatch.setattr(Session, "commit", failing_commit)
+    with pytest.raises(RuntimeError, match="simulated database failure"):
+        post_with_session("/api/v1/food-labels", {"name":"Test dish", "image_token":token}, cookies)
+    monkeypatch.setattr(Session, "commit", original_commit)
+    assert not list((tmp_path / "comidas").glob("*.webp"))
+
+
+def test_create_food_label_returns_published_image_url(meal_database, tmp_path, monkeypatch):
+    import app.meal_planning_api as api
+    from app.food_images import save_temporary
+
+    cookies = authenticate(meal_database)
+    monkeypatch.setattr(api, "DATA_ROOT", tmp_path)
+    with meal_database() as db:
+        session = db.scalar(select(UserSession).where(UserSession.token_digest == digest_token(cookies[SESSION_COOKIE])))
+        token = save_temporary(tmp_path, session.id, b"prepared-webp")
+    response = post_with_session("/api/v1/food-labels", {"name":"Image dish", "image_token":token}, cookies)
+    assert response.status_code == 201
+    assert response.json()["image_url"] == f"/food-labels/{response.json()['id']}/image"
 
 
 def test_meal_planning_range_is_inclusive_and_reports_canary_date(

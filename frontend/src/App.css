@@ -253,6 +253,7 @@ button.today-button { min-height: 36px; padding: .3rem .7rem; color: #007346; ba
 .week-grid .meal-slot + .meal-slot { border-left: 1px solid #e0ebef; }
 .week-grid .meal-slot:hover:not(:disabled) { background: #edf9f2; }
 .meal-thumbnail { display: grid; flex: 0 0 auto; place-items: center; width: 42px; height: 42px; border-radius: 50%; color: #7897a8; background: #edf3f5; }
+.meal-thumbnail img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 .meal-details { display: flex; min-width: 0; flex-direction: column; align-items: flex-start; gap: .25rem; }
 .meal-card-status.lunch { color: #604900; background: #fff0b8; }
 .meal-card-status.dinner { color: #4d3184; background: #eee3ff; }
@@ -293,12 +294,70 @@ button.today-button { min-height: 36px; padding: .3rem .7rem; color: #007346; ba
 .dish-selector { min-width: 0; border: 0; margin: 1rem 0; padding: 0; }
 .dish-selector legend { margin-bottom: .5rem; font-weight: 700; }
 .dish-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; }
+.food-catalog-form { display: flex; align-items: end; gap: .75rem; flex-wrap: wrap; margin: 1rem 0; }
+.food-catalog-form label { flex: 1 1 16rem; }
+.food-catalog .dish-search { margin: 1.25rem 0; }
+.food-catalog .dish-card img, .food-catalog .dish-image { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: .55rem; background: #f0f8f4; }
+.food-card-actions { display: flex; justify-content: center; gap: .5rem; }
+.food-card-actions button { min-width: 40px; min-height: 40px; }
+.image-drop { flex: 1 1 100%; padding: 1rem; border: 1px dashed #8ca8a0; border-radius: .75rem; }
+.crop-dialog { position: fixed; z-index: 30; inset: 5vh max(1rem, calc((100vw - 600px) / 2)); padding: 1rem; background: white; border: 1px solid #c8e1d5; border-radius: 1rem; box-shadow: 0 12px 40px #12334a55; }
+.crop-area { position: relative; height: min(55vh, 420px); background: #12334a; }
 .dish-card { position: relative; display: flex; flex-direction: column; align-items: stretch; gap: .45rem; min-width: 0; padding: .45rem; color: #12334a; background: white; border: 1px solid #dce8ec; border-radius: .75rem; text-align: center; }
 .dish-card:hover { background: #f3faf6; }
 .dish-card.selected { border: 2px solid #00854a; padding: calc(.45rem - 1px); background: #e8f7ef; }
 .dish-card strong { overflow-wrap: anywhere; }
+
+/* Responsive shared food catalog */
+.food-catalog { display: block; width: 100%; min-width: 0; }
+.food-catalog-panel { width: 100%; padding: clamp(1rem, 2vw, 1.75rem); }
+.food-catalog-heading { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.1rem; }
+.food-catalog-heading h1 { margin: 0 0 .35rem; color: #123a46; font-size: clamp(1.65rem, 2.6vw, 2.2rem); letter-spacing: -.04em; }
+.food-catalog-heading > div > p:last-child { margin: 0; font-size: .9rem; }
+.food-catalog-form { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: end; gap: .65rem; margin: 1.1rem 0 1.5rem; padding: 1rem; border: 1px solid #dcebe3; border-radius: .85rem; background: #f7fbf8; }
+.food-catalog-form .food-name-field { min-width: 0; margin: 0; }
+.food-catalog-form .food-name-field input { min-height: 42px; margin-top: .35rem; }
+.food-catalog-form > button { min-height: 42px; padding: .55rem .9rem; }
+.food-catalog-form .food-cancel-button { grid-column: 3; }
+.food-image-options { grid-column: 1 / -1; border-top: 1px solid #e1ece6; padding-top: .6rem; }
+.food-image-options .image-drop { display: flex; align-items: center; gap: .8rem; margin: .7rem 0; padding: .7rem; }
+.food-image-options .image-drop input { flex: 1; min-height: 38px; margin: 0; padding: .35rem; }
+.food-image-options .image-url-import { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: .5rem; }
+.food-image-options .image-url-import label { grid-column: 1 / -1; margin: .3rem 0 0; }
+.food-image-options .image-url-import input { margin: 0; }
+.food-image-options .image-url-import button { min-height: 42px; }
+.food-image-options .food-remove-image { display: flex; align-items: center; gap: .5rem; margin: .75rem 0 .2rem; }
+.food-image-options .food-remove-image input { width: 18px; min-height: 18px; height: 18px; margin: 0; accent-color: #007c46; }
+.food-catalog-search-row { display: flex; align-items: end; gap: .65rem; margin: 0 0 1rem; }
+.food-catalog-search-row .dish-search { flex: 1; margin: 0; }
+.food-catalog-search-row .dish-search input { min-height: 42px; border: 1px solid #9bb2b9; }
+.food-catalog-search-row .dish-search input:focus { border-color: #18875a; }
+.food-clear-search { min-height: 42px; padding: .55rem .8rem; white-space: nowrap; }
+.food-empty-state { margin: 0; padding: 1.5rem; border: 1px dashed #c9ddd2; border-radius: .8rem; text-align: center; background: #fbfdfb; }
+.food-catalog .dish-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 155px), 1fr)); gap: .8rem; }
+.food-catalog .dish-card { gap: .55rem; padding: .65rem; text-align: left; }
+.food-catalog .dish-card img, .food-catalog .dish-card .dish-image { aspect-ratio: 4 / 3; border-radius: .6rem; }
+.food-catalog .dish-card .dish-image { display: grid; place-items: center; color: #638879; }
+.food-catalog .dish-card .dish-image .app-icon { width: 30px; height: 30px; }
+.food-catalog .dish-card strong { min-height: 2.6em; line-height: 1.3; }
+.food-catalog .food-card-actions { justify-content: stretch; gap: .4rem; }
+.food-catalog .food-card-actions button { flex: 1; min-width: 0; min-height: 38px; padding: .4rem .5rem; font-size: .75rem; }
+@media (max-width: 600px) {
+  .food-catalog-form { grid-template-columns: minmax(0, 1fr) auto; padding: .8rem; }
+  .food-catalog-form .food-save-button { grid-column: 1; }
+  .food-catalog-form .food-cancel-button { grid-column: 2; }
+  .food-catalog-form .food-image-options { grid-column: 1 / -1; }
+  .food-image-options .image-drop { align-items: flex-start; flex-direction: column; }
+  .food-image-options .image-drop input { width: 100%; }
+  .food-catalog .dish-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 135px), 1fr)); gap: .55rem; }
+  .food-catalog .dish-card { padding: .5rem; }
+  .food-catalog .food-card-actions button { font-size: .7rem; }
+  .food-catalog-search-row { align-items: stretch; flex-direction: column; }
+  .food-clear-search { align-self: flex-start; }
+}
 .dish-image { display: flex; height: 90px; justify-content: center; align-items: center; border-radius: .5rem; background: #f1f5f5; color: #8da4aa; }
 .dish-image svg { width: 32px; height: 32px; }
+.dish-image img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 .dish-check { position: absolute; top: .7rem; right: .7rem; display: grid; place-items: center; width: 23px; height: 23px; border-radius: 50%; color: white; background: #00854a; }
 .meal-editor .repeat-toggle input { appearance: none; width: 40px; height: 24px; border: 0; border-radius: 20px; background: #a8bbc1; cursor: pointer; position: relative; }
 .meal-editor .repeat-toggle input::before { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: white; transition: transform 180ms; }
@@ -308,5 +367,29 @@ button.today-button { min-height: 36px; padding: .3rem .7rem; color: #007346; ba
 @keyframes drawer-enter { from { transform: translateX(100%); } to { transform: translateX(0); } }
 @media (max-width: 600px) { .meal-editor { width: 100%; padding: 0; } .meal-editor-heading { flex-wrap: nowrap; padding-top: max(1rem, env(safe-area-inset-top)); } .drawer-actions button { flex: 1; } }
 @media (prefers-reduced-motion: reduce) { .meal-editor { animation: none; } .meal-editor .repeat-toggle input::before { transition: none; } }
+
+/* Food catalog uses the same right-side editor drawer as meal planning. */
+.food-catalog-heading { align-items: center; }
+.food-create-trigger { display: inline-flex; align-items: center; justify-content: center; gap: .45rem; min-height: 44px; white-space: nowrap; }
+.food-catalog .dish-card { position: relative; padding: .55rem; }
+.food-catalog .dish-card strong { min-height: 0; }
+.food-catalog .food-card-actions button { flex: 0 0 40px; min-height: 40px; padding: .4rem; }
+.food-editor { width: min(520px, 100%); }
+.food-editor-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.food-editor-heading h2 { margin: 0; font-size: 1.2rem; }
+.food-editor-content { padding-top: 1.1rem; }
+.food-editor-content > .food-name-field { display: block; margin-bottom: 1.25rem; }
+.food-editor-content > .food-name-field input { min-height: 44px; margin-top: .4rem; }
+.food-editor .food-image-options { margin: 0; }
+.food-editor .food-crop { margin-top: 1rem; }
+.food-editor .food-crop > label { display: block; margin: .75rem 0; }
+.food-drawer-overlay { z-index: 1100; }
+@media (max-width: 600px) {
+  .food-editor { width: 100%; }
+  .food-editor-heading { padding-top: max(1rem, env(safe-area-inset-top)); }
+  .food-catalog-heading { align-items: flex-start; flex-direction: column; gap: .8rem; }
+  .food-create-trigger { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .food-editor { animation: none; } }
 
 .drawer-edit-fields { min-width: 0; margin: 0; padding: 0; border: 0; }

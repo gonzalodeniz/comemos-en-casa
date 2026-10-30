@@ -5,6 +5,7 @@ Las restricciones e índices respaldan invariantes de cuentas, planificación, r
 
 from datetime import date, datetime
 from uuid import UUID, uuid4
+import unicodedata
 
 from sqlalchemy import (
     CheckConstraint,
@@ -14,6 +15,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    Text,
     UniqueConstraint,
     Uuid,
     func,
@@ -145,11 +147,19 @@ class FoodLabel(Base):
     __tablename__ = "food_labels"
     __table_args__ = (
         UniqueConstraint("code", name="uq_food_labels_code"),
+        UniqueConstraint("name_canonical", name="uq_food_labels_name_canonical"),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     code: Mapped[str] = mapped_column(String(32), nullable=False)
-    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    name_canonical: Mapped[str] = mapped_column(
+        Text, nullable=False,
+        default=lambda context: unicodedata.normalize(
+            "NFC", context.get_current_parameters()["name"].strip()
+        ).casefold(),
+    )
+    image_path: Mapped[str | None] = mapped_column(String(255))
 
 
 class MealAssignment(Base):

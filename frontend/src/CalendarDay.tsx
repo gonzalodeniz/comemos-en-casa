@@ -31,7 +31,7 @@ export default function CalendarDay({ date, weekday, today, outsideMonth = false
               disabled={disabled}
               onClick={() => onEdit(date, slot)}
             >
-              <span className="meal-thumbnail"><AppIcon name="utensils" /></span>
+              <span className="meal-thumbnail">{assignment?.label.image_url ? <img src={`${import.meta.env.VITE_API_BASE_URL || "/comemos"}/api/v1${assignment.label.image_url}`} alt="" /> : <AppIcon name="utensils" />}</span>
               <span className="meal-details"><strong>{assignment?.label.name ?? "Sin planificar"}</strong>{compact && assignment && <span className={`meal-card-status ${slot}`}>{SLOT_LABELS[slot]}</span>}</span>
             </button>
           );

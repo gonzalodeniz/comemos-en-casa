@@ -55,6 +55,8 @@ services:
       EMAIL_SMTP_STARTTLS: ${EMAIL_SMTP_STARTTLS:-false}
     ports:
       - "127.0.0.1:8000:8000"
+    volumes:
+      - ./data:/app/data
     depends_on:
       postgres:
         condition: service_healthy

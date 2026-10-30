@@ -1,6 +1,6 @@
 import { apiRequest } from "./api";
 
-export type FoodLabel = { id: string; code: string; name: string };
+export type FoodLabel = { id: string; code: string; name: string; image_url?: string | null };
 export type MealSlot = "lunch" | "dinner";
 export type MealAssignment = {
   id: string;
@@ -46,6 +46,30 @@ export type MealPlanningOperationResult = {
 
 export function getFoodLabels(): Promise<{ labels: FoodLabel[] }> {
   return apiRequest("/food-labels");
+}
+
+export function createFoodLabel(name: string, csrfToken: string, imageToken?: string): Promise<FoodLabel> {
+  return apiRequest("/food-labels", { method: "POST", csrfToken, body: { name, ...(imageToken ? { image_token: imageToken } : {}) } });
+}
+
+export function updateFoodLabel(id: string, name: string, csrfToken: string, imageToken?: string, removeImage = false): Promise<FoodLabel> {
+  return apiRequest(`/food-labels/${id}`, { method: "PATCH", csrfToken, body: { name, ...(imageToken ? { image_token: imageToken } : {}), ...(removeImage ? { remove_image: true } : {}) } });
+}
+
+export function prepareFoodImage(dataUrl: string, crop: { x: number; y: number; width: number; height: number }, csrfToken: string): Promise<{ image_token: string; expires_in_seconds: number }> {
+  return apiRequest("/food-labels/images/prepare", { method: "POST", csrfToken, body: { data_url: dataUrl, crop } });
+}
+
+export function importFoodImageUrl(url: string, csrfToken: string): Promise<{ data_url: string }> {
+  return apiRequest("/food-labels/images/import-url", { method: "POST", csrfToken, body: { url } });
+}
+
+export function getFoodLabelImpact(id: string): Promise<{ assignment_count: number; recipe_count: number }> {
+  return apiRequest(`/food-labels/${id}/deletion-impact`);
+}
+
+export function deleteFoodLabel(id: string, csrfToken: string): Promise<void> {
+  return apiRequest(`/food-labels/${id}`, { method: "DELETE", csrfToken });
 }
 
 export function getMealPlanning(

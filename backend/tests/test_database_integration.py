@@ -49,7 +49,7 @@ def test_database_is_ready_and_latest_migration_is_applied():
         check=False,
     )
     assert migration.returncode == 0, migration.stderr
-    assert "0005_meal_planning (head)" in migration.stdout
+    assert "0006_food_catalog_images (head)" in migration.stdout
 
 
 @pytest.mark.skipif(

@@ -416,7 +416,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
                     {filteredLabels.map((label) => (
                       <button type="button" key={label.id} className={`dish-card${draft.labelId === label.id ? " selected" : ""}`}
                         aria-pressed={draft.labelId === label.id} onClick={() => { setDraft({ ...draft, labelId: label.id }); setPreview(null); }}>
-                        <span className="dish-image" aria-hidden="true"><AppIcon name="utensils" /></span>
+                        <span className="dish-image" aria-hidden="true">{label.image_url ? <img src={`${import.meta.env.VITE_API_BASE_URL || "/comemos"}/api/v1${label.image_url}`} alt="" /> : <AppIcon name="utensils" />}</span>
                         <strong>{label.name}</strong>
                         {draft.labelId === label.id && <span className="dish-check" aria-hidden="true">✓</span>}
                       </button>

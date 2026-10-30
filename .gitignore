@@ -8,3 +8,6 @@ frontend/dist/
 .env.*
 !.env.example
 frontend/ui-lib/dist/
+data/.tmp
+data/.publication.lock
+data/comidas/

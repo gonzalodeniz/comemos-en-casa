@@ -128,8 +128,16 @@ def safe_fetch_image(url: str, *, resolver=socket.getaddrinfo, connection_factor
         host_header = f"[{host}]" if ":" in host else host
         if parsed.port is not None:
             host_header = f"{host_header}:{port}"
+        response = None
         try:
             connection.request("GET", path, headers={"Host": host_header, "Accept": "image/jpeg,image/png,image/webp", "Connection": "close"})
+            # HTTPConnection detaches its socket for a closing response, but the
+            # response file keeps the underlying descriptor alive until closed.
+            response_socket = connection.sock
+            remaining = deadline - clock()
+            if remaining <= 0:
+                raise UnsafeImageURL("Image URL request timed out")
+            response_socket.settimeout(remaining)
             response = connection.getresponse()
             if response.status in REDIRECT_CODES:
                 location = response.getheader("Location")
@@ -154,16 +162,22 @@ def safe_fetch_image(url: str, *, resolver=socket.getaddrinfo, connection_factor
                 remaining = deadline - clock()
                 if remaining <= 0:
                     raise UnsafeImageURL("Image URL request timed out")
-                connection.sock.settimeout(remaining)
-                chunk = response.read(min(65536, max_bytes + 1 - len(chunks)))
+                response_socket.settimeout(remaining)
+                chunk = response.read1(min(65536, max_bytes + 1 - len(chunks)))
                 if not chunk:
                     break
                 chunks.extend(chunk)
                 if len(chunks) > max_bytes:
                     raise UnsafeImageURL("Image exceeds 2 MiB")
+                # A complete fixed-length response closes its file and may release
+                # the detached socket immediately, so do not set its timeout again.
+                if response.isclosed():
+                    break
             return bytes(chunks), current
         except (OSError, http.client.HTTPException) as error:
             raise UnsafeImageURL("Could not retrieve image URL") from error
         finally:
+            if response is not None:
+                response.close()
             connection.close()
     raise UnsafeImageURL("Too many image redirects")

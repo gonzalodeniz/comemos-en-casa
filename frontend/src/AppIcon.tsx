@@ -1,4 +1,4 @@
-type IconName = "calendar" | "users" | "chevron-left" | "chevron-right" | "plus" | "logout" | "utensils" | "menu" | "edit" | "trash";
+type IconName = "calendar" | "users" | "chevron-left" | "chevron-right" | "plus" | "logout" | "utensils" | "menu" | "edit" | "trash" | "eye";
 
 const paths: Record<IconName, string> = {
   utensils: "M4 3v6a3 3 0 0 0 6 0V3M7 3v18M16 21V3c-3 2-3 7-3 9h3",
@@ -11,6 +11,7 @@ const paths: Record<IconName, string> = {
   logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 14 5-5-5-5m5 5H9",
   edit: "M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z",
   trash: "M3 6h18m-2 0-.9 14H5.9L5 6m4 0V4h6v2m-5 4v6m4-6v6",
+  eye: "M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Zm10-2a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z",
 };
 
 export default function AppIcon({ name, className = "" }: { name: IconName; className?: string }) {

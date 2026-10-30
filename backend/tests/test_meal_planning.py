@@ -1,6 +1,6 @@
 import asyncio
 from datetime import date, datetime, timedelta, timezone
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -20,8 +20,40 @@ from app.models import (
 from app.security import digest_token
 
 
+def test_managed_image_rejects_absolute_traversal_and_symlinks(tmp_path, monkeypatch):
+    import app.meal_planning_api as api
+
+    monkeypatch.setattr(api, "DATA_ROOT", tmp_path)
+    folder = tmp_path / "comidas"
+    folder.mkdir()
+    name = "a" * 32 + ".webp"
+    image = folder / name
+    image.write_bytes(b"image")
+    assert api._managed_food_image_path(f"comidas/{name}") == image
+    assert api._managed_food_image_path(str(image)) is None
+    assert api._managed_food_image_path(f"comidas/../comidas/{name}") is None
+    image.unlink()
+    image.symlink_to(tmp_path / "outside")
+    assert api._managed_food_image_path(f"comidas/{name}") is None
+
+
+def test_cleanup_failure_does_not_raise(tmp_path, monkeypatch, caplog):
+    import app.meal_planning_api as api
+    from pathlib import Path
+
+    monkeypatch.setattr(api, "DATA_ROOT", tmp_path)
+    (tmp_path / "comidas").mkdir()
+    def fail_unlink(self, *args, **kwargs):
+        raise PermissionError("denied")
+    monkeypatch.setattr(Path, "unlink", fail_unlink)
+    api._remove_food_image("comidas/" + "a" * 32 + ".webp")
+    assert "food_image_cleanup_failed" in caplog.text
+
+
 @pytest.fixture
 def meal_database(monkeypatch, tmp_path):
+    import app.meal_planning_api as api
+    monkeypatch.setattr(api, "DATA_ROOT", tmp_path / "image-data")
     monkeypatch.setenv("AUTH_RATE_LIMIT_HMAC_KEY", "22" * 32)
     engine = create_engine(
         f"sqlite+pysqlite:///{tmp_path / 'meal-planning.sqlite'}",
@@ -40,6 +72,248 @@ def meal_database(monkeypatch, tmp_path):
     finally:
         app.dependency_overrides.pop(get_database_session, None)
         engine.dispose()
+
+
+def test_orphan_inspection_is_advisory_and_preserves_files(meal_database, tmp_path):
+    import os
+    from app.food_images import ORPHAN_GRACE_SECONDS, inspect_possible_orphans
+
+    folder = tmp_path / "comidas"
+    folder.mkdir()
+    active, orphan, fresh = [folder / (character * 32 + ".webp") for character in "abc"]
+    for image in (active, orphan, fresh):
+        image.write_bytes(b"image")
+    now = 2_000_000.0
+    for image in (active, orphan):
+        os.utime(image, (now - ORPHAN_GRACE_SECONDS - 1,) * 2)
+    os.utime(fresh, (now,) * 2)
+    with meal_database() as db:
+        db.add(FoodLabel(code="active-image", name="Active", image_path=f"comidas/{active.name}"))
+        db.commit()
+        assert inspect_possible_orphans(tmp_path, db, now=now) == [f"comidas/{orphan.name}"]
+    assert all(image.exists() for image in (active, orphan, fresh))
+
+
+def test_reconciliation_deletes_only_old_unreferenced_files(meal_database, tmp_path):
+    import os
+    from app.food_images import ORPHAN_GRACE_SECONDS, reconcile_orphans
+
+    folder = tmp_path / "comidas"
+    folder.mkdir()
+    active, orphan, fresh = [folder / (character * 32 + ".webp") for character in "abc"]
+    now = 2_000_000.0
+    for image in (active, orphan, fresh):
+        image.write_bytes(b"image")
+    for image in (active, orphan):
+        os.utime(image, (now - ORPHAN_GRACE_SECONDS - 1,) * 2)
+    os.utime(fresh, (now,) * 2)
+    with meal_database() as db:
+        db.add(FoodLabel(code="protected", name="Protected", image_path=f"comidas/{active.name}"))
+        db.commit()
+    assert reconcile_orphans(tmp_path, meal_database, now=now) == [f"comidas/{orphan.name}"]
+    assert active.exists() and fresh.exists() and not orphan.exists()
+    assert reconcile_orphans(tmp_path, meal_database, now=now) == []
+
+
+def test_reconciliation_waits_for_publication_commit(meal_database, tmp_path):
+    import os
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    from app.food_images import ORPHAN_GRACE_SECONDS, publication_lock, reconcile_orphans
+
+    folder = tmp_path / "comidas"
+    folder.mkdir()
+    image = folder / ("a" * 32 + ".webp")
+    image.write_bytes(b"image")
+    now = 2_000_000.0
+    os.utime(image, (now - ORPHAN_GRACE_SECONDS - 1,) * 2)
+    started = threading.Event()
+    def reconcile():
+        started.set()
+        return reconcile_orphans(tmp_path, meal_database, now=now)
+    with ThreadPoolExecutor() as executor:
+        with publication_lock(tmp_path):
+            future = executor.submit(reconcile)
+            assert started.wait(5)
+            with meal_database() as db:
+                db.add(FoodLabel(code="in-flight", name="In flight", image_path=f"comidas/{image.name}"))
+                db.commit()
+        assert future.result(timeout=5) == []
+    assert image.exists()
+
+
+def test_async_publication_lock_keeps_event_loop_responsive(tmp_path):
+    from app.food_images import async_publication_lock, publication_lock
+
+    async def check():
+        entered = asyncio.Event()
+        async def waiter():
+            async with async_publication_lock(tmp_path):
+                entered.set()
+        with publication_lock(tmp_path):
+            task = asyncio.create_task(waiter())
+            await asyncio.sleep(0.12)
+            assert not entered.is_set()
+        await asyncio.wait_for(task, 2)
+        assert entered.is_set()
+    asyncio.run(check())
+
+
+def test_manual_reconciliation_requires_explicit_confirmation(meal_database, tmp_path, monkeypatch):
+    import os
+    import sys
+    import app.database as database
+    from app.food_images import main
+
+    monkeypatch.setenv("APP_DATA_ROOT", str(tmp_path))
+    monkeypatch.setattr(database, "SessionFactory", meal_database)
+    monkeypatch.setattr(sys, "argv", ["food_images"])
+    with pytest.raises(SystemExit):
+        main()
+    folder = tmp_path / "comidas"
+    folder.mkdir()
+    image = folder / ("a" * 32 + ".webp")
+    image.write_bytes(b"image")
+    os.utime(image, (1, 1))
+    monkeypatch.setattr(sys, "argv", ["food_images", "--confirm-coordinated-storage"])
+    main()
+    assert not image.exists()
+
+
+def test_app_lifespan_does_not_schedule_orphan_reconciliation():
+    import ast
+    import inspect
+    import textwrap
+    import app.main as main_module
+
+    for function in (main_module.lifespan, main_module._cleanup_food_image_temporaries):
+        tree = ast.parse(textwrap.dedent(inspect.getsource(function)))
+        names = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
+        assert "reconcile_orphans" not in names
+
+
+def test_reconciliation_database_failure_preserves_files(tmp_path):
+    from app.food_images import reconcile_orphans
+    folder = tmp_path / "comidas"
+    folder.mkdir()
+    image = folder / ("a" * 32 + ".webp")
+    image.write_bytes(b"image")
+    def broken_factory():
+        raise RuntimeError("database unavailable")
+    with pytest.raises(RuntimeError, match="database unavailable"):
+        reconcile_orphans(tmp_path, broken_factory)
+    assert image.exists()
+
+
+def test_reconciliation_rejects_symlinked_directory(tmp_path):
+    from app.food_images import reconcile_orphans
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    image = outside / ("a" * 32 + ".webp")
+    image.write_bytes(b"image")
+    (tmp_path / "comidas").symlink_to(outside, target_is_directory=True)
+    class EmptyDatabase:
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+        def scalars(self, _query): return iter(())
+    with pytest.raises(OSError):
+        reconcile_orphans(tmp_path, EmptyDatabase)
+    assert image.exists()
+
+
+def test_reconciliation_propagates_unlink_failure(meal_database, tmp_path, monkeypatch):
+    import os
+    from app.food_images import reconcile_orphans
+    folder = tmp_path / "comidas"
+    folder.mkdir()
+    image = folder / ("a" * 32 + ".webp")
+    image.write_bytes(b"image")
+    os.utime(image, (1, 1))
+    def fail(*args, **kwargs):
+        raise PermissionError("unlink denied")
+    monkeypatch.setattr(os, "unlink", fail)
+    with pytest.raises(PermissionError, match="unlink denied"):
+        reconcile_orphans(tmp_path, meal_database, now=2_000_000)
+    assert image.exists()
+
+
+def test_orphan_inspection_fails_closed_on_database_failure(tmp_path):
+    from app.food_images import inspect_possible_orphans
+
+    class BrokenDatabase:
+        def scalars(self, _query):
+            raise RuntimeError("database unavailable")
+
+    with pytest.raises(RuntimeError, match="database unavailable"):
+        inspect_possible_orphans(tmp_path, BrokenDatabase())
+
+
+def test_orphan_inspection_rejects_symlinked_storage(tmp_path):
+    from app.food_images import inspect_possible_orphans
+
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (tmp_path / "comidas").symlink_to(outside, target_is_directory=True)
+
+    class EmptyDatabase:
+        def scalars(self, _query):
+            return iter(())
+
+    with pytest.raises(OSError, match="Unsafe image storage"):
+        inspect_possible_orphans(tmp_path, EmptyDatabase())
+
+
+def test_orphan_inspection_propagates_file_metadata_errors(tmp_path, monkeypatch):
+    from pathlib import Path
+    from app.food_images import inspect_possible_orphans
+
+    folder = tmp_path / "comidas"
+    folder.mkdir()
+    image = folder / ("a" * 32 + ".webp")
+    image.write_bytes(b"image")
+    original_lstat = Path.lstat
+
+    def fail_image_lstat(path):
+        if path == image:
+            raise PermissionError("metadata unavailable")
+        return original_lstat(path)
+
+    class EmptyDatabase:
+        def scalars(self, _query):
+            return iter(())
+
+    monkeypatch.setattr(Path, "lstat", fail_image_lstat)
+    with pytest.raises(PermissionError, match="metadata unavailable"):
+        inspect_possible_orphans(tmp_path, EmptyDatabase())
+    assert image.read_bytes() == b"image"
+
+
+def test_orphan_inspection_never_deletes_publication_after_snapshot(meal_database, tmp_path):
+    import os
+    from concurrent.futures import ThreadPoolExecutor
+    from app.food_images import ORPHAN_GRACE_SECONDS, inspect_possible_orphans
+
+    folder = tmp_path / "comidas"
+    folder.mkdir()
+    image = folder / ("a" * 32 + ".webp")
+    image.write_bytes(b"image")
+    now = 2_000_000.0
+    os.utime(image, (now - ORPHAN_GRACE_SECONDS - 1,) * 2)
+
+    def commit_reference():
+        with meal_database() as writer:
+            writer.add(FoodLabel(code="concurrent-image", name="Concurrent", image_path=f"comidas/{image.name}"))
+            writer.commit()
+
+    with meal_database() as reader, ThreadPoolExecutor(max_workers=1) as executor:
+        class ConcurrentPublication:
+            def scalars(self, query):
+                snapshot = list(reader.scalars(query))
+                executor.submit(commit_reference).result(timeout=5)
+                return iter(snapshot)
+
+        assert inspect_possible_orphans(tmp_path, ConcurrentPublication(), now=now) == [f"comidas/{image.name}"]
+    assert image.exists()  # A stale candidate is never treated as deletion authority.
 
 
 def api_get(path: str, *, params=None, cookies=None):
@@ -206,7 +480,36 @@ def test_update_food_label_reports_duplicate_name(meal_database):
     assert response.status_code == 409
 
 
-def test_create_commit_failure_removes_published_image(meal_database, tmp_path, monkeypatch):
+def test_update_succeeds_when_old_image_cleanup_fails(meal_database, tmp_path, monkeypatch, caplog):
+    import app.meal_planning_api as api
+    from pathlib import Path
+
+    cookies = authenticate(meal_database)
+    monkeypatch.setattr(api, "DATA_ROOT", tmp_path)
+    folder = tmp_path / "comidas"
+    folder.mkdir()
+    image = folder / ("a" * 32 + ".webp")
+    image.write_bytes(b"image")
+    with meal_database() as db:
+        label = FoodLabel(code="cleanup-test", name="Before", image_path=f"comidas/{image.name}")
+        db.add(label)
+        db.commit()
+        label_id = label.id
+    original_unlink = Path.unlink
+    def fail_old_image(self, *args, **kwargs):
+        if self == image:
+            raise PermissionError("denied")
+        return original_unlink(self, *args, **kwargs)
+    monkeypatch.setattr(Path, "unlink", fail_old_image)
+    response = api_patch(f"/api/v1/food-labels/{label_id}", payload={"name": "After", "remove_image": True}, cookies=cookies, csrf_token=cookies["csrf_token"])
+    assert response.status_code == 200
+    with meal_database() as db:
+        label = db.get(FoodLabel, label_id)
+        assert label.name == "After" and label.image_path is None
+    assert image.exists() and "food_image_cleanup_failed" in caplog.text
+
+
+def test_create_commit_failure_preserves_published_image(meal_database, tmp_path, monkeypatch):
     import app.meal_planning_api as api
     from app.food_images import save_temporary
     from sqlalchemy.orm import Session
@@ -219,12 +522,39 @@ def test_create_commit_failure_removes_published_image(meal_database, tmp_path, 
         token = save_temporary(tmp_path, session.id, b"webp")
     original_commit = Session.commit
     def failing_commit(self):
-        raise RuntimeError("simulated database failure")
+        if any(isinstance(item, FoodLabel) for item in self.new):
+            raise RuntimeError("simulated database failure")
+        return original_commit(self)
     monkeypatch.setattr(Session, "commit", failing_commit)
     with pytest.raises(RuntimeError, match="simulated database failure"):
         post_with_session("/api/v1/food-labels", {"name":"Test dish", "image_token":token}, cookies)
     monkeypatch.setattr(Session, "commit", original_commit)
-    assert not list((tmp_path / "comidas").glob("*.webp"))
+    assert len(list((tmp_path / "comidas").glob("*.webp"))) == 1
+
+
+def test_ambiguous_commit_preserves_committed_image(meal_database, tmp_path, monkeypatch):
+    import app.meal_planning_api as api
+    from app.food_images import save_temporary
+    from sqlalchemy.orm import Session
+
+    cookies = authenticate(meal_database)
+    monkeypatch.setattr(api, "DATA_ROOT", tmp_path)
+    with meal_database() as db:
+        session = db.scalar(select(UserSession).where(UserSession.token_digest == digest_token(cookies[SESSION_COOKIE])))
+        token = save_temporary(tmp_path, session.id, b"webp")
+    original_commit = Session.commit
+    def ambiguous_commit(self):
+        is_food_commit = any(isinstance(item, FoodLabel) for item in self.new)
+        original_commit(self)
+        if is_food_commit:
+            raise RuntimeError("commit acknowledgement lost")
+    monkeypatch.setattr(Session, "commit", ambiguous_commit)
+    with pytest.raises(RuntimeError, match="acknowledgement lost"):
+        post_with_session("/api/v1/food-labels", {"name": "Committed dish", "image_token": token}, cookies)
+    monkeypatch.setattr(Session, "commit", original_commit)
+    with meal_database() as db:
+        label = db.scalar(select(FoodLabel).where(FoodLabel.name == "Committed dish"))
+        assert label is not None and (tmp_path / label.image_path).is_file()
 
 
 def test_create_food_label_returns_published_image_url(meal_database, tmp_path, monkeypatch):
@@ -238,7 +568,7 @@ def test_create_food_label_returns_published_image_url(meal_database, tmp_path, 
         token = save_temporary(tmp_path, session.id, b"prepared-webp")
     response = post_with_session("/api/v1/food-labels", {"name":"Image dish", "image_token":token}, cookies)
     assert response.status_code == 201
-    assert response.json()["image_url"] == f"/food-labels/{response.json()['id']}/image"
+    assert response.json()["image_url"].startswith(f"/food-labels/{response.json()['id']}/image?v=")
 
 
 def test_meal_planning_range_is_inclusive_and_reports_canary_date(
@@ -536,3 +866,36 @@ def test_failed_repeated_operation_rolls_back_the_entire_batch(meal_database):
     assert response.status_code == 503
     with meal_database() as db:
         assert db.query(MealAssignment).count() == 0
+
+
+def test_replacing_image_changes_urls_across_catalog_and_planning(meal_database, tmp_path, monkeypatch):
+    import app.meal_planning_api as api
+    from app.food_images import save_temporary
+
+    root = tmp_path / "cache-version-data"
+    monkeypatch.setattr(api, "DATA_ROOT", root)
+    cookies = authenticate(meal_database)
+    with meal_database() as db:
+        session = db.scalar(select(UserSession).where(UserSession.token_digest == digest_token(cookies[SESSION_COOKIE])))
+        first = save_temporary(root, session.id, b"first image")
+        second = save_temporary(root, session.id, b"second image")
+    created = post_with_session("/api/v1/food-labels", {"name": "Versioned", "image_token": first}, cookies)
+    assert created.status_code == 201
+    label = created.json()
+    old_url = label["image_url"]
+    with meal_database() as db:
+        db.add(MealAssignment(date=date(2026, 11, 2), slot="lunch", label_id=UUID(label["id"])))
+        db.commit()
+    updated = api_patch(f"/api/v1/food-labels/{label['id']}", payload={"name": "Versioned", "image_token": second}, cookies=cookies, csrf_token=cookies["csrf_token"])
+    assert updated.status_code == 200
+    new_url = updated.json()["image_url"]
+    assert new_url != old_url
+    listing = api_get("/api/v1/food-labels", cookies=cookies).json()["labels"]
+    assert next(item for item in listing if item["id"] == label["id"])["image_url"] == new_url
+    planning = api_get("/api/v1/meal-planning", params={"start_date": "2026-11-02", "end_date": "2026-11-02"}, cookies=cookies).json()
+    assert planning["assignments"][0]["label"]["image_url"] == new_url
+    preview = post_with_session("/api/v1/meal-planning/preview", {"action": "assign", "start_date": "2026-11-02", "slot": "lunch", "label_id": label["id"], "repeat": None}, cookies).json()
+    assert preview["dates"][0]["current_label"]["image_url"] == new_url
+    assert preview["dates"][0]["resulting_label"]["image_url"] == new_url
+    removed = api_patch(f"/api/v1/food-labels/{label['id']}", payload={"name": "Versioned", "remove_image": True}, cookies=cookies, csrf_token=cookies["csrf_token"])
+    assert removed.json()["image_url"] is None

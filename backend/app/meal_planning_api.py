@@ -9,6 +9,7 @@ import unicodedata
 from pathlib import Path
 from contextlib import contextmanager
 from datetime import date, datetime
+from functools import wraps
 from typing import Literal
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -23,7 +24,7 @@ from app.auth import ActiveSession, get_active_session, require_csrf
 from app.database import get_database_session
 from app.models import FoodLabel, MealAssignment
 from app.meal_planning import repetition_dates
-from app.food_images import InvalidFoodImage, crop_to_webp, publish_temporary, save_temporary, temporary_path
+from app.food_images import InvalidFoodImage, async_publication_lock, crop_to_webp, publish_temporary, save_temporary, temporary_path
 from app.safe_image_url import UnsafeImageURL, safe_fetch_image
 
 router = APIRouter(prefix="/api/v1", tags=["meal-planning"])
@@ -32,15 +33,48 @@ MEAL_PLANNING_WRITE_LOCK = 1128481603
 DATA_ROOT = Path(os.getenv("APP_DATA_ROOT", "/app/data"))
 
 
+def serialized_image_publication(function):
+    @wraps(function)
+    async def wrapped(*args, **kwargs):
+        async with async_publication_lock(DATA_ROOT):
+            return await function(*args, **kwargs)
+    return wrapped
+
+
 def _managed_food_image_path(relative_path: str) -> Path | None:
-    """Resolve a stored image path only when it remains inside comidas/."""
+    """Accept only opaque files directly inside the managed directory."""
     try:
-        path = (DATA_ROOT / relative_path).resolve()
-        if not path.is_relative_to((DATA_ROOT / "comidas").resolve()):
+        relative = Path(relative_path)
+        if len(relative.parts) != 2 or relative.parts[0] != "comidas":
+            return None
+        name = relative.parts[1]
+        if len(name) != 37 or not name.endswith(".webp") or any(c not in "0123456789abcdef" for c in name[:32]):
+            return None
+        directory = DATA_ROOT / "comidas"
+        path = directory / name
+        if directory.is_symlink() or path.is_symlink():
             return None
         return path
     except (OSError, RuntimeError, ValueError):
         return None
+
+
+def _food_image_url(label: FoodLabel) -> str | None:
+    if not label.image_path:
+        return None
+    version = hashlib.sha256(label.image_path.encode("utf-8")).hexdigest()
+    return f"/food-labels/{label.id}/image?v={version}"
+
+
+def _remove_food_image(relative_path: str) -> None:
+    path = _managed_food_image_path(relative_path)
+    if path is None:
+        logger.warning("food_image_cleanup_rejected_path")
+        return
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        logger.warning("food_image_cleanup_failed")
 
 
 def canonical_label_name(value: str) -> tuple[str, str]:
@@ -172,12 +206,12 @@ def build_preview(
                     "id": str(current_label.id),
                     "code": current_label.code,
                     "name": current_label.name,
-                    "image_url": f"/food-labels/{current_label.id}/image" if current_label.image_path else None,
+                    "image_url": _food_image_url(current_label),
                 }
             ),
             "resulting_label": (
                 {"id": str(label.id), "code": label.code, "name": label.name,
-                 "image_url": f"/food-labels/{label.id}/image" if label.image_path else None}
+                 "image_url": _food_image_url(label)}
                 if operation.action == "assign"
                 else None
             ),
@@ -240,13 +274,14 @@ async def list_food_labels(
     return {
         "labels": [
             {"id": str(label.id), "code": label.code, "name": label.name,
-             "image_url": f"/food-labels/{label.id}/image" if label.image_path else None}
+             "image_url": _food_image_url(label)}
             for label in labels
         ]
     }
 
 
 @router.post("/food-labels", status_code=201)
+@serialized_image_publication
 async def create_food_label(payload: dict[str, str], request: Request,
     active_session: ActiveSession = Depends(get_active_session),
     db: Session = Depends(get_database_session)):
@@ -265,27 +300,27 @@ async def create_food_label(payload: dict[str, str], request: Request,
         db.commit()
     except IntegrityError as error:
         db.rollback()
-        if image_path:
-            (DATA_ROOT / image_path).unlink(missing_ok=True)
         if _is_duplicate_label_error(error):
             raise HTTPException(status_code=409, detail="Food already exists") from error
         raise
     except Exception:
         db.rollback()
-        if image_path:
-            (DATA_ROOT / image_path).unlink(missing_ok=True)
         raise
     db.refresh(label)
     return {"id": str(label.id), "code": label.code, "name": label.name,
-            "image_url": f"/food-labels/{label.id}/image" if label.image_path else None}
+            "image_url": _food_image_url(label)}
 
 
 @router.patch("/food-labels/{label_id}")
-async def update_food_label(label_id: UUID, payload: dict[str, str], request: Request,
+@serialized_image_publication
+async def update_food_label(label_id: UUID, payload: dict[str, object], request: Request,
     active_session: ActiveSession = Depends(get_active_session),
     db: Session = Depends(get_database_session)):
     require_csrf(request, active_session)
-    if set(payload) - {"name", "image_token", "remove_image"} or not isinstance(payload.get("name"), str):
+    if (set(payload) - {"name", "image_token", "remove_image"}
+        or not isinstance(payload.get("name"), str)
+        or ("image_token" in payload and not isinstance(payload["image_token"], str))
+        or ("remove_image" in payload and not isinstance(payload["remove_image"], bool))):
         raise HTTPException(status_code=422, detail="Invalid food label")
     label = db.get(FoodLabel, label_id)
     if label is None:
@@ -307,23 +342,15 @@ async def update_food_label(label_id: UUID, payload: dict[str, str], request: Re
         db.commit()
     except IntegrityError as error:
         db.rollback()
-        if new_path:
-            (DATA_ROOT / new_path).unlink(missing_ok=True)
         if _is_duplicate_label_error(error):
             raise HTTPException(status_code=409, detail="Food already exists") from error
         raise
     except Exception:
         db.rollback()
-        if new_path:
-            (DATA_ROOT / new_path).unlink(missing_ok=True)
         raise
     if old_path and label.image_path != old_path:
-        old_image_path = _managed_food_image_path(old_path)
-        if old_image_path is None:
-            logger.warning("food_image_cleanup_rejected_path")
-        else:
-            old_image_path.unlink(missing_ok=True)
-    return {"id": str(label.id), "code": label.code, "name": label.name, "image_url": f"/food-labels/{label.id}/image" if label.image_path else None}
+        _remove_food_image(old_path)
+    return {"id": str(label.id), "code": label.code, "name": label.name, "image_url": _food_image_url(label)}
 
 
 @router.post("/food-labels/images/prepare")
@@ -384,14 +411,7 @@ async def delete_food_label(label_id: UUID, request: Request, response: Response
         db.delete(label)
         db.commit()
     if old_path:
-        image_path = _managed_food_image_path(old_path)
-        if image_path is None:
-            logger.warning("food_image_cleanup_rejected_path")
-        else:
-            try:
-                image_path.unlink(missing_ok=True)
-            except OSError:
-                logger.warning("food_image_cleanup_failed")
+        _remove_food_image(old_path)
     response.status_code = 204
 
 
@@ -443,7 +463,7 @@ async def get_meal_planning(
                     "id": str(label.id),
                     "code": label.code,
                     "name": label.name,
-                    "image_url": f"/food-labels/{label.id}/image" if label.image_path else None,
+                    "image_url": _food_image_url(label),
                 },
             }
             for assignment, label in assignments

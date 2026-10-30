@@ -1,4 +1,5 @@
 import socket
+import io
 
 import pytest
 import threading
@@ -17,11 +18,14 @@ class FakeResponse:
     def __init__(self, status, body=b"image", headers=None):
         self.status, self.body, self.headers, self.offset = status, body, headers or {}, 0
     def getheader(self, key): return self.headers.get(key)
+    def close(self): pass
     def read(self, amount=-1):
         if amount == 0: return b""
         result = self.body[self.offset:self.offset + amount]
         self.offset += len(result)
         return result
+    def read1(self, amount=-1): return self.read(amount)
+    def isclosed(self): return False
 
 
 class FakeConnection:
@@ -123,3 +127,53 @@ def test_slow_dns_timeouts_do_not_exceed_bounded_resolver_capacity(monkeypatch):
     data, _ = safe_fetch_image("http://public.example/ready", resolver=dns_records,
         connection_factory=lambda *_: FakeConnection(FakeResponse(200, b"ok")))
     assert data == b"ok"
+
+
+def test_connection_close_response_keeps_body_socket_until_read(monkeypatch):
+    class ResponseSocket:
+        def __init__(self):
+            self.closed = False
+            self.stream = io.BytesIO(b"HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 5\r\n\r\nimage")
+            self.timeouts = []
+        def sendall(self, data): pass
+        def makefile(self, mode): return self.stream
+        def settimeout(self, timeout): self.timeouts.append(timeout)
+        def close(self): self.closed = True
+
+    sock = ResponseSocket()
+    monkeypatch.setattr(_PinnedHTTPConnection, "connect", lambda connection: setattr(connection, "sock", sock))
+    data, final = safe_fetch_image("http://public.example/image", resolver=dns_records)
+    assert data == b"image"
+    assert final == "http://public.example/image"
+    assert sock.closed and sock.stream.closed
+    assert len(sock.timeouts) >= 2
+
+
+def test_response_timeout_uses_remaining_total_deadline_after_socket_detached():
+    moments = iter([0, 0, 0, 3, 7, 10])
+    connection = FakeConnection(FakeResponse(200, b"image"))
+    original_getresponse = connection.getresponse
+    timeouts = []
+    connection.settimeout = timeouts.append
+    def getresponse():
+        response = original_getresponse()
+        connection.sock = None
+        return response
+    connection.getresponse = getresponse
+    with pytest.raises(UnsafeImageURL, match="timed out"):
+        safe_fetch_image("http://public.example/image", resolver=dns_records,
+                         connection_factory=lambda *_: connection, clock=lambda: next(moments))
+    assert timeouts == [7, 3]
+
+
+def test_fixed_length_close_response_releases_real_socket_after_body(monkeypatch):
+    client, server = socket.socketpair()
+    try:
+        server.sendall(b"HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 5\r\n\r\nimage")
+        monkeypatch.setattr(_PinnedHTTPConnection, "connect", lambda connection: setattr(connection, "sock", client))
+        data, _ = safe_fetch_image("http://public.example/image", resolver=dns_records)
+        assert data == b"image"
+        assert client.fileno() == -1
+    finally:
+        client.close()
+        server.close()

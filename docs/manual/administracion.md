@@ -6,6 +6,18 @@ Compose mantiene frontend, API y PostgreSQL separados; únicamente el servicio N
 
 No existe un rol de administrador separado. Todo usuario autenticado y activo puede gestionar todas las cuentas familiares; la primera cuenta se crea solo mientras no exista ninguna. Protege la dirección de la aplicación y las credenciales iniciales como acceso administrativo compartido.
 
+## Reconciliación manual de imágenes huérfanas
+
+La reconciliación de imágenes persistentes solo se ejecuta manualmente; no hay tarea programada. Una futura vista de administración queda fuera de HU-003 y todavía no existe. La limpieza periódica de imágenes temporales es independiente. El borrado normal intenta retirar la imagen anterior tras confirmar el cambio en base de datos.
+
+El comando elimina archivos regulares con nombres gestionados en `comidas/` que llevan más de 24 horas sin referencia en la base de datos. Es idempotente y consulta las referencias bajo el mismo bloqueo que usan los publicadores cooperantes. Desde `backend/`, con el entorno y las dependencias del backend configurados para la base y el directorio de datos correctos, se ejecuta explícitamente:
+
+```sh
+python -m app.food_images --confirm-coordinated-storage
+```
+
+La confirmación significa que todos los procesos que escriben en ese almacenamiento respetan el bloqueo de publicación hasta el commit, que el almacenamiento es fiable y no sufre modificaciones externas concurrentes, y que no hay una restauración incompleta. No ejecutes el comando si no puedes garantizar esas condiciones o sobre una copia incompleta. La comprobación de candidatos aislada es orientativa y puede quedar obsoleta; no autoriza por sí sola el borrado. Fallos de base de datos o acceso interrumpen la operación, que puede haber eliminado algunos archivos antes de un error de archivos. No se ha validado la coordinación con PostgreSQL ni entre procesos, ni la resistencia a sustituciones concurrentes de rutas.
+
 ## Preparar y arrancar Compose
 
 En un checkout nuevo, desde la raíz copia la plantilla y completa sus valores locales:

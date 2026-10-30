@@ -1,5 +1,6 @@
 import base64
 import io
+import stat
 
 import pytest
 from PIL import Image
@@ -50,6 +51,17 @@ def test_expired_temporary_files_are_removed_by_periodic_cleanup(tmp_path):
     assert not path.exists()
 
 
+def test_cleanup_does_not_follow_symlinked_temp_root(tmp_path):
+    outside = tmp_path / "outside"
+    session_dir = outside / str(uuid4())
+    session_dir.mkdir(parents=True)
+    image = session_dir / ("a" * 32 + ".webp")
+    image.write_bytes(b"image")
+    (tmp_path / ".tmp").symlink_to(outside, target_is_directory=True)
+    assert cleanup_expired_temporary(tmp_path, now=image.stat().st_mtime + food_images.TEMP_LIFETIME_SECONDS + 1) == 0
+    assert image.exists()
+
+
 def test_session_quota_is_serialized_across_concurrent_uploads(tmp_path, monkeypatch):
     monkeypatch.setattr(food_images, "MAX_SESSION_BYTES", 10)
     session = uuid4()
@@ -62,3 +74,17 @@ def test_session_quota_is_serialized_across_concurrent_uploads(tmp_path, monkeyp
     with ThreadPoolExecutor(max_workers=2) as executor:
         results = list(executor.map(lambda _: save(), range(2)))
     assert sorted(results) == ["quota", "saved"]
+
+
+def test_new_storage_files_are_private_and_symlink_directories_rejected(tmp_path):
+    session = uuid4()
+    token = food_images.save_temporary(tmp_path, session, b"image")
+    path = food_images.temporary_path(tmp_path, session, token)
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    assert stat.S_IMODE(path.parent.stat().st_mode) == 0o700
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (tmp_path / "comidas").symlink_to(outside, target_is_directory=True)
+    with pytest.raises(OSError):
+        food_images.publish_temporary(tmp_path, session, token)
+    assert path.exists()

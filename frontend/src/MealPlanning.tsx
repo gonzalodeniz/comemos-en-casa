@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { ApiError } from "./api";
 import AppIcon from "./AppIcon";
 import CalendarDay from "./CalendarDay";
@@ -36,6 +36,25 @@ type Props = { csrfToken: string; onSessionExpired: () => void };
 
 const SLOT_LABELS: Record<MealSlot, string> = { lunch: "Almuerzo", dinner: "Cena" };
 const WEEKDAY_LABELS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+const MAX_LOADED_WEEKS = 26;
+
+export function adjacentWeek(starts: CalendarDate[], direction: -1 | 1): CalendarDate {
+  return addCalendarDays(direction === -1 ? starts[0] : starts[starts.length - 1], direction * 7);
+}
+
+export function extendWeeks(starts: CalendarDate[], direction: -1 | 1): CalendarDate[] {
+  const adjacent = adjacentWeek(starts, direction);
+  return direction === -1
+    ? [adjacent, ...starts].slice(0, MAX_LOADED_WEEKS)
+    : [...starts, adjacent].slice(-MAX_LOADED_WEEKS);
+}
+
+export function weekLabel(start: CalendarDate): string {
+  const end = addCalendarDays(start, 6);
+  const sameMonth = start.slice(0, 7) === end.slice(0, 7);
+  const sameYear = start.slice(0, 4) === end.slice(0, 4);
+  return `Semana del ${formatDateLabel(start, { day: "numeric", ...(!sameMonth ? { month: "long" as const } : {}), ...(!sameYear ? { year: "numeric" as const } : {}) })} al ${formatDateLabel(end, { day: "numeric", month: "long", year: "numeric" })}`;
+}
 
 export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
   const [view, setView] = useState<CalendarView>("week");
@@ -46,6 +65,19 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
   const [labels, setLabels] = useState<FoodLabel[]>([]);
   const [assignments, setAssignments] = useState<MealAssignment[]>([]);
   const [calendarLoading, setCalendarLoading] = useState(true);
+  const [mainLoadError, setMainLoadError] = useState(false);
+  const [weekStarts, setWeekStarts] = useState<CalendarDate[]>(() => [visibleDateRange(localToday(), "week").start]);
+  const weekStartsRef = useRef(weekStarts);
+  const [edgeLoading, setEdgeLoading] = useState(false);
+  const [edgeError, setEdgeError] = useState<"previous" | "next" | null>(null);
+  const [observerAvailable, setObserverAvailable] = useState(true);
+  const edgeBusyRef = useRef(false);
+  const generationRef = useRef(0);
+  const weekListRef = useRef<HTMLDivElement>(null);
+  const topSentinelRef = useRef<HTMLDivElement>(null);
+  const bottomSentinelRef = useRef<HTMLDivElement>(null);
+  const scrollAnchorRef = useRef<{ start: CalendarDate; top: number } | null>(null);
+  const todayScrollRef = useRef<CalendarDate | null>(null);
   const [editorDate, setEditorDate] = useState<CalendarDate | null>(null);
   const [editorSlot, setEditorSlot] = useState<MealSlot | null>(null);
   const [draft, setDraft] = useState<EditorDraft | null>(null);
@@ -62,6 +94,8 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
   const [search, setSearch] = useState("");
   const editorOpen = editorDate !== null && editorSlot !== null && draft !== null;
   const filteredLabels = filterFoodLabels(labels, search);
+
+  useEffect(() => { setObserverAvailable(typeof IntersectionObserver !== "undefined"); }, []);
 
   useEffect(() => {
     if (!notice) return;
@@ -99,26 +133,131 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
   }, [onSessionExpired]);
 
   useEffect(() => {
+    const generation = ++generationRef.current;
     let cancelled = false;
+    edgeBusyRef.current = false;
+    setEdgeLoading(false);
+    setEdgeError(null);
     setCalendarLoading(true);
-    void getMealPlanning(range.start, range.end)
+    const start = view === "week" ? weekStartsRef.current[0] : range.start;
+    const end = view === "week" ? addCalendarDays(weekStartsRef.current[weekStartsRef.current.length - 1], 6) : range.end;
+    void getMealPlanning(start, end)
       .then((result) => {
-        if (cancelled) return;
+        if (cancelled || generation !== generationRef.current) return;
         setAssignments(result.assignments);
         setToday(result.today);
-        if (referenceDate === null) setReferenceDate(result.today as CalendarDate);
+        if (referenceDate === null) {
+          const serverToday = result.today as CalendarDate;
+          const serverWeek = visibleDateRange(serverToday, "week").start;
+          if (view === "week" && serverWeek !== weekStartsRef.current[0]) {
+            weekStartsRef.current = [serverWeek];
+            setWeekStarts([serverWeek]);
+          }
+          setReferenceDate(serverToday);
+        }
+        setMainLoadError(false);
         setError("");
       })
       .catch((cause: unknown) => {
-        if (cancelled) return;
+        if (cancelled || generation !== generationRef.current) return;
         if (cause instanceof ApiError && cause.status === 401) onSessionExpired();
-        else setError(errorMessage(cause));
+        else { setMainLoadError(true); setError(errorMessage(cause)); }
       })
       .finally(() => {
-        if (!cancelled) setCalendarLoading(false);
+        if (!cancelled && generation === generationRef.current) setCalendarLoading(false);
       });
-    return () => { cancelled = true; };
-  }, [range.start, range.end, referenceDate, revision, onSessionExpired]);
+    return () => { cancelled = true; if (generationRef.current === generation) generationRef.current += 1; };
+  }, [view, range.start, range.end, referenceDate, revision, onSessionExpired]);
+
+  useLayoutEffect(() => {
+    const anchor = scrollAnchorRef.current;
+    if (anchor) {
+      const element = weekListRef.current?.querySelector<HTMLElement>(`[data-week-start="${anchor.start}"]`);
+      if (element) window.scrollBy(0, element.getBoundingClientRect().top - anchor.top);
+      scrollAnchorRef.current = null;
+    }
+    if (todayScrollRef.current && view === "week") {
+      const row = weekListRef.current?.querySelector<HTMLTimeElement>(`time[datetime="${todayScrollRef.current}"]`)?.closest<HTMLElement>(".calendar-day");
+      row?.scrollIntoView({ block: "center" });
+      todayScrollRef.current = null;
+    }
+  }, [weekStarts, view]);
+
+  async function loadAdjacentWeek(direction: -1 | 1) {
+    if (view !== "week" || calendarLoading || mainLoadError || edgeBusyRef.current || editorOpen || busyRef.current) return;
+    const generation = generationRef.current;
+    const start = adjacentWeek(weekStartsRef.current, direction);
+    edgeBusyRef.current = true;
+    setEdgeLoading(true);
+    setEdgeError(null);
+    setError("");
+    try {
+      const result = await getMealPlanning(start, addCalendarDays(start, 6));
+      if (generation !== generationRef.current) return;
+      const currentWeeks = weekStartsRef.current;
+      const next = extendWeeks(currentWeeks, direction);
+      if (direction === -1 || next[0] !== currentWeeks[0]) {
+        const anchor = direction === -1 ? currentWeeks[0] : next[0];
+        const element = weekListRef.current?.querySelector<HTMLElement>(`[data-week-start="${anchor}"]`);
+        if (element) scrollAnchorRef.current = { start: anchor, top: element.getBoundingClientRect().top };
+      }
+      weekStartsRef.current = next;
+      const lastDate = addCalendarDays(next[next.length - 1], 6);
+      setAssignments((current) => [...current, ...result.assignments].filter((assignment) => assignment.date >= next[0] && assignment.date <= lastDate));
+      setWeekStarts(next);
+      setToday(result.today);
+    } catch (cause: unknown) {
+      if (generation !== generationRef.current) return;
+      if (cause instanceof ApiError && cause.status === 401) onSessionExpired();
+      else { setEdgeError(direction === -1 ? "previous" : "next"); setError(errorMessage(cause)); }
+    } finally {
+      if (generation === generationRef.current) { edgeBusyRef.current = false; setEdgeLoading(false); }
+    }
+  }
+
+  useEffect(() => {
+    if (view !== "week" || calendarLoading || mainLoadError || edgeLoading || editorOpen || edgeError || typeof IntersectionObserver === "undefined") return;
+    let lastY = window.scrollY;
+    let movingUp = false;
+    let touchY = 0;
+    const nearTop = () => {
+      const rect = topSentinelRef.current?.getBoundingClientRect();
+      return !!rect && rect.top <= window.innerHeight + 200 && rect.bottom >= -200;
+    };
+    const handleScroll = () => { movingUp = window.scrollY < lastY; lastY = window.scrollY; };
+    const handleWheel = (event: WheelEvent) => { if (event.deltaY < 0 && nearTop()) void loadAdjacentWeek(-1); };
+    const handleTouchStart = (event: TouchEvent) => { touchY = event.touches[0]?.clientY ?? 0; };
+    const handleTouchMove = (event: TouchEvent) => {
+      const nextY = event.touches[0]?.clientY ?? touchY;
+      if (nextY > touchY && nearTop()) void loadAdjacentWeek(-1);
+      touchY = nextY;
+    };
+    const handleKey = (event: globalThis.KeyboardEvent) => {
+      if (["ArrowUp", "PageUp", "Home"].includes(event.key) && nearTop()) void loadAdjacentWeek(-1);
+    };
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        if (entry.target === topSentinelRef.current && movingUp) void loadAdjacentWeek(-1);
+        else if (entry.target === bottomSentinelRef.current) void loadAdjacentWeek(1);
+      }
+    }, { rootMargin: "200px 0px" });
+    if (topSentinelRef.current) observer.observe(topSentinelRef.current);
+    if (bottomSentinelRef.current) observer.observe(bottomSentinelRef.current);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("wheel", handleWheel, { passive: true });
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+    window.addEventListener("touchmove", handleTouchMove, { passive: true });
+    window.addEventListener("keydown", handleKey);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("wheel", handleWheel);
+      window.removeEventListener("touchstart", handleTouchStart);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("keydown", handleKey);
+    };
+  });
 
   const assignmentMap = useMemo(() => {
     const result = new Map<string, MealAssignment>();
@@ -131,10 +270,46 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
   function moveRange(direction: -1 | 1) {
     setReferenceDate((current) => {
       const from = current ?? today ?? localToday();
-      return view === "week"
-        ? addCalendarDays(from, direction * 7)
-        : shiftMonthClamped(from, direction);
+      return shiftMonthClamped(from, direction);
     });
+    closeEditor();
+  }
+
+  function changeView(next: CalendarView) {
+    if (next === view) return;
+    generationRef.current += 1;
+    edgeBusyRef.current = false;
+    scrollAnchorRef.current = null;
+    if (next === "week") {
+      const current = (today ?? localToday()) as CalendarDate;
+      const start = visibleDateRange(current, "week").start;
+      weekStartsRef.current = [start];
+      setWeekStarts([start]);
+      setReferenceDate(current);
+      todayScrollRef.current = current;
+    } else {
+      const visibleDay = Array.from(weekListRef.current?.querySelectorAll<HTMLElement>(".calendar-day") ?? [])
+        .find((day) => { const rect = day.getBoundingClientRect(); return rect.bottom > 0 && rect.top < window.innerHeight; });
+      const date = visibleDay?.querySelector<HTMLTimeElement>("time")?.dateTime;
+      if (date) setReferenceDate(date as CalendarDate);
+    }
+    setView(next);
+    closeEditor();
+  }
+
+  function returnToToday() {
+    const current = (today ?? localToday()) as CalendarDate;
+    if (view === "week") {
+      generationRef.current += 1;
+      edgeBusyRef.current = false;
+      scrollAnchorRef.current = null;
+      const start = visibleDateRange(current, "week").start;
+      weekStartsRef.current = [start];
+      setWeekStarts([start]);
+      todayScrollRef.current = current;
+      setRevision((value) => value + 1);
+    }
+    setReferenceDate(current);
     closeEditor();
   }
 
@@ -292,40 +467,39 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
     });
   }
 
-  const title = view === "week"
-    ? `${formatDateLabel(range.start, { day: "numeric", month: "short", ...(range.start.slice(0, 4) !== range.end.slice(0, 4) ? { year: "numeric" } : {}) })} – ${formatDateLabel(range.end, { day: "numeric", month: "short", year: "numeric" })}`
-    : formatDateLabel(queryDate, { month: "long", year: "numeric" });
+  const title = formatDateLabel(queryDate, { month: "long", year: "numeric" });
 
   return (
     <section className="meal-planning" aria-labelledby="meal-planning-title">
       <div className="meal-heading">
         <div className="meal-title">
           <h2 id="meal-planning-title">Planificación de comidas</h2>
-          <p className="meal-subtitle">{view === "week" ? `Semana del ${title}` : "Vista mensual"}</p>
+          {view === "month" && <p className="meal-subtitle">Vista mensual</p>}
         </div>
         <div className="calendar-toolbar">
-          <div className="calendar-navigation">
-            <button type="button" className="secondary" aria-label={view === "week" ? "Semana anterior" : "Mes anterior"} disabled={calendarLoading || busy} onClick={() => moveRange(-1)}><AppIcon name="chevron-left" /></button>
+          {view === "month" && <div className="calendar-navigation">
+            <button type="button" className="secondary" aria-label="Mes anterior" disabled={calendarLoading || busy} onClick={() => moveRange(-1)}><AppIcon name="chevron-left" /></button>
             <h3 aria-live="polite">{title}</h3>
-            <button type="button" className="secondary" aria-label={view === "week" ? "Semana siguiente" : "Mes siguiente"} disabled={calendarLoading || busy} onClick={() => moveRange(1)}><AppIcon name="chevron-right" /></button>
-          </div>
+            <button type="button" className="secondary" aria-label="Mes siguiente" disabled={calendarLoading || busy} onClick={() => moveRange(1)}><AppIcon name="chevron-right" /></button>
+          </div>}
           <div className="meal-view-switch" role="group" aria-label="Vista del calendario">
-            <button type="button" aria-pressed={view === "week"} disabled={calendarLoading || busy} onClick={() => setView("week")}>Semana</button>
-            <button type="button" aria-pressed={view === "month"} disabled={calendarLoading || busy} onClick={() => setView("month")}>Mes</button>
+            <button type="button" aria-pressed={view === "week"} disabled={calendarLoading || busy} onClick={() => changeView("week")}>Semana</button>
+            <button type="button" aria-pressed={view === "month"} disabled={calendarLoading || busy} onClick={() => changeView("month")}>Mes</button>
           </div>
         </div>
       </div>
       <div className="calendar-context">
         <p className="meal-date-context">Tu menú, día a día <span aria-hidden="true">·</span> <span>Atlantic/Canary</span></p>
-        <button type="button" className="secondary today-button" disabled={calendarLoading || busy} onClick={() => { setReferenceDate((today ?? localToday()) as CalendarDate); closeEditor(); }}>Volver a hoy</button>
+        <button type="button" className={`secondary today-button${view === "week" ? " today-button-fixed" : ""}`} disabled={calendarLoading || busy} onClick={returnToToday}>Volver a hoy</button>
       </div>
 
       {error && !editorOpen && <p className="message error" role="alert">{error}</p>}
+      {mainLoadError && !editorOpen && <button type="button" className="secondary" disabled={calendarLoading} onClick={() => setRevision((value) => value + 1)}>Reintentar cargar planificación</button>}
       {notice && <p className="message success toast" role="status">{notice}</p>}
       {calendarLoading && <p role="status">Cargando planificación…</p>}
 
       {view === "week" ? (
-        <div className="week-grid" aria-label="Planificación semanal">
+        <div className="week-scroll-content" ref={weekListRef} aria-label="Planificación semanal">
           <div className="week-meal-headings">
             <span className="week-heading-spacer" aria-hidden="true" />
             <div className="week-heading-meals">
@@ -334,18 +508,20 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
             </div>
             <span className="week-heading-spacer" aria-hidden="true" />
           </div>
-          {range.dates.map((date, index) => (
-            <CalendarDay
-              key={date}
-              date={date}
-              weekday={WEEKDAY_LABELS[index]}
-              today={date === today}
-              assignments={assignmentMap}
-              disabled={calendarLoading || busy}
-              onEdit={openEditor}
-              onDelete={openDeletePreview}
-            />
+          <div ref={topSentinelRef} className="week-sentinel" aria-hidden="true" />
+          {(edgeError === "previous" || !observerAvailable) && <button type="button" className="secondary week-retry" disabled={calendarLoading || edgeLoading || busy} onClick={() => void loadAdjacentWeek(-1)}>{edgeError === "previous" ? "Reintentar semanas anteriores" : "Cargar semana anterior"}</button>}
+          {weekStarts.map((start) => (
+            <section className="week-grid week-section" data-week-start={start} key={start} aria-label={weekLabel(start)}>
+              <h3 className="week-separator">{weekLabel(start)}</h3>
+              {visibleDateRange(start, "week").dates.map((date, index) => (
+                <CalendarDay key={date} date={date} weekday={WEEKDAY_LABELS[index]} today={date === today}
+                  assignments={assignmentMap} disabled={calendarLoading || mainLoadError || busy} onEdit={openEditor} onDelete={openDeletePreview} />
+              ))}
+            </section>
           ))}
+          {(edgeError === "next" || !observerAvailable) && <button type="button" className="secondary week-retry" disabled={calendarLoading || edgeLoading || busy} onClick={() => void loadAdjacentWeek(1)}>{edgeError === "next" ? "Reintentar semanas siguientes" : "Cargar semana siguiente"}</button>}
+          {edgeLoading && <p role="status" className="week-loading">Cargando semana…</p>}
+          <div ref={bottomSentinelRef} className="week-sentinel" aria-hidden="true" />
         </div>
       ) : (
         <div
@@ -378,7 +554,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
               outsideMonth={parseCalendarDate(date).getMonth() !== parseCalendarDate(queryDate).getMonth()}
               compact
               assignments={assignmentMap}
-              disabled={calendarLoading || busy}
+              disabled={calendarLoading || mainLoadError || busy}
               onEdit={openEditor}
               onDelete={openDeletePreview}
             />

@@ -447,6 +447,7 @@ def test_food_labels_are_sorted_and_read_does_not_create_meal_assignments(
         "arroz",
         "pescado",
     ]
+    assert [label["recipe_count"] for label in response.json()["labels"]] == [0, 0]
     with meal_database() as db:
         assert db.scalar(select(MealAssignment.id)) is None
 

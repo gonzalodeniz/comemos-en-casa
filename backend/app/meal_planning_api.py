@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -269,12 +269,16 @@ def canary_today() -> date:
 async def list_food_labels(
     _active_session: ActiveSession = Depends(get_active_session),
     db: Session = Depends(get_database_session),
-) -> dict[str, list[dict[str, str | None]]]:
+) -> dict[str, list[dict[str, str | int | None]]]:
     labels = db.scalars(select(FoodLabel).order_by(FoodLabel.code)).all()
+    recipe_counts = dict(db.execute(
+        select(RecipeFoodLabel.food_label_id, func.count(RecipeFoodLabel.recipe_id))
+        .group_by(RecipeFoodLabel.food_label_id)
+    ).all())
     return {
         "labels": [
             {"id": str(label.id), "code": label.code, "name": label.name,
-             "image_url": _food_image_url(label)}
+             "image_url": _food_image_url(label), "recipe_count": recipe_counts.get(label.id, 0)}
             for label in labels
         ]
     }

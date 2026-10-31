@@ -483,7 +483,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
 
   return (
     <section className="meal-planning" aria-labelledby="meal-planning-title">
-      <div className={view === "week" ? "planning-sticky-header" : undefined}>
+      <div className="planning-sticky-header">
       <div className="meal-heading">
         <div className="meal-title">
           <h2 id="meal-planning-title">Planificación de comidas</h2>

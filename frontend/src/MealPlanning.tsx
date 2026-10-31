@@ -173,13 +173,22 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
     const anchor = scrollAnchorRef.current;
     if (anchor) {
       const element = weekListRef.current?.querySelector<HTMLElement>(`[data-week-start="${anchor.start}"]`);
-      if (element) window.scrollBy(0, element.getBoundingClientRect().top - anchor.top);
+      if (element) weekListRef.current?.closest<HTMLElement>(".workspace-content")?.scrollBy(0, element.getBoundingClientRect().top - anchor.top);
       scrollAnchorRef.current = null;
     }
     if (todayScrollRef.current && view === "week") {
-      const row = weekListRef.current?.querySelector<HTMLTimeElement>(`time[datetime="${todayScrollRef.current}"]`)?.closest<HTMLElement>(".calendar-day");
-      row?.scrollIntoView({ block: "center" });
+      const date = todayScrollRef.current;
       todayScrollRef.current = null;
+      window.requestAnimationFrame(() => {
+        const row = weekListRef.current?.querySelector<HTMLTimeElement>(`time[datetime="${date}"]`)?.closest<HTMLElement>(".calendar-day");
+        const scrollRoot = weekListRef.current?.closest<HTMLElement>(".workspace-content");
+        const header = scrollRoot?.querySelector<HTMLElement>(".planning-sticky-header");
+        if (row && scrollRoot && header) {
+          const rowRect = row.getBoundingClientRect();
+          const visibleCenter = (header.getBoundingClientRect().bottom + scrollRoot.getBoundingClientRect().bottom) / 2;
+          scrollRoot.scrollBy(0, rowRect.top + rowRect.height / 2 - visibleCenter);
+        }
+      });
     }
   }, [weekStarts, view]);
 
@@ -217,14 +226,17 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
 
   useEffect(() => {
     if (view !== "week" || calendarLoading || mainLoadError || edgeLoading || editorOpen || edgeError || typeof IntersectionObserver === "undefined") return;
-    let lastY = window.scrollY;
+    const scrollRoot = weekListRef.current?.closest<HTMLElement>(".workspace-content");
+    if (!scrollRoot) return;
+    let lastY = scrollRoot.scrollTop;
     let movingUp = false;
     let touchY = 0;
     const nearTop = () => {
       const rect = topSentinelRef.current?.getBoundingClientRect();
-      return !!rect && rect.top <= window.innerHeight + 200 && rect.bottom >= -200;
+      const rootRect = scrollRoot.getBoundingClientRect();
+      return !!rect && rect.top <= rootRect.bottom + 200 && rect.bottom >= rootRect.top - 200;
     };
-    const handleScroll = () => { movingUp = window.scrollY < lastY; lastY = window.scrollY; };
+    const handleScroll = () => { movingUp = scrollRoot.scrollTop < lastY; lastY = scrollRoot.scrollTop; };
     const handleWheel = (event: WheelEvent) => { if (event.deltaY < 0 && nearTop()) void loadAdjacentWeek(-1); };
     const handleTouchStart = (event: TouchEvent) => { touchY = event.touches[0]?.clientY ?? 0; };
     const handleTouchMove = (event: TouchEvent) => {
@@ -241,17 +253,17 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
         if (entry.target === topSentinelRef.current && movingUp) void loadAdjacentWeek(-1);
         else if (entry.target === bottomSentinelRef.current) void loadAdjacentWeek(1);
       }
-    }, { rootMargin: "200px 0px" });
+    }, { root: scrollRoot, rootMargin: "200px 0px" });
     if (topSentinelRef.current) observer.observe(topSentinelRef.current);
     if (bottomSentinelRef.current) observer.observe(bottomSentinelRef.current);
-    window.addEventListener("scroll", handleScroll, { passive: true });
+    scrollRoot.addEventListener("scroll", handleScroll, { passive: true });
     window.addEventListener("wheel", handleWheel, { passive: true });
     window.addEventListener("touchstart", handleTouchStart, { passive: true });
     window.addEventListener("touchmove", handleTouchMove, { passive: true });
     window.addEventListener("keydown", handleKey);
     return () => {
       observer.disconnect();
-      window.removeEventListener("scroll", handleScroll);
+      scrollRoot.removeEventListener("scroll", handleScroll);
       window.removeEventListener("wheel", handleWheel);
       window.removeEventListener("touchstart", handleTouchStart);
       window.removeEventListener("touchmove", handleTouchMove);
@@ -471,6 +483,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
 
   return (
     <section className="meal-planning" aria-labelledby="meal-planning-title">
+      <div className={view === "week" ? "planning-sticky-header" : undefined}>
       <div className="meal-heading">
         <div className="meal-title">
           <h2 id="meal-planning-title">Planificación de comidas</h2>
@@ -492,6 +505,14 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
         <p className="meal-date-context">Tu menú, día a día <span aria-hidden="true">·</span> <span>Atlantic/Canary</span></p>
         <button type="button" className={`secondary today-button${view === "week" ? " today-button-fixed" : ""}`} disabled={calendarLoading || busy} onClick={returnToToday}>Volver a hoy</button>
       </div>
+      {view === "week" && <div className="week-meal-headings">
+        <span className="week-heading-spacer" aria-hidden="true" />
+        <div className="week-heading-meals">
+          <span><span aria-hidden="true">☀️</span><span className="week-heading-label" aria-hidden="true">Almuerzo</span><span className="visually-hidden">Almuerzo</span></span>
+          <span><span aria-hidden="true">🌙</span><span className="week-heading-label" aria-hidden="true">Cena</span><span className="visually-hidden">Cena</span></span>
+        </div>
+      </div>}
+      </div>
 
       {error && !editorOpen && <p className="message error" role="alert">{error}</p>}
       {mainLoadError && !editorOpen && <button type="button" className="secondary" disabled={calendarLoading} onClick={() => setRevision((value) => value + 1)}>Reintentar cargar planificación</button>}
@@ -500,14 +521,6 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
 
       {view === "week" ? (
         <div className="week-scroll-content" ref={weekListRef} aria-label="Planificación semanal">
-          <div className="week-meal-headings">
-            <span className="week-heading-spacer" aria-hidden="true" />
-            <div className="week-heading-meals">
-              <span><span aria-hidden="true">☀️</span><span className="week-heading-label" aria-hidden="true">Almuerzo</span><span className="visually-hidden">Almuerzo</span></span>
-              <span><span aria-hidden="true">🌙</span><span className="week-heading-label" aria-hidden="true">Cena</span><span className="visually-hidden">Cena</span></span>
-            </div>
-            <span className="week-heading-spacer" aria-hidden="true" />
-          </div>
           <div ref={topSentinelRef} className="week-sentinel" aria-hidden="true" />
           {(edgeError === "previous" || !observerAvailable) && <button type="button" className="secondary week-retry" disabled={calendarLoading || edgeLoading || busy} onClick={() => void loadAdjacentWeek(-1)}>{edgeError === "previous" ? "Reintentar semanas anteriores" : "Cargar semana anterior"}</button>}
           {weekStarts.map((start) => (

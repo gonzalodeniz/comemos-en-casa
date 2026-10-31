@@ -18,6 +18,13 @@ describe("MealPlanning presentation", () => {
     expect(markup.match(/<article/g)).toHaveLength(7);
     expect(markup.match(/class="meal-slot /g)).toHaveLength(14);
     expect(markup.match(/week-heading-label/g)).toHaveLength(2);
+    const fixedHeader = markup.slice(markup.indexOf('class="planning-sticky-header"'), markup.indexOf('class="week-scroll-content"'));
+    expect(fixedHeader).toContain("Planificación de comidas");
+    expect(fixedHeader).toContain('aria-label="Vista del calendario"');
+    expect(fixedHeader).toContain("Tu menú, día a día");
+    expect(fixedHeader).toContain('class="week-meal-headings"');
+    expect(fixedHeader).toContain("Almuerzo");
+    expect(fixedHeader).toContain("Cena");
     expect(markup).not.toContain("day-actions");
     expect(markup).toContain("Cargando planificación");
   });

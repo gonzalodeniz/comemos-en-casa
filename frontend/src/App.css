@@ -490,6 +490,13 @@ button.today-button-fixed { position: fixed; right: max(1rem, env(safe-area-inse
 }
 
 .recipe-page { min-height: 70vh; }
+.recipe-page > .dish-grid { grid-template-columns: minmax(0, 1fr); }
+.recipe-page .recipe-card { display: flex; flex-direction: row; align-items: stretch; gap: .65rem; text-align: left; }
+.recipe-page .recipe-card .meal-thumbnail { flex: 0 0 5rem; width: 5rem; aspect-ratio: 1; }
+.recipe-page .recipe-card strong { align-self: center; min-width: 0; text-align: left; }
+.recipe-page .recipe-categories { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin: -.5rem 0 1rem; }
+.recipe-page .recipe-categories .link-button { width: auto; min-height: 0; margin: 0; padding: .35rem .65rem; border: 1px solid #dce8ec; border-radius: 999px; background: #f2f8f6; text-decoration: none; }
+.recipe-page .recipe-actions { display: flex; flex-wrap: wrap; gap: .8rem; margin-top: 1.25rem; }
 .recipe-page > header { display:flex; align-items:center; justify-content:space-between; gap:1rem; }
 .recipe-page form { max-width:760px; }
 .recipe-page textarea { display:block; width:100%; margin-top:.4rem; padding:.75rem; border:1px solid var(--color-border); border-radius:.65rem; font:inherit; resize:vertical; }

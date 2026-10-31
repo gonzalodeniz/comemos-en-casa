@@ -11,3 +11,7 @@ frontend/ui-lib/dist/
 data/.tmp
 data/.publication.lock
 data/comidas/
+data/**/*.webp
+data/**/*.png
+data/**/*.jpg
+data/**/*.jpeg

@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import MealPlanning, { filterFoodLabels, snapshotOperation } from "./MealPlanning";
+import MealPlanning, { filterFoodLabels, repeatFromInterval, snapshotOperation } from "./MealPlanning";
 
 describe("MealPlanning presentation", () => {
   it("renders the weekly layout with accessible date and view controls", () => {
@@ -17,9 +17,10 @@ describe("MealPlanning presentation", () => {
     expect(markup.match(/<article/g)).toHaveLength(7);
     expect(markup.match(/class="meal-slot /g)).toHaveLength(14);
     expect(markup.match(/week-heading-label/g)).toHaveLength(2);
-    expect(markup.match(/class="day-actions"/g)).toHaveLength(7);
+    expect(markup).not.toContain("day-actions");
     expect(markup).toContain("Cargando planificación");
   });
+
 });
 
 describe("dish search", () => {
@@ -38,4 +39,14 @@ it("keeps a preview operation unchanged if the editor changes while a request is
   operation.repeat.interval_weeks = 2;
   expect(snapshot.label_id).toBe("rice");
   expect(snapshot.repeat?.interval_weeks).toBe(1);
+});
+
+describe("repeat interval payload", () => {
+  it("omits recurrence for a zero-week interval", () => {
+    expect(repeatFromInterval("0", "2026-12-01")).toBeNull();
+  });
+
+  it("includes the interval and end date for positive intervals", () => {
+    expect(repeatFromInterval("3", "2026-12-01")).toEqual({ interval_weeks: 3, end_date: "2026-12-01" });
+  });
 });

@@ -28,7 +28,6 @@ import {
 type EditorDraft = {
   action: "assign" | "delete";
   labelId: string;
-  repeat: boolean;
   intervalWeeks: string;
   endDate: string;
 };
@@ -60,11 +59,8 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
   const [notice, setNotice] = useState("");
   const editorRef = useRef<HTMLFormElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
-  const initialDraftRef = useRef("");
   const [search, setSearch] = useState("");
-  const [hadAssignment, setHadAssignment] = useState(false);
   const editorOpen = editorDate !== null && editorSlot !== null && draft !== null;
-  const dirty = draft !== null && JSON.stringify({ date: editorDate, draft }) !== initialDraftRef.current;
   const filteredLabels = filterFoodLabels(labels, search);
 
   useEffect(() => {
@@ -146,14 +142,12 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
     const current = assignmentMap.get(`${date}:${slot}`);
     const labelId = current?.label.id ?? labels[0]?.id ?? "";
     const nextDraft: EditorDraft = {
-      action: "assign", labelId, repeat: false, intervalWeeks: "1",
+      action: "assign", labelId, intervalWeeks: "0",
       endDate: annualMaximumEndDate(date),
     };
     const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const closedDetails = active?.closest("details:not([open])");
     openerRef.current = closedDetails?.querySelector<HTMLElement>("summary") ?? active;
-    initialDraftRef.current = JSON.stringify({ date, draft: nextDraft });
-    setHadAssignment(Boolean(current));
     setSearch("");
     setEditorDate(date);
     setEditorSlot(slot);
@@ -162,6 +156,35 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
     setForceReconfirmation(false);
     setError("");
     setNotice("");
+  }
+
+  function openDeletePreview(date: CalendarDate, slot: MealSlot) {
+    const current = assignmentMap.get(`${date}:${slot}`);
+    if (!current || busyRef.current) return;
+    const nextDraft: EditorDraft = {
+      action: "delete", labelId: current.label.id, intervalWeeks: "0",
+      endDate: annualMaximumEndDate(date),
+    };
+    const operation: MealPlanningOperation = {
+      action: "delete", start_date: date, slot, label_id: current.label.id, repeat: null,
+    };
+    const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    openerRef.current = active;
+    setSearch("");
+    setEditorDate(date);
+    setEditorSlot(slot);
+    setDraft(nextDraft);
+    setPreview(null);
+    previewOperationRef.current = null;
+    setForceReconfirmation(false);
+    setError("");
+    setNotice("");
+    const snapshot = snapshotOperation(operation);
+    void runExclusive(async () => {
+      const result = await previewMealPlanning(snapshot, csrfToken);
+      previewOperationRef.current = snapshot;
+      setPreview(result);
+    });
   }
 
   function closeEditor() {
@@ -174,7 +197,6 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
 
   function requestClose() {
     if (busyRef.current) return;
-    if (dirty && !window.confirm("¿Descartar los cambios sin guardar?")) return;
     setError("");
     closeEditor();
   }
@@ -199,21 +221,6 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
     }
   }
 
-  function changeStartDate(value: string) {
-    if (!draft || !value) return;
-    const maximum = annualMaximumEndDate(value);
-    let endDate = draft.endDate;
-    try {
-      if (parseCalendarDate(endDate) < parseCalendarDate(value)) endDate = value;
-      if (parseCalendarDate(endDate) > parseCalendarDate(maximum)) endDate = maximum;
-    } catch {
-      endDate = maximum;
-    }
-    setEditorDate(value as CalendarDate);
-    setDraft({ ...draft, endDate });
-    setPreview(null);
-  }
-
   function operationFromDraft(): MealPlanningOperation | null {
     if (!draft || !editorDate || !editorSlot || !draft.labelId) return null;
     return {
@@ -221,9 +228,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
       start_date: editorDate,
       slot: editorSlot,
       label_id: draft.labelId,
-      repeat: draft.repeat
-        ? { interval_weeks: Number(draft.intervalWeeks), end_date: draft.endDate }
-        : null,
+      repeat: repeatFromInterval(draft.intervalWeeks, draft.endDate),
     };
   }
 
@@ -251,6 +256,13 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
     const snapshot = snapshotOperation(operation);
     void runExclusive(async () => {
       const result = await previewMealPlanning(snapshot, csrfToken);
+      if (!result.requires_confirmation) {
+        const saved = await applyMealPlanning(snapshot, result.preview_token, csrfToken);
+        closeEditor();
+        setNotice(saved.changed_count === 0 ? "No había cambios que guardar." : `Se guardaron ${saved.changed_count} cambio${saved.changed_count === 1 ? "" : "s"}.`);
+        setRevision((value) => value + 1);
+        return;
+      }
       previewOperationRef.current = snapshot;
       setPreview(result);
       setForceReconfirmation(false);
@@ -331,6 +343,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
               assignments={assignmentMap}
               disabled={calendarLoading || busy}
               onEdit={openEditor}
+              onDelete={openDeletePreview}
             />
           ))}
         </div>
@@ -367,18 +380,19 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
               assignments={assignmentMap}
               disabled={calendarLoading || busy}
               onEdit={openEditor}
+              onDelete={openDeletePreview}
             />
           ))}
         </div>
       )}
 
       {editorDate && editorSlot && draft && (
-        <div className="drawer-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) requestClose(); }}>
+        <div className="drawer-overlay">
           <form className="meal-editor" ref={editorRef} tabIndex={-1} onSubmit={submitPreview}
             onKeyDown={handleDrawerKeyDown} role="dialog" aria-modal="true" aria-labelledby="meal-editor-title" aria-describedby="meal-editor-subtitle">
             <div className="meal-editor-heading">
               <div>
-                <h3 id="meal-editor-title">{hadAssignment ? "Editar comida" : "Añadir comida"}</h3>
+                <h3 id="meal-editor-title">Asignar comida</h3>
                 <p id="meal-editor-subtitle">{formatDateLabel(editorDate, { dateStyle: "full" })} · {SLOT_LABELS[editorSlot]}</p>
               </div>
               <button type="button" className="drawer-close secondary" onClick={requestClose} disabled={busy} aria-label="Cerrar editor">×</button>
@@ -401,14 +415,17 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
                   <p>{preview.changed_count} cambio{preview.changed_count === 1 ? "" : "s"} previsto{preview.changed_count === 1 ? "" : "s"}.</p>
                 </div>
               ) : <fieldset className="drawer-edit-fields" disabled={busy}>
-                <label>Operación
-                  <select value={draft.action} onChange={(event) => { setDraft({ ...draft, action: event.target.value as EditorDraft["action"] }); setPreview(null); }}>
-                    <option value="assign">Asignar o sustituir</option>
-                    <option value="delete">Eliminar esta etiqueta</option>
-                  </select>
-                </label>
-                <label className="dish-search">Buscar plato
-                  <span><span aria-hidden="true">⌕</span><input type="search" placeholder="Buscar plato..." value={search} onChange={(event) => setSearch(event.target.value)} /></span>
+                <div className="repeat-panel">
+                  <label className="repeat-toggle"><AppIcon name="repeat" /><strong>Repetir</strong><input type="checkbox" role="switch" checked={Number(draft.intervalWeeks) > 0} onChange={(event) => { setDraft({ ...draft, intervalWeeks: event.target.checked ? "1" : "0" }); setPreview(null); }} /></label>
+                  <div className="repeat-fields">
+                    <label>Cada<input type="number" min={1} step={1} aria-label="Intervalo en semanas" value={Number(draft.intervalWeeks) > 0 ? draft.intervalWeeks : ""} disabled={Number(draft.intervalWeeks) <= 0} onChange={(event) => { setDraft({ ...draft, intervalWeeks: Number(event.target.value) > 0 ? event.target.value : "1" }); setPreview(null); }} required={Number(draft.intervalWeeks) > 0} /><span>semanas</span></label>
+                    <label>Hasta<input type="date" aria-label="Fecha final" min={editorDate} max={annualMaximumEndDate(editorDate)} value={draft.endDate} disabled={Number(draft.intervalWeeks) <= 0} onChange={(event) => { setDraft({ ...draft, endDate: event.target.value }); setPreview(null); }} required={Number(draft.intervalWeeks) > 0} /></label>
+                  </div>
+                  <p className="repeat-summary">{Number(draft.intervalWeeks) > 0 ? `Se repetirá cada ${draft.intervalWeeks} semana${Number(draft.intervalWeeks) === 1 ? "" : "s"}${draft.endDate ? ` hasta el ${formatDateLabel(draft.endDate, { dateStyle: "long" })}` : ""}.` : "No se repetirá esta comida."}</p>
+                </div>
+                <label className="dish-search">
+                  <span className="visually-hidden">Buscar plato</span>
+                  <span><input type="search" placeholder="Buscar plato..." value={search} onChange={(event) => setSearch(event.target.value)} /></span>
                 </label>
                 <fieldset className="dish-selector">
                   <legend>Plato</legend>
@@ -423,21 +440,6 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
                     ))}
                   </div>}
                 </fieldset>
-                <label>Fecha
-                  <input type="date" value={editorDate} onChange={(event) => changeStartDate(event.target.value)} required />
-                </label>
-                <label className="repeat-toggle">
-                  <input type="checkbox" role="switch" checked={draft.repeat} onChange={(event) => { setDraft({ ...draft, repeat: event.target.checked }); setPreview(null); }} />
-                  <span>Repetir cada cierto número de semanas</span>
-                </label>
-                {draft.repeat && <div className="repeat-fields">
-                  <label>Intervalo en semanas
-                    <input type="number" min={1} step={1} value={draft.intervalWeeks} onChange={(event) => { setDraft({ ...draft, intervalWeeks: event.target.value }); setPreview(null); }} required />
-                  </label>
-                  <label>Fecha final (incluida si coincide)
-                    <input type="date" min={editorDate} max={annualMaximumEndDate(editorDate)} value={draft.endDate} onChange={(event) => { setDraft({ ...draft, endDate: event.target.value }); setPreview(null); }} required />
-                  </label>
-                </div>}
               </fieldset>}
             </div>
             <div className="drawer-actions">
@@ -446,7 +448,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
                 <button type="button" disabled={busy} onClick={saveOperation}>{busy ? "Guardando…" : "Confirmar y guardar"}</button>
               </> : <>
                 <button type="button" className="secondary" onClick={requestClose} disabled={busy}>Cancelar</button>
-                <button type="submit" disabled={busy || labels.length === 0}>{busy ? "Calculando…" : "Previsualizar cambios"}</button>
+                <button type="submit" disabled={busy || labels.length === 0}>{busy ? "Guardando…" : "Guardar"}</button>
               </>}
             </div>
           </form>
@@ -480,4 +482,9 @@ export function filterFoodLabels(labels: FoodLabel[], search: string): FoodLabel
 
 export function snapshotOperation(operation: MealPlanningOperation): MealPlanningOperation {
   return { ...operation, repeat: operation.repeat ? { ...operation.repeat } : null };
+}
+
+export function repeatFromInterval(intervalWeeks: string, endDate: string): MealPlanningOperation["repeat"] {
+  const interval = Number(intervalWeeks);
+  return interval > 0 ? { interval_weeks: interval, end_date: endDate } : null;
 }

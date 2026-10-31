@@ -32,7 +32,7 @@ type EditorDraft = {
   endDate: string;
 };
 
-type Props = { csrfToken: string; onSessionExpired: () => void };
+type Props = { csrfToken: string; onSessionExpired: () => void; onOpenRecipes?: (foodId: string) => void };
 
 const SLOT_LABELS: Record<MealSlot, string> = { lunch: "Almuerzo", dinner: "Cena" };
 const WEEKDAY_LABELS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
@@ -56,7 +56,7 @@ export function weekLabel(start: CalendarDate): string {
   return `Semana del ${formatDateLabel(start, { day: "numeric", ...(!sameMonth ? { month: "long" as const } : {}), ...(!sameYear ? { year: "numeric" as const } : {}) })} al ${formatDateLabel(end, { day: "numeric", month: "long", year: "numeric" })}`;
 }
 
-export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
+export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipes = () => {} }: Props) {
   const [view, setView] = useState<CalendarView>("week");
   const [referenceDate, setReferenceDate] = useState<CalendarDate | null>(null);
   const queryDate = referenceDate ?? localToday();
@@ -528,7 +528,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
               <h3 className="week-separator">{weekLabel(start)}</h3>
               {visibleDateRange(start, "week").dates.map((date, index) => (
                 <CalendarDay key={date} date={date} weekday={WEEKDAY_LABELS[index]} today={date === today}
-                  assignments={assignmentMap} disabled={calendarLoading || mainLoadError || busy} onEdit={openEditor} onDelete={openDeletePreview} />
+                  assignments={assignmentMap} disabled={calendarLoading || mainLoadError || busy} onEdit={openEditor} onDelete={openDeletePreview} onOpenRecipes={onOpenRecipes} />
               ))}
             </section>
           ))}
@@ -570,6 +570,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired }: Props) {
               disabled={calendarLoading || mainLoadError || busy}
               onEdit={openEditor}
               onDelete={openDeletePreview}
+              onOpenRecipes={onOpenRecipes}
             />
           ))}
         </div>

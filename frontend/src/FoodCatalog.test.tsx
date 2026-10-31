@@ -3,12 +3,16 @@ import { describe, expect, it, vi } from "vitest";
 import { FoodCard, filterAndSortFoods } from "./FoodCatalog";
 
 describe("FoodCard", () => {
-  it("exposes edit and delete actions and a disabled recipes action", () => {
-    const markup = renderToStaticMarkup(<FoodCard label={{ id: "1", code: "x", name: "Pasta" }} busy={false} onEdit={vi.fn()} onRemove={vi.fn()} />);
+  it("exposes edit and delete actions and opens recipes from the food", () => {
+    const onOpenRecipes = vi.fn();
+    const card = FoodCard({ label: { id: "1", code: "x", name: "Pasta" }, busy: false, onEdit: vi.fn(), onRemove: vi.fn(), onOpenRecipes });
+    card.props.children[0].props.onClick();
+    const markup = renderToStaticMarkup(<FoodCard label={{ id: "1", code: "x", name: "Pasta" }} busy={false} onEdit={vi.fn()} onRemove={vi.fn()} onOpenRecipes={onOpenRecipes} />);
     expect(markup).toContain('aria-label="Editar Pasta"');
     expect(markup).toContain('aria-label="Eliminar Pasta"');
-    expect(markup).toMatch(/aria-label="Ver recetas de Pasta"[^>]*disabled=""/);
+    expect(markup).toContain('class="food-card-open"');
     expect(markup).toContain('class="dish-image"');
+    expect(onOpenRecipes).toHaveBeenCalledWith("1");
   });
 });
 

@@ -8,9 +8,9 @@ No existe un rol de administrador separado. Todo usuario autenticado y activo pu
 
 ## Reconciliación manual de imágenes huérfanas
 
-La reconciliación de imágenes persistentes solo se ejecuta manualmente; no hay tarea programada. Una futura vista de administración queda fuera de HU-003 y todavía no existe. La limpieza periódica de imágenes temporales es independiente. El borrado normal intenta retirar la imagen anterior tras confirmar el cambio en base de datos.
+La reconciliación de imágenes persistentes solo se ejecuta manualmente; no hay tarea programada. Una futura vista de administración queda fuera de HU-003 y HU-004 y todavía no existe. La limpieza periódica de imágenes temporales es independiente. El borrado normal intenta retirar la imagen anterior tras confirmar el cambio en base de datos.
 
-El comando elimina archivos regulares con nombres gestionados en `comidas/` que llevan más de 24 horas sin referencia en la base de datos. Es idempotente y consulta las referencias bajo el mismo bloqueo que usan los publicadores cooperantes. Desde `backend/`, con el entorno y las dependencias del backend configurados para la base y el directorio de datos correctos, se ejecuta explícitamente:
+El comando elimina archivos regulares con nombres gestionados en `comidas/` o `recetas/` que llevan más de 24 horas sin referencia en la base de datos. Es idempotente y consulta las referencias bajo el mismo bloqueo que usan los publicadores cooperantes. Desde `backend/`, con el entorno y las dependencias del backend configurados para la base y el directorio de datos correctos, se ejecuta explícitamente:
 
 ```sh
 python -m app.food_images --confirm-coordinated-storage
@@ -68,7 +68,7 @@ La renovación se ejecuta con `make cert-renew`; Certbot reutiliza el webroot y 
 
 ## Esquema, persistencia y copias
 
-Aplica migraciones con `make migrate`; inspecciona la versión con `docker compose exec backend python -m alembic current`. El volumen `postgres_data` solo conserva datos locales entre reinicios: no equivale a una copia de seguridad. Las imágenes de comidas viven en `data/`, por lo que una copia válida incluye **la base PostgreSQL y todo `data/` en una misma ventana sin escrituras**. No guardes la copia dentro de `data/` ni en el repositorio.
+Aplica migraciones con `make migrate`; inspecciona la versión con `docker compose exec backend python -m alembic current`. El volumen `postgres_data` solo conserva datos locales entre reinicios: no equivale a una copia de seguridad. Las imágenes de comidas y recetas viven bajo `data/`, por lo que una copia válida incluye **la base PostgreSQL y todo `data/` en una misma ventana sin escrituras**. No guardes la copia dentro de `data/` ni en el repositorio.
 
 ### Copia coherente de base de datos e imágenes
 

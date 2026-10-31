@@ -5,7 +5,7 @@ import { addCalendarDays } from "./mealPlanningDates";
 
 describe("MealPlanning presentation", () => {
   it("renders the weekly layout with accessible date and view controls", () => {
-    const markup = renderToStaticMarkup(<MealPlanning csrfToken="test" onSessionExpired={() => {}} />);
+    const markup = renderToStaticMarkup(<MealPlanning csrfToken="test" onSessionExpired={() => {}} onOpenRecipes={() => {}} />);
 
     expect(markup).toContain("Planificación de comidas");
     expect(markup).toContain("Semana del");

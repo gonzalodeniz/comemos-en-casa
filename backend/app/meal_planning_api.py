@@ -16,13 +16,13 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.auth import ActiveSession, get_active_session, require_csrf
 from app.database import get_database_session
-from app.models import FoodLabel, MealAssignment
+from app.models import FoodLabel, MealAssignment, RecipeFoodLabel
 from app.meal_planning import repetition_dates
 from app.food_images import InvalidFoodImage, async_publication_lock, crop_to_webp, publish_temporary, save_temporary, temporary_path
 from app.safe_image_url import UnsafeImageURL, safe_fetch_image
@@ -269,12 +269,16 @@ def canary_today() -> date:
 async def list_food_labels(
     _active_session: ActiveSession = Depends(get_active_session),
     db: Session = Depends(get_database_session),
-) -> dict[str, list[dict[str, str | None]]]:
+) -> dict[str, list[dict[str, str | int | None]]]:
     labels = db.scalars(select(FoodLabel).order_by(FoodLabel.code)).all()
+    recipe_counts = dict(db.execute(
+        select(RecipeFoodLabel.food_label_id, func.count(RecipeFoodLabel.recipe_id))
+        .group_by(RecipeFoodLabel.food_label_id)
+    ).all())
     return {
         "labels": [
             {"id": str(label.id), "code": label.code, "name": label.name,
-             "image_url": _food_image_url(label)}
+             "image_url": _food_image_url(label), "recipe_count": recipe_counts.get(label.id, 0)}
             for label in labels
         ]
     }
@@ -396,7 +400,7 @@ async def food_label_impact(label_id: UUID, _active: ActiveSession = Depends(get
     db: Session = Depends(get_database_session)):
     label = db.get(FoodLabel, label_id)
     if label is None: raise HTTPException(status_code=404, detail="Food not found")
-    return {"assignment_count": len(db.scalars(select(MealAssignment).where(MealAssignment.label_id == label_id)).all()), "recipe_count": 0}
+    return {"assignment_count": len(db.scalars(select(MealAssignment).where(MealAssignment.label_id == label_id)).all()), "recipe_count": len(db.scalars(select(RecipeFoodLabel).where(RecipeFoodLabel.food_label_id == label_id)).all())}
 
 
 @router.delete("/food-labels/{label_id}", status_code=204)
@@ -407,6 +411,7 @@ async def delete_food_label(label_id: UUID, request: Request, response: Response
         label = db.get(FoodLabel, label_id)
         if label is None: raise HTTPException(status_code=404, detail="Food not found")
         db.query(MealAssignment).filter(MealAssignment.label_id == label_id).delete(synchronize_session=False)
+        db.query(RecipeFoodLabel).filter(RecipeFoodLabel.food_label_id == label_id).delete(synchronize_session=False)
         old_path = label.image_path
         db.delete(label)
         db.commit()

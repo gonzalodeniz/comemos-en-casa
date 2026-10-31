@@ -1,6 +1,6 @@
 import { apiRequest } from "./api";
 
-export type FoodLabel = { id: string; code: string; name: string; image_url?: string | null };
+export type FoodLabel = { id: string; code: string; name: string; image_url?: string | null; recipe_count?: number };
 export type MealSlot = "lunch" | "dinner";
 export type MealAssignment = {
   id: string;

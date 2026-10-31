@@ -307,9 +307,13 @@ def test_orphan_inspection_never_deletes_publication_after_snapshot(meal_databas
 
     with meal_database() as reader, ThreadPoolExecutor(max_workers=1) as executor:
         class ConcurrentPublication:
+            committed = False
+
             def scalars(self, query):
                 snapshot = list(reader.scalars(query))
-                executor.submit(commit_reference).result(timeout=5)
+                if not self.committed:
+                    self.committed = True
+                    executor.submit(commit_reference).result(timeout=5)
                 return iter(snapshot)
 
         assert inspect_possible_orphans(tmp_path, ConcurrentPublication(), now=now) == [f"comidas/{image.name}"]
@@ -443,6 +447,7 @@ def test_food_labels_are_sorted_and_read_does_not_create_meal_assignments(
         "arroz",
         "pescado",
     ]
+    assert [label["recipe_count"] for label in response.json()["labels"]] == [0, 0]
     with meal_database() as db:
         assert db.scalar(select(MealAssignment.id)) is None
 

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { apiRequest, ApiError, type User, type UserResponse } from "./api";
 import MealPlanning from "./MealPlanning";
 import FoodCatalog from "./FoodCatalog";
+import Recipes from "./Recipes";
 import AppWorkspace, { type AppView } from "./AppWorkspace";
 import AppBrand from "./AppBrand";
 import AppIcon from "./AppIcon";
@@ -22,6 +23,7 @@ function field(form: FormData, name: string): string {
 export default function App() {
   const [screen, setScreen] = useState<Screen>("loading");
   const [view, setView] = useState<AppView>(restoreAppView);
+  const [recipeFoodId, setRecipeFoodId] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [csrfToken, setCsrfToken] = useState("");
   const [users, setUsers] = useState<User[]>([]);
@@ -300,12 +302,13 @@ export default function App() {
       {screen === "app" && currentUser && (
         <AppWorkspace
           view={view}
-          onViewChange={(nextView) => { setView(nextView); persistAppView(nextView); setError(""); setNotice(""); }}
+          onViewChange={(nextView) => { setView(nextView); if (nextView === "recipes") setRecipeFoodId(null); persistAppView(nextView); setError(""); setNotice(""); }}
           disabled={loading}
           sessionTools={<div className="session-tools"><div className="session-identity"><span className="session-avatar" aria-hidden="true">{currentUser.name.trim().charAt(0).toLocaleUpperCase("es")}</span><div><small>Tu cuenta</small><strong>{currentUser.name}</strong></div></div><button type="button" className="secondary sign-out" disabled={loading} onClick={() => void perform(signOut)}><AppIcon name="logout" />Cerrar sesión</button></div>}
           notifications={<>{error && <p className="message error" role="alert">{error}</p>}{notice && <p className="message success" role="status">{notice}</p>}</>}
-          mealPlanning={<MealPlanning csrfToken={csrfToken} onSessionExpired={mealSessionExpired} />}
-          foodCatalog={<FoodCatalog csrfToken={csrfToken} onSessionExpired={mealSessionExpired} />}
+          mealPlanning={<MealPlanning csrfToken={csrfToken} onSessionExpired={mealSessionExpired} onOpenRecipes={(foodId) => { setRecipeFoodId(foodId); setView("recipes"); persistAppView("recipes"); }} />}
+          foodCatalog={<FoodCatalog csrfToken={csrfToken} onSessionExpired={mealSessionExpired} onOpenRecipes={(foodId) => { setRecipeFoodId(foodId); setView("recipes"); persistAppView("recipes"); }} />}
+          recipes={<Recipes csrfToken={csrfToken} onSessionExpired={mealSessionExpired} initialFoodId={recipeFoodId} />}
           userManagement={<div className="dashboard">
             <section className="panel">
               <p className="eyebrow">Tu familia</p>

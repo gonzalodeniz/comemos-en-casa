@@ -5,7 +5,7 @@ import type { MealAssignment, MealSlot } from "./mealPlanningApi";
 
 const SLOT_LABELS: Record<MealSlot, string> = { lunch: "Almuerzo", dinner: "Cena" };
 
-function MealThumbnail({ name, imageUrl }: { name: string; imageUrl?: string | null }) {
+function MealThumbnail({ name, imageUrl, onOpen }: { name: string; imageUrl?: string | null; onOpen?: () => void }) {
   const ref = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
@@ -36,10 +36,10 @@ function MealThumbnail({ name, imageUrl }: { name: string; imageUrl?: string | n
     return () => { active = false; observer.disconnect(); media.removeEventListener("change", update); slot.classList.remove("hide-meal-image"); };
   }, [name]);
 
-  return <span className="meal-thumbnail" ref={ref}>{imageUrl ? <img src={`${import.meta.env.VITE_API_BASE_URL || "/comemos"}/api/v1${imageUrl}`} alt="" /> : <AppIcon name="utensils" />}</span>;
+  return <span className="meal-thumbnail" ref={ref} role={onOpen ? "button" : undefined} tabIndex={onOpen ? 0 : undefined} onClick={onOpen} onKeyDown={onOpen ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(); } } : undefined} aria-label={onOpen ? `Ver recetas de ${name}` : undefined}>{imageUrl ? <img src={`${import.meta.env.VITE_API_BASE_URL || "/comemos"}/api/v1${imageUrl}`} alt="" /> : <AppIcon name="utensils" />}</span>;
 }
 
-export default function CalendarDay({ date, weekday, today, outsideMonth = false, compact = false, assignments, disabled, onEdit, onDelete }: {
+export default function CalendarDay({ date, weekday, today, outsideMonth = false, compact = false, assignments, disabled, onEdit, onDelete, onOpenRecipes = () => {} }: {
   date: CalendarDate;
   weekday: string;
   today: boolean;
@@ -49,6 +49,7 @@ export default function CalendarDay({ date, weekday, today, outsideMonth = false
   disabled: boolean;
   onEdit: (date: CalendarDate, slot: MealSlot) => void;
   onDelete: (date: CalendarDate, slot: MealSlot) => void;
+  onOpenRecipes?: (foodId: string) => void;
 }) {
 
   return (
@@ -60,8 +61,8 @@ export default function CalendarDay({ date, weekday, today, outsideMonth = false
           return (
             <div className={`meal-card${assignment ? " assigned" : ""}`} key={slot}>
             <div className={`meal-slot ${assignment ? "planned" : "unplanned"}`}>
-              <MealThumbnail name={assignment?.label.name ?? "Sin planificar"} imageUrl={assignment?.label.image_url} />
-              <span className="meal-details"><strong>{assignment?.label.name ?? "Sin planificar"}</strong>{compact && assignment && <span className={`meal-card-status ${slot}`}>{SLOT_LABELS[slot]}</span>}</span>
+              <MealThumbnail name={assignment?.label.name ?? "Sin planificar"} imageUrl={assignment?.label.image_url} onOpen={assignment ? () => onOpenRecipes(assignment.label.id) : undefined} />
+              <span className="meal-details"><strong>{assignment ? <button type="button" className="link-button meal-recipe-link" onClick={() => onOpenRecipes(assignment.label.id)}>{assignment.label.name}</button> : "Sin planificar"}</strong>{compact && assignment && <span className={`meal-card-status ${slot}`}>{SLOT_LABELS[slot]}</span>}</span>
               <button type="button" className="meal-edit" disabled={disabled}
                 aria-label={`${assignment ? "Editar" : "Añadir"} ${SLOT_LABELS[slot].toLowerCase()} del ${formatDateLabel(date, { dateStyle: "full" })}`}
                 title={assignment ? "Editar comida" : "Añadir comida"} onClick={() => onEdit(date, slot)}><AppIcon name={assignment ? "edit" : "plus"} /></button>

@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import ActiveSession, get_active_session, require_csrf
 from app.database import get_database_session
-from app.models import FoodLabel, MealAssignment
+from app.models import FoodLabel, MealAssignment, RecipeFoodLabel
 from app.meal_planning import repetition_dates
 from app.food_images import InvalidFoodImage, async_publication_lock, crop_to_webp, publish_temporary, save_temporary, temporary_path
 from app.safe_image_url import UnsafeImageURL, safe_fetch_image
@@ -396,7 +396,7 @@ async def food_label_impact(label_id: UUID, _active: ActiveSession = Depends(get
     db: Session = Depends(get_database_session)):
     label = db.get(FoodLabel, label_id)
     if label is None: raise HTTPException(status_code=404, detail="Food not found")
-    return {"assignment_count": len(db.scalars(select(MealAssignment).where(MealAssignment.label_id == label_id)).all()), "recipe_count": 0}
+    return {"assignment_count": len(db.scalars(select(MealAssignment).where(MealAssignment.label_id == label_id)).all()), "recipe_count": len(db.scalars(select(RecipeFoodLabel).where(RecipeFoodLabel.food_label_id == label_id)).all())}
 
 
 @router.delete("/food-labels/{label_id}", status_code=204)
@@ -407,6 +407,7 @@ async def delete_food_label(label_id: UUID, request: Request, response: Response
         label = db.get(FoodLabel, label_id)
         if label is None: raise HTTPException(status_code=404, detail="Food not found")
         db.query(MealAssignment).filter(MealAssignment.label_id == label_id).delete(synchronize_session=False)
+        db.query(RecipeFoodLabel).filter(RecipeFoodLabel.food_label_id == label_id).delete(synchronize_session=False)
         old_path = label.image_path
         db.delete(label)
         db.commit()

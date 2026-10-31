@@ -1,6 +1,6 @@
 # HU-004 — Recetas
 
-**Estado (2026-10-31):** historia aprobada expresamente por el usuario; pendiente de implementación. Plan aprobado: [HU-004 — Recetas](../planes/hu-004-recetas.md). Tareas: [TASKS de HU-004](../../odd/tasks/hu-004-recetas.md).
+**Estado (2026-10-31):** historia aprobada expresamente por el usuario; implementación en curso, con evidencia pendiente. Plan aprobado: [HU-004 — Recetas](../planes/hu-004-recetas.md). Tareas: [TASKS de HU-004](../../odd/tasks/hu-004-recetas.md).
 
 ## Historia de usuario
 

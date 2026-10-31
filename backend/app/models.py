@@ -162,6 +162,24 @@ class FoodLabel(Base):
     image_path: Mapped[str | None] = mapped_column(String(255))
 
 
+class Recipe(Base):
+    __tablename__ = "recipes"
+    __table_args__ = (UniqueConstraint("title_canonical", name="uq_recipes_title_canonical"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    title: Mapped[str] = mapped_column(String(150), nullable=False)
+    title_canonical: Mapped[str] = mapped_column(Text, nullable=False)
+    image_path: Mapped[str | None] = mapped_column(String(255))
+    ingredients: Mapped[str | None] = mapped_column(Text)
+    preparation: Mapped[str | None] = mapped_column(Text)
+
+
+class RecipeFoodLabel(Base):
+    __tablename__ = "recipe_food_labels"
+    recipe_id: Mapped[UUID] = mapped_column(ForeignKey("recipes.id", ondelete="CASCADE"), primary_key=True)
+    food_label_id: Mapped[UUID] = mapped_column(ForeignKey("food_labels.id", ondelete="CASCADE"), primary_key=True)
+
+
 class MealAssignment(Base):
     __tablename__ = "meal_assignments"
     __table_args__ = (

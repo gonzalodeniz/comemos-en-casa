@@ -1,7 +1,7 @@
 import type { AppView } from "./AppWorkspace";
 
 const STORAGE_KEY = "comemos-en-casa:workspace-view";
-const APP_VIEWS: readonly AppView[] = ["meal-planning", "food-catalog", "users"];
+const APP_VIEWS: readonly AppView[] = ["meal-planning", "food-catalog", "recipes", "users"];
 
 function getSessionStorage(): Storage | undefined {
   try {

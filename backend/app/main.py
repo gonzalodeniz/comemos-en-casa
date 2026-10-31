@@ -13,6 +13,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.auth import router as auth_router
 from app.database import engine
 from app.meal_planning_api import router as meal_planning_router
+from app.recipes_api import router as recipes_router
 from app.food_images import cleanup_expired_temporary
 from app.meal_planning_api import DATA_ROOT
 from app.settings import allowed_origins
@@ -44,6 +45,7 @@ app.add_middleware(
 )
 app.include_router(auth_router)
 app.include_router(meal_planning_router)
+app.include_router(recipes_router)
 
 
 def database_is_ready() -> bool:

@@ -36,6 +36,15 @@ describe("CalendarDay", () => {
     expect(onEdit.mock.calls).toEqual([[date, "lunch"], [date, "dinner"]]);
   });
 
+  it("opens recipes from either the assigned dish image or its name", () => {
+    const onOpenRecipes = vi.fn();
+    const element = day(["lunch"], { onOpenRecipes });
+    const mealSlot = element.props.children[1].props.children[0].props.children[0];
+    mealSlot.props.children[0].props.onOpen();
+    mealSlot.props.children[1].props.children[0].props.children.props.onClick();
+    expect(onOpenRecipes.mock.calls).toEqual([["rice"], ["rice"]]);
+  });
+
   it("renders the catalog image in the planning card when available", () => {
     const assignments = new Map<string, MealAssignment>([[`${date}:lunch`, {
       id: "assignment", date, slot: "lunch",
@@ -68,7 +77,7 @@ describe("CalendarDay", () => {
   it("keeps month cells compact and excludes redundant day-level actions", () => {
     const markup = renderToStaticMarkup(day(["lunch"], { compact: true, outsideMonth: true }));
     expect(markup).toContain("outside-month compact-day");
-    expect(markup.match(/<button/g)).toHaveLength(3);
+    expect(markup.match(/<button/g)).toHaveLength(4);
     expect(markup).not.toContain("add-meal");
   });
 });

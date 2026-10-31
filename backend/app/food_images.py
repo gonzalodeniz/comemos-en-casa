@@ -131,31 +131,33 @@ def reconcile_orphans(root: Path, session_factory, *, now: float | None = None) 
     run it during restoration. A future administration view may invoke it.
     """
     from sqlalchemy import select
-    from app.models import FoodLabel
+    from app.models import FoodLabel, Recipe
 
     cutoff = (time.time() if now is None else now) - ORPHAN_GRACE_SECONDS
     removed = []
     with publication_lock(root):
         with session_factory() as db:
             references = set(db.scalars(select(FoodLabel.image_path).where(FoodLabel.image_path.is_not(None))))
+            references.update(db.scalars(select(Recipe.image_path).where(Recipe.image_path.is_not(None))))
         root_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
         try:
-            try:
-                folder_fd = os.open("comidas", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=root_fd)
-            except FileNotFoundError:
-                return []
-            try:
-                for name in os.listdir(folder_fd):
-                    if (len(name) != 37 or not name.endswith(".webp")
-                            or any(character not in "0123456789abcdef" for character in name[:32])):
-                        continue
-                    info = os.stat(name, dir_fd=folder_fd, follow_symlinks=False)
-                    relative = f"comidas/{name}"
-                    if stat.S_ISREG(info.st_mode) and info.st_mtime < cutoff and relative not in references:
-                        os.unlink(name, dir_fd=folder_fd)
-                        removed.append(relative)
-            finally:
-                os.close(folder_fd)
+            for category in ("comidas", "recetas"):
+                try:
+                    folder_fd = os.open(category, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=root_fd)
+                except FileNotFoundError:
+                    continue
+                try:
+                    for name in os.listdir(folder_fd):
+                        if (len(name) != 37 or not name.endswith(".webp")
+                                or any(character not in "0123456789abcdef" for character in name[:32])):
+                            continue
+                        info = os.stat(name, dir_fd=folder_fd, follow_symlinks=False)
+                        relative = f"{category}/{name}"
+                        if stat.S_ISREG(info.st_mode) and info.st_mtime < cutoff and relative not in references:
+                            os.unlink(name, dir_fd=folder_fd)
+                            removed.append(relative)
+                finally:
+                    os.close(folder_fd)
         finally:
             os.close(root_fd)
     return sorted(removed)
@@ -260,19 +262,21 @@ def inspect_possible_orphans(root: Path, db, *, now: float | None = None) -> lis
     Database and directory access errors abort the inspection.
     """
     from sqlalchemy import select
-    from app.models import FoodLabel
+    from app.models import FoodLabel, Recipe
 
     references = set(db.scalars(select(FoodLabel.image_path).where(FoodLabel.image_path.is_not(None))))
+    references.update(db.scalars(select(Recipe.image_path).where(Recipe.image_path.is_not(None))))
     cutoff = (time.time() if now is None else now) - ORPHAN_GRACE_SECONDS
-    folder = root / "comidas"
-    if folder.is_symlink():
-        raise OSError("Unsafe image storage directory")
-    try:
-        entries = list(folder.iterdir())
-    except FileNotFoundError:
-        return []
     candidates = []
-    for path in entries:
+    for category in ("comidas", "recetas"):
+      folder = root / category
+      if folder.is_symlink():
+          raise OSError("Unsafe image storage directory")
+      try:
+          entries = list(folder.iterdir())
+      except FileNotFoundError:
+          continue
+      for path in entries:
         stem = path.stem
         if (path.suffix != ".webp" or len(stem) != 32
                 or any(character not in "0123456789abcdef" for character in stem)):
@@ -280,7 +284,7 @@ def inspect_possible_orphans(root: Path, db, *, now: float | None = None) -> lis
         info = path.lstat()
         if not stat.S_ISREG(info.st_mode):
             continue
-        relative = f"comidas/{path.name}"
+        relative = f"{category}/{path.name}"
         if relative not in references and info.st_mtime < cutoff:
             candidates.append(relative)
     return sorted(candidates)

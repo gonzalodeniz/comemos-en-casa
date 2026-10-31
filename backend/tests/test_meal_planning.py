@@ -307,9 +307,13 @@ def test_orphan_inspection_never_deletes_publication_after_snapshot(meal_databas
 
     with meal_database() as reader, ThreadPoolExecutor(max_workers=1) as executor:
         class ConcurrentPublication:
+            committed = False
+
             def scalars(self, query):
                 snapshot = list(reader.scalars(query))
-                executor.submit(commit_reference).result(timeout=5)
+                if not self.committed:
+                    self.committed = True
+                    executor.submit(commit_reference).result(timeout=5)
                 return iter(snapshot)
 
         assert inspect_possible_orphans(tmp_path, ConcurrentPublication(), now=now) == [f"comidas/{image.name}"]

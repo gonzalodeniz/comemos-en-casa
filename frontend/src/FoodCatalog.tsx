@@ -4,7 +4,7 @@ import { ApiError } from "./api";
 import AppIcon from "./AppIcon";
 import { createFoodLabel, deleteFoodLabel, getFoodLabelImpact, getFoodLabels, importFoodImageUrl, prepareFoodImage, updateFoodLabel, type FoodLabel } from "./mealPlanningApi";
 
-type Props = { csrfToken: string; onSessionExpired: () => void };
+type Props = { csrfToken: string; onSessionExpired: () => void; onOpenRecipes: (foodId: string) => void };
 
 export function filterAndSortFoods(labels: FoodLabel[], query: string): FoodLabel[] {
   const search = query.toLocaleLowerCase("es");
@@ -13,12 +13,12 @@ export function filterAndSortFoods(labels: FoodLabel[], query: string): FoodLabe
     .sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }));
 }
 
-export function FoodCard({ label, busy, onEdit, onRemove }: { label: FoodLabel; busy: boolean; onEdit: (label: FoodLabel, opener: HTMLElement) => void; onRemove: (label: FoodLabel) => void }) {
-  return <article className="dish-card">{label.image_url ? <img src={`${import.meta.env.VITE_API_BASE_URL || "/comemos"}/api/v1${label.image_url}`} alt="" /> : <span className="dish-image"><AppIcon name="utensils" /></span>}<strong>{label.name}</strong><div className="food-card-actions"><button type="button" className="secondary" aria-label={`Editar ${label.name}`} title={`Editar ${label.name}`} disabled={busy} onClick={(e) => onEdit(label, e.currentTarget)}><AppIcon name="edit" /></button><button type="button" className="danger" aria-label={`Eliminar ${label.name}`} title={`Eliminar ${label.name}`} disabled={busy} onClick={() => onRemove(label)}><AppIcon name="trash" /></button><button type="button" className="secondary" aria-label={`Ver recetas de ${label.name}`} title="Recetas no disponibles" disabled><AppIcon name="eye" /></button></div></article>;
+export function FoodCard({ label, busy, onEdit, onRemove, onOpenRecipes }: { label: FoodLabel; busy: boolean; onEdit: (label: FoodLabel, opener: HTMLElement) => void; onRemove: (label: FoodLabel) => void; onOpenRecipes?: (foodId: string) => void }) {
+  return <article className="dish-card"><button type="button" className="food-card-open" aria-label={`Ver recetas de ${label.name}`} onClick={() => onOpenRecipes?.(label.id)}>{label.image_url ? <img src={`${import.meta.env.VITE_API_BASE_URL || "/comemos"}/api/v1${label.image_url}`} alt="" /> : <span className="dish-image"><AppIcon name="utensils" /></span>}<strong>{label.name}</strong></button><div className="food-card-actions"><button type="button" className="secondary" aria-label={`Editar ${label.name}`} title={`Editar ${label.name}`} disabled={busy} onClick={(e) => onEdit(label, e.currentTarget)}><AppIcon name="edit" /></button><button type="button" className="danger" aria-label={`Eliminar ${label.name}`} title={`Eliminar ${label.name}`} disabled={busy} onClick={() => onRemove(label)}><AppIcon name="trash" /></button></div></article>;
 }
 
 
-export default function FoodCatalog({ csrfToken, onSessionExpired }: Props) {
+export default function FoodCatalog({ csrfToken, onSessionExpired, onOpenRecipes }: Props) {
   const [labels, setLabels] = useState<FoodLabel[]>([]);
   const [query, setQuery] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -110,7 +110,7 @@ export default function FoodCatalog({ csrfToken, onSessionExpired }: Props) {
     <header className="food-catalog-heading"><div><p className="eyebrow">Catálogo compartido</p><h1>Comidas</h1><p>Organiza las comidas disponibles para tu planificación.</p></div><button ref={createButtonRef} type="button" className="food-create-trigger" onClick={(e) => open(undefined, e.currentTarget)}><AppIcon name="plus" /> Nueva comida</button></header>
     {error && !editing && <p className="message error" role="alert">{error}</p>}{notice && <p className="message success" role="status">{notice}</p>}
     <div className="food-catalog-search-row"><div className="dish-search"><input id="food-search" type="search" aria-label="Buscar comida" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar comida" /></div>{query && <button type="button" className="secondary food-clear-search" onClick={() => setQuery("")}>Limpiar búsqueda</button>}</div>
-    {loading ? <p className="food-empty-state" role="status">Cargando comidas…</p> : !filtered.length ? <p className="food-empty-state" role="status">{query ? "No se encontraron comidas con esa búsqueda." : "Todavía no hay comidas. Añade la primera."}</p> : <div className="dish-grid">{filtered.map((label) => <FoodCard key={label.id} label={label} busy={busy} onEdit={open} onRemove={(item) => void remove(item)} />)}</div>}
+    {loading ? <p className="food-empty-state" role="status">Cargando comidas…</p> : !filtered.length ? <p className="food-empty-state" role="status">{query ? "No se encontraron comidas con esa búsqueda." : "Todavía no hay comidas. Añade la primera."}</p> : <div className="dish-grid">{filtered.map((label) => <FoodCard key={label.id} label={label} busy={busy} onEdit={open} onRemove={(item) => void remove(item)} onOpenRecipes={onOpenRecipes} />)}</div>}
   </section>
   {drawerOpen && <div className="drawer-overlay food-drawer-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
     <form className="meal-editor food-editor" ref={drawerRef} tabIndex={-1} onSubmit={save} onKeyDown={handleDrawerKeyDown} role="dialog" aria-modal="true" aria-labelledby="food-editor-title">

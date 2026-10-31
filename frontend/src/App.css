@@ -92,6 +92,11 @@ h2 { font-size: clamp(1.5rem, 2.2vw, 2.35rem); letter-spacing: -.035em; }
 .message.success { color: #166534; border-color: #c7e7d5; background: #eaf8ef; }
 
 .meal-heading { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 1.3rem; margin-bottom: .8rem; }
+.app-workspace:has(.planning-sticky-header) { height: 100dvh; min-height: 0; overflow: hidden; grid-template-rows: minmax(0, 1fr); }
+.workspace-content:has(.planning-sticky-header) { min-height: 0; overflow-y: auto; overflow-anchor: none; padding-top: 0; }
+.planning-sticky-header { position: sticky; top: 0; z-index: 30; padding-top: 2.4rem; background: #f7fbf9; }
+.planning-sticky-header .meal-heading { padding: .45rem 0; }
+.planning-sticky-header .calendar-context { margin-top: 0; margin-bottom: 0; padding: .35rem 0; }
 .meal-title h2 { margin-bottom: .7rem; line-height: 1.15; }
 .meal-subtitle { margin-bottom: 0; color: #648896; font-size: 1.2rem; font-weight: 550; }
 .calendar-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; padding-top: .25rem; }
@@ -180,6 +185,8 @@ button.today-button:hover:not(:disabled), button.today-button-fixed:hover:not(:d
   .brand-mark { width: 40px; }
   .app-brand h1 { font-size: 1.4rem; }
   .workspace-content { padding: 2rem 1.5rem; }
+  .workspace-content:has(.planning-sticky-header) { padding-top: 0; }
+  .planning-sticky-header { padding-top: 2rem; }
   .week-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .85rem; }
   .calendar-day h4 { min-height: 54px; }
   .meal-slot { min-height: 125px; }
@@ -187,6 +194,11 @@ button.today-button:hover:not(:disabled), button.today-button-fixed:hover:not(:d
 }
 
 @media (max-width: 760px) {
+  .app-workspace:has(.planning-sticky-header) { display: flex; flex-direction: column; }
+  .app-workspace:has(.planning-sticky-header) > .app-sidebar { align-self: stretch; flex: none; }
+  .workspace-content:has(.planning-sticky-header) { flex: 1; padding-top: 0; }
+  .planning-sticky-header { padding-top: 1.7rem; }
+  .planning-sticky-header .week-heading-label { display: inline; }
   .app-workspace { display: block; }
   .app-sidebar { position: static; display: grid; min-height: 0; padding: 1.2rem; border-right: 0; border-bottom: 1px solid #dfecef; }
   .app-sidebar .app-brand { margin: 0 0 1.3rem; }

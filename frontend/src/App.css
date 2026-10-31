@@ -106,7 +106,8 @@ h2 { font-size: clamp(1.5rem, 2.2vw, 2.35rem); letter-spacing: -.035em; }
 .calendar-context { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: 1.4rem; }
 .meal-date-context { margin: 0; color: #648391; font-size: .75rem; }
 .meal-date-context > span:first-child { margin: 0 .4rem; }
-button.today-button { min-height: 36px; padding: .3rem .7rem; color: #007346; background: transparent; border-color: transparent; font-size: .8rem; }
+button.today-button { min-height: 36px; padding: .3rem .7rem; color: #684f00; background: #fff4c7; border-color: #f0d98a; box-shadow: 0 2px 5px rgb(104 79 0 / 18%); font-size: .8rem; }
+button.today-button:hover:not(:disabled), button.today-button-fixed:hover:not(:disabled) { background: #ffec9e; }
 .week-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); align-items: stretch; gap: .55rem; }
 .calendar-day { min-width: 0; padding: .75rem .55rem; border: 1px solid #dae7ec; border-radius: .6rem; background: rgb(255 255 255 / 85%); }
 .calendar-day.is-today { border-color: #159c61; box-shadow: inset 0 0 0 1px #159c61; background: linear-gradient(180deg, #f1faf5, #f9fdfb); }
@@ -255,6 +256,13 @@ button.today-button { min-height: 36px; padding: .3rem .7rem; color: #007346; ba
 .sidebar-menu { display: flex; flex: 1; flex-direction: column; }
 .mobile-menu-toggle { display: none; }
 .week-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: .55rem; }
+.week-scroll-content { overflow-anchor: none; }
+.week-section { margin-bottom: .8rem; }
+.week-separator { margin: .5rem 0 .15rem; color: #54758a; font-size: .85rem; font-weight: 650; }
+.week-sentinel { height: 1px; }
+.week-loading { margin: .5rem 0; color: #54758a; font-size: .85rem; }
+.week-retry { margin: .4rem 0; }
+button.today-button-fixed { position: fixed; right: max(1rem, env(safe-area-inset-right)); bottom: max(1rem, env(safe-area-inset-bottom)); z-index: 20; padding: .55rem .85rem; border: 1px solid #f0d98a; color: #684f00; background: #fff4c7; box-shadow: 0 3px 8px rgb(104 79 0 / 24%); }
 .week-grid .calendar-day { display: grid; grid-template-columns: 110px minmax(0, 1fr); padding: 0; border-radius: .85rem; background: #fff; }
 .week-meal-headings { display: grid; grid-template-columns: 110px minmax(0, 1fr); align-items: center; min-height: 40px; }
 .week-meal-headings > .week-heading-spacer:last-child { display: none; }

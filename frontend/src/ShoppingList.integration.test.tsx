@@ -100,4 +100,22 @@ describe("shopping list integration", () => {
     expect((await screen.findByRole("alert")).textContent).toContain("No se pudo crear el producto");
     expect((input as HTMLInputElement).value).toBe("Manzanas");
   });
+
+  // Comprueba que los fallos al consultar productos se comunican en la categoría correspondiente.
+  it("shows an error when loading products fails", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
+      if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Verduras" }] }), { status: 200 });
+      if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ detail: "Database unavailable" }), { status: 500 });
+      return new Response(JSON.stringify({}), { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("No se pudieron cargar los productos");
+  });
 });

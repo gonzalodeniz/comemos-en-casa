@@ -6,6 +6,8 @@ import { apiRequest, ApiError, type User, type UserResponse } from "./api";
 import MealPlanning from "./MealPlanning";
 import FoodCatalog from "./FoodCatalog";
 import Recipes from "./Recipes";
+import ShoppingList from "./ShoppingList";
+import { getShoppingCategories, createShoppingCategory, type ShoppingCategory } from "./mealPlanningApi";
 import AppWorkspace, { type AppView } from "./AppWorkspace";
 import AppBrand from "./AppBrand";
 import AppIcon from "./AppIcon";
@@ -28,6 +30,7 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [csrfToken, setCsrfToken] = useState("");
   const [users, setUsers] = useState<User[]>([]);
+  const [shoppingCategories, setShoppingCategories] = useState<ShoppingCategory[]>([]);
   const [resetToken, setResetToken] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -89,6 +92,19 @@ export default function App() {
       cancelled = true;
     };
   }, [refreshSession]);
+
+  useEffect(() => {
+    if (screen !== "app" || view !== "shopping-list") return;
+    let cancelled = false;
+    void getShoppingCategories().then((result) => {
+      if (!cancelled) setShoppingCategories(result.categories);
+    }).catch((cause) => {
+      if (cancelled) return;
+      if (cause instanceof ApiError && cause.status === 401) mealSessionExpired();
+      else setError("No se pudieron cargar las categorías.");
+    });
+    return () => { cancelled = true; };
+  }, [screen, view, mealSessionExpired]);
 
   async function perform(action: () => Promise<void>) {
     setLoading(true);
@@ -310,6 +326,10 @@ export default function App() {
           mealPlanning={<MealPlanning csrfToken={csrfToken} onSessionExpired={mealSessionExpired} onOpenRecipes={(foodId) => { setRecipeFoodId(foodId); setView("recipes"); persistAppView("recipes"); }} />}
           foodCatalog={<FoodCatalog csrfToken={csrfToken} onSessionExpired={mealSessionExpired} onOpenRecipes={(foodId) => { setRecipeFoodId(foodId); setView("recipes"); persistAppView("recipes"); }} />}
           recipes={<Recipes key={recipeListReset} csrfToken={csrfToken} onSessionExpired={mealSessionExpired} initialFoodId={recipeFoodId} />}
+          shoppingList={<ShoppingList categories={shoppingCategories} onCreateCategory={(name) => void perform(async () => {
+            const category = await createShoppingCategory(name, csrfToken);
+            setShoppingCategories((current) => [...current, category]);
+          })} />}
           userManagement={<div className="dashboard">
             <section className="panel">
               <p className="eyebrow">Tu familia</p>

@@ -55,12 +55,14 @@ def test_food_catalog_migration_follows_meal_planning_and_auth_migrations():
     root = Path(__file__).resolve().parents[1]
     script = ScriptDirectory(dir=str(root / "migrations"))
 
-    assert script.get_heads() == ["0006_food_catalog_images"]
+    assert script.get_heads() == ["0008_shopping_categories"]
     assert script.get_revision("0002_user_auth").down_revision == "0001_baseline"
     assert script.get_revision("0003_login_attempt_events").down_revision == "0002_user_auth"
     assert script.get_revision("0004_password_reset_rate_scopes").down_revision == "0003_login_attempt_events"
     assert script.get_revision("0005_meal_planning").down_revision == "0004_password_reset_rate_scopes"
     assert script.get_revision("0006_food_catalog_images").down_revision == "0005_meal_planning"
+    assert script.get_revision("0007_recipes").down_revision == "0006_food_catalog_images"
+    assert script.get_revision("0008_shopping_categories").down_revision == "0007_recipes"
 
 
 def test_meal_assignments_have_slot_check_and_unique_date_slot():

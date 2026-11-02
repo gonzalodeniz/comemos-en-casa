@@ -1,6 +1,16 @@
 import { apiRequest } from "./api";
 
 export type FoodLabel = { id: string; code: string; name: string; image_url?: string | null; recipe_count?: number };
+export type ShoppingCategory = { id: string; name: string };
+
+export function getShoppingCategories(): Promise<{ categories: ShoppingCategory[] }> {
+  return apiRequest("/shopping-categories");
+}
+
+export function createShoppingCategory(name: string, csrfToken: string): Promise<ShoppingCategory> {
+  return apiRequest("/shopping-categories", { method: "POST", csrfToken, body: { name } });
+}
+
 export type MealSlot = "lunch" | "dinner";
 export type MealAssignment = {
   id: string;

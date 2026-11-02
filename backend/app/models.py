@@ -162,6 +162,13 @@ class FoodLabel(Base):
     image_path: Mapped[str | None] = mapped_column(String(255))
 
 
+class ShoppingCategory(Base):
+    __tablename__ = "shopping_categories"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
 class Recipe(Base):
     __tablename__ = "recipes"
     __table_args__ = (UniqueConstraint("title_canonical", name="uq_recipes_title_canonical"),)

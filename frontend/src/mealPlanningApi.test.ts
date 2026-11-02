@@ -33,6 +33,25 @@ describe("meal planning API client", () => {
     expect(init.credentials).toBe("include");
   });
 
+  it("loads and creates shopping categories through the shared API", async () => {
+    const response = { categories: [{ id: "category-1", name: "Verduras" }] };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(response), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(response.categories[0]), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { getShoppingCategories, createShoppingCategory } = await import("./mealPlanningApi");
+    await expect(getShoppingCategories()).resolves.toEqual(response);
+    await expect(createShoppingCategory("Verduras", "csrf-1")).resolves.toEqual(response.categories[0]);
+
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("/api/v1/shopping-categories");
+    const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(url).toContain("/api/v1/shopping-categories");
+    expect(init.method).toBe("POST");
+    expect(new Headers(init.headers).get("X-CSRF-Token")).toBe("csrf-1");
+    expect(JSON.parse(String(init.body))).toEqual({ name: "Verduras" });
+  });
+
   it("requests an inclusive planning range with encoded calendar-date parameters", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ assignments: [] }), { status: 200 }),

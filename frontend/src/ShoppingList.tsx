@@ -35,9 +35,14 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
   /** Crea un producto y lo incorpora a la categoría visible. */
   async function submitProduct(event: FormEvent<HTMLFormElement>, category: ShoppingCategory) {
     event.preventDefault();
-    const product = await onCreateProduct(category.id, (productNames[category.id] ?? "").trim());
-    setProducts((current) => ({ ...current, [category.id]: [...(current[category.id] ?? []), product] }));
-    setProductNames((current) => ({ ...current, [category.id]: "" }));
+    try {
+      const product = await onCreateProduct(category.id, (productNames[category.id] ?? "").trim());
+      setProducts((current) => ({ ...current, [category.id]: [...(current[category.id] ?? []), product] }));
+      setProductNames((current) => ({ ...current, [category.id]: "" }));
+      setProductErrors((current) => ({ ...current, [category.id]: "" }));
+    } catch {
+      setProductErrors((current) => ({ ...current, [category.id]: "No se pudo crear el producto. Inténtalo de nuevo." }));
+    }
   }
 
   return <section className="panel">

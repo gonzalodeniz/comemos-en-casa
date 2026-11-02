@@ -23,7 +23,7 @@ Reemplaza los marcadores de `POSTGRES_PASSWORD` y `AUTH_RATE_LIMIT_HMAC_KEY` por
 ```sh
 make up
 make mailhog-up
-make migrate
+make alembic-upgrade
 ```
 
 Interfaz empaquetada local: `http://localhost:5173/comemos/`; API no se publica al host. Para edición con HMR, inicia Vite con `npm run dev` y abre `http://localhost:5173/comemos/`; el servidor dev no forma parte del proxy público. En producción solo se expone `https://gonzalodeniz.com/comemos/` tras emitir/activar TLS. Compose publica ambos puertos solo en loopback y no publica PostgreSQL al host. El volumen `postgres_data` conserva datos al reiniciar. No uses `down -v` en un entorno con datos que quieras conservar.

@@ -12,7 +12,7 @@ export AUTH_RATE_LIMIT_HMAC_KEY="$(openssl rand -hex 32)"
 export APP_PUBLIC_URL='https://gonzalodeniz.com/comemos'
 make up
 make mailhog-up
-make migrate
+make alembic-upgrade
 ```
 
 La interfaz local empaquetada está en <http://localhost:5173/comemos/> (solo loopback); para desarrollo con recarga rápida ejecuta `cd frontend && npm run dev`. La API y PostgreSQL no se publican al host. El proxy público solo atenderá <https://gonzalodeniz.com/comemos/> después de obtener y activar el certificado TLS. El backend ofrece `/health` (proceso vivo) y `/ready` (conexión a PostgreSQL; HTTP 503 si no está disponible) dentro de la red Docker. Compose conserva PostgreSQL en el volumen `postgres_data`. Las migraciones `0002_user_auth`, `0003_login_attempt_events` y `0004_password_reset_rate_scopes` incluyen persistencia para cuentas, sesiones, recuperación y límites de acceso. `AUTH_RATE_LIMIT_HMAC_KEY` debe ser una clave hexadecimal aleatoria de 32 bytes; consérvala entre reinicios y compártela entre instancias del mismo entorno. `APP_PUBLIC_URL` es obligatorio y debe apuntar a la ruta pública de interfaz. MailHog captura los correos de desarrollo en <http://127.0.0.1:8025>; abre la interfaz de usuario y revisa el buzón después de generar un correo de recuperación. SMTP (1025) solo está disponible dentro de la red Docker compartida `comemos-dev`, y MailHog solo se publica en loopback. El almacenamiento es en memoria y desaparece al reiniciar/eliminar MailHog. Es una herramienta exclusivamente de desarrollo; no la uses para producción ni conectes datos reales. `make mailhog-down` detiene y elimina únicamente MailHog (sin borrar el volumen PostgreSQL). Opcionalmente, `POSTGRES_USER` y `POSTGRES_DB` modifican usuario y nombre de base.

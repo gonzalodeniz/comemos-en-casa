@@ -75,4 +75,26 @@ describe("shopping list integration", () => {
     expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-1");
     expect(JSON.parse(String(init?.body))).toEqual({ name: "Manzanas" });
   });
+
+  it("shows an error and preserves the product name when creation fails", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
+      if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Verduras" }] }), { status: 200 });
+      if (url.endsWith("/category-1/products") && init?.method === "POST") return new Response(JSON.stringify({ detail: "Database unavailable" }), { status: 500 });
+      if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [] }), { status: 200 });
+      return new Response(JSON.stringify({}), { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    const input = await screen.findByLabelText("Nombre del producto en Verduras");
+    await user.type(input, "Manzanas");
+    await user.click(screen.getByRole("button", { name: "Crear producto" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("No se pudo crear el producto");
+    expect((input as HTMLInputElement).value).toBe("Manzanas");
+  });
 });

@@ -5,7 +5,12 @@ import ShoppingList from "./ShoppingList";
 describe("ShoppingList", () => {
   it("shows saved categories and a category creation form", () => {
     const markup = renderToStaticMarkup(
-      <ShoppingList categories={[{ id: "1", name: "Verduras" }]} onCreateCategory={vi.fn()} />,
+      <ShoppingList
+        categories={[{ id: "1", name: "Verduras" }]}
+        onCreateCategory={vi.fn()}
+        onGetProducts={vi.fn().mockResolvedValue([])}
+        onCreateProduct={vi.fn().mockResolvedValue({ id: "product-1", name: "Manzanas" })}
+      />,
     );
 
     expect(markup).toContain("Verduras");

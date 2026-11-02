@@ -2,6 +2,7 @@ import { apiRequest } from "./api";
 
 export type FoodLabel = { id: string; code: string; name: string; image_url?: string | null; recipe_count?: number };
 export type ShoppingCategory = { id: string; name: string };
+export type ShoppingProduct = { id: string; name: string };
 
 export function getShoppingCategories(): Promise<{ categories: ShoppingCategory[] }> {
   return apiRequest("/shopping-categories");
@@ -9,6 +10,14 @@ export function getShoppingCategories(): Promise<{ categories: ShoppingCategory[
 
 export function createShoppingCategory(name: string, csrfToken: string): Promise<ShoppingCategory> {
   return apiRequest("/shopping-categories", { method: "POST", csrfToken, body: { name } });
+}
+
+export function getShoppingProducts(categoryId: string): Promise<{ products: ShoppingProduct[] }> {
+  return apiRequest(`/shopping-categories/${categoryId}/products`);
+}
+
+export function createShoppingProduct(categoryId: string, name: string, csrfToken: string): Promise<ShoppingProduct> {
+  return apiRequest(`/shopping-categories/${categoryId}/products`, { method: "POST", csrfToken, body: { name } });
 }
 
 export type MealSlot = "lunch" | "dinner";

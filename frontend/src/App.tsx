@@ -7,7 +7,7 @@ import MealPlanning from "./MealPlanning";
 import FoodCatalog from "./FoodCatalog";
 import Recipes from "./Recipes";
 import ShoppingList from "./ShoppingList";
-import { getShoppingCategories, createShoppingCategory, type ShoppingCategory } from "./mealPlanningApi";
+import { getShoppingCategories, createShoppingCategory, getShoppingProducts, createShoppingProduct, type ShoppingCategory } from "./mealPlanningApi";
 import AppWorkspace, { type AppView } from "./AppWorkspace";
 import AppBrand from "./AppBrand";
 import AppIcon from "./AppIcon";
@@ -326,7 +326,7 @@ export default function App() {
           mealPlanning={<MealPlanning csrfToken={csrfToken} onSessionExpired={mealSessionExpired} onOpenRecipes={(foodId) => { setRecipeFoodId(foodId); setView("recipes"); persistAppView("recipes"); }} />}
           foodCatalog={<FoodCatalog csrfToken={csrfToken} onSessionExpired={mealSessionExpired} onOpenRecipes={(foodId) => { setRecipeFoodId(foodId); setView("recipes"); persistAppView("recipes"); }} />}
           recipes={<Recipes key={recipeListReset} csrfToken={csrfToken} onSessionExpired={mealSessionExpired} initialFoodId={recipeFoodId} />}
-          shoppingList={<ShoppingList categories={shoppingCategories} onCreateCategory={(name) => void perform(async () => {
+          shoppingList={<ShoppingList categories={shoppingCategories} onGetProducts={async (categoryId) => (await getShoppingProducts(categoryId)).products} onCreateProduct={(categoryId, name) => createShoppingProduct(categoryId, name, csrfToken)} onCreateCategory={(name) => void perform(async () => {
             const category = await createShoppingCategory(name, csrfToken);
             setShoppingCategories((current) => [...current, category]);
           })} />}

@@ -17,6 +17,7 @@ describe("shopping list integration", () => {
       }
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Verduras" }] }), { status: 200 });
+      if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [] }), { status: 200 });
       return new Response(JSON.stringify({}), { status: 404 });
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -36,6 +37,7 @@ describe("shopping list integration", () => {
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories") && init?.method === "POST") return new Response(JSON.stringify({ id: "category-1", name: "Verduras" }), { status: 201 });
       if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [] }), { status: 200 });
+      if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [] }), { status: 200 });
       return new Response(JSON.stringify({}), { status: 404 });
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -49,5 +51,28 @@ describe("shopping list integration", () => {
     const [, init] = fetchMock.mock.calls.find(([url, options]) => String(url).endsWith("/shopping-categories") && options?.method === "POST")!;
     expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-1");
     expect(JSON.parse(String(init?.body))).toEqual({ name: "Verduras" });
+  });
+
+  it("creates a product from its category", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
+      if (url.endsWith("/shopping-categories") && init?.method !== "POST") return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Verduras" }] }), { status: 200 });
+      if (url.endsWith("/category-1/products") && init?.method !== "POST") return new Response(JSON.stringify({ products: [] }), { status: 200 });
+      if (url.endsWith("/category-1/products") && init?.method === "POST") return new Response(JSON.stringify({ id: "product-1", name: "Manzanas" }), { status: 201 });
+      return new Response(JSON.stringify({}), { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.type(await screen.findByLabelText("Nombre del producto en Verduras"), "Manzanas");
+    await user.click(screen.getByRole("button", { name: "Crear producto" }));
+
+    expect(await screen.findByText("Manzanas")).toBeTruthy();
+    const [, init] = fetchMock.mock.calls.find(([url, options]) => String(url).endsWith("/category-1/products") && options?.method === "POST")!;
+    expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-1");
+    expect(JSON.parse(String(init?.body))).toEqual({ name: "Manzanas" });
   });
 });

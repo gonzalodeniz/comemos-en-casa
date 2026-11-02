@@ -6,9 +6,11 @@
 
 - **Lista de la compra**: Lista única, común a todos los usuarios de la aplicación, de los ingredientes y productos necesarios para preparar las comidas planificadas o para el hogar. 
 
-- **Categoría de productos**: Agrupación de productos del catálogo común, como frutas, verduras o productos de limpieza.
+- **Categoría de productos**: Agrupación de productos que pertenece al catálogo de categorías y productos, como frutas, verduras o productos de limpieza.
 
-- **Producto**: Elemento del catálogo común que pertenece a una categoría y puede añadirse a la lista de la compra indicando una cantidad en unidades o en peso.
+- **Producto**: Elemento del catálogo de productos que pertenece a una categoría y puede añadirse a la lista de la compra indicando una cantidad en unidades o en peso.
+
+- **Catálogo de categorías y productos**: Conjunto compartido de categorías de productos y de los productos que pertenecen a ellas.
 
 - **Producto ya incluido**: Producto que ya está en la lista de la compra. Al añadirlo de nuevo, se acumulan sus cantidades compatibles; las cantidades en unidades y en peso se mantienen en registros diferentes.
 

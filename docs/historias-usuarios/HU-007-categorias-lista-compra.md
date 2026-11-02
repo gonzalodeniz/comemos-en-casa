@@ -4,7 +4,7 @@
 
 ## Historia de usuario
 
-Como usuario, quiero crear categorías desde la interfaz, para organizar el catálogo común.
+Como usuario, quiero crear categorías desde la interfaz, para organizar el catálogo de categorías y productos.
 
 ## Criterios de aceptación
 
@@ -13,7 +13,7 @@ Como usuario, quiero crear categorías desde la interfaz, para organizar el cat�
 
 ## Plan
 
-- Guardar las categorías en el catálogo compartido.
+- Guardar las categorías en el catálogo de categorías de productos.
 - Permitir su creación y consulta a los usuarios autenticados.
 - Incorporar un formulario de creación y mostrar las categorías guardadas.
 - Verificar la creación y la consulta desde otro usuario.

@@ -10,7 +10,7 @@
 
 ## Relación con las comidas
 
-Las comidas son las del catálogo compartido de [HU-003](HU-003-gestion-comidas.md). Una receta puede asociarse a ninguna, una o varias comidas; una comida puede tener ninguna, una o varias recetas. No se crea un catálogo de comidas independiente.
+Las comidas son las del catálogo de comidas de [HU-003](HU-003-gestion-comidas.md). Una receta puede asociarse a ninguna, una o varias comidas; una comida puede tener ninguna, una o varias recetas. No se crea un catálogo de comidas independiente.
 
 ## Criterios de aceptación
 

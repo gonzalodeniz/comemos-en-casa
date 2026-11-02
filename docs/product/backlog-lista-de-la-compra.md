@@ -20,6 +20,6 @@ Las historias pendientes están ordenadas de mayor a menor prioridad para dispon
 
 ## Completadas
 
-- **#7 · Hecha** — Como usuario, quiero crear categorías desde la interfaz, para organizar el catálogo común.
+- **#7 · Hecha** — Como usuario, quiero crear categorías desde la interfaz, para organizar el catálogo de categorías y productos.
 - **#8 · Hecha** — Como usuario, quiero crear productos dentro de una categoría desde la interfaz, para que todos podamos añadirlos a la compra.
 

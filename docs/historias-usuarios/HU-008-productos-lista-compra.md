@@ -9,12 +9,12 @@ Como usuario, quiero crear productos dentro de una categoría desde la interfaz,
 ## Criterios de aceptación
 
 - [ ] Dada una categoría existente y un usuario autenticado, cuando crea un producto indicando su nombre, entonces lo ve dentro de esa categoría.
-- [ ] Dado un producto creado, cuando otro usuario consulta esa categoría, entonces también puede verlo en el catálogo compartido.
+- [ ] Dado un producto creado, cuando otro usuario consulta esa categoría, entonces también puede verlo en el catálogo de productos.
 - [ ] Dado un nombre vacío o compuesto solo por espacios, cuando intenta guardar, entonces se muestra una validación y no se crea el producto.
 
 ## Plan
 
-- Incorporar productos asociados a categorías en el catálogo compartido.
+- Incorporar productos asociados a categorías en el catálogo de categorías y productos.
 - Permitir su creación y consulta a usuarios autenticados.
 - Mostrar los productos y el formulario de creación dentro de cada categoría.
 - Verificar creación, validación y visibilidad desde otra cuenta.

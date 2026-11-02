@@ -3,7 +3,7 @@
 ## Historia de usuario
 
 **Como** usuario autenticado,  
-**quiero** añadir, editar y eliminar comidas de un catálogo compartido mediante una interfaz visual clara y amigable,  
+**quiero** añadir, editar y eliminar comidas de un catálogo de comidas mediante una interfaz visual clara y amigable,
 **para** reutilizarlas en la planificación.
 
 ## Relación con la planificación existente

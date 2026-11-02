@@ -26,3 +26,8 @@ Añadir productos a la compra, cantidades y unidades (HU-001 de la lista de la c
 ## Siguiente paso
 
 El usuario invocará `/pair` manualmente para implementar esta historia refinada. No se inicia automáticamente.
+
+## Tareas antes del cierre
+
+- [ ] Refactorizar `backend/tests/test_meal_planning.py`.
+- [ ] Añadir comentarios en el código de todos los ficheros de la historia.

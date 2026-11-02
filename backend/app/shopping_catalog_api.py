@@ -64,3 +64,23 @@ async def create_product(
     db.commit()
     db.refresh(product)
     return {"id": str(product.id), "name": product.name}
+
+
+@router.get("/{category_id}/products")
+async def list_products(
+    category_id: UUID,
+    _session: ActiveSession = Depends(get_active_session),
+    db: Session = Depends(get_database_session),
+) -> dict[str, list[dict[str, str]]]:
+    if db.get(ShoppingCategory, category_id) is None:
+        raise HTTPException(status_code=404, detail="Category not found")
+    products = db.scalars(
+        select(ShoppingProduct)
+        .where(ShoppingProduct.category_id == category_id)
+        .order_by(ShoppingProduct.name)
+    ).all()
+    return {
+        "products": [
+            {"id": str(product.id), "name": product.name} for product in products
+        ]
+    }

@@ -4,7 +4,7 @@ MAILHOG_COMPOSE ?= $(COMPOSE) -f docker-compose.mailhog.yml
 PYTHON ?= ../.venv/bin/python
 NPM ?= npm
 
-.PHONY: help up down stop restart ps logs migrate mailhog-up mailhog-down mailhog-restart mailhog-status mailhog-logs test test-backend test-frontend build-frontend
+.PHONY: help up down stop restart ps logs alembic-current alembic-upgrade alembic-downgrade mailhog-up mailhog-down mailhog-restart mailhog-status mailhog-logs test test-backend test-frontend build-frontend
 
 ## Entorno
 help: ## Muestra los comandos agrupados por propósito.
@@ -48,8 +48,14 @@ mailhog-logs: ## Muestra los registros de MailHog en tiempo real.
 	$(MAILHOG_COMPOSE) logs -f
 
 ## Tareas de base de datos y aplicación
-migrate: ## Aplica las migraciones pendientes en el contenedor activo del backend.
+alembic-current: ## Muestra la versión de migración actual de la base de datos.
+	$(COMPOSE) exec -T backend python -m alembic current
+
+alembic-upgrade: ## Aplica todas las migraciones pendientes hasta la última versión.
 	$(COMPOSE) exec -T backend python -m alembic upgrade head
+
+alembic-downgrade: ## Retrocede una revisión de migración.
+	$(COMPOSE) exec -T backend python -m alembic downgrade -1
 
 ## Validación
 test: test-backend test-frontend ## Ejecuta las pruebas unitarias locales del backend y frontend.

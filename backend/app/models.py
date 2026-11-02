@@ -169,6 +169,16 @@ class ShoppingCategory(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
 
 
+class ShoppingProduct(Base):
+    __tablename__ = "shopping_products"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    category_id: Mapped[UUID] = mapped_column(
+        ForeignKey("shopping_categories.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
 class Recipe(Base):
     __tablename__ = "recipes"
     __table_args__ = (UniqueConstraint("title_canonical", name="uq_recipes_title_canonical"),)

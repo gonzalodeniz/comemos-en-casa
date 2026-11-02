@@ -1,4 +1,4 @@
-"""Create products for the shared shopping catalog.
+"""Crea la tabla de productos del catálogo compartido de la compra.
 
 Revision ID: 0009_shopping_products
 Revises: 0008_shopping_categories
@@ -13,6 +13,7 @@ depends_on = None
 
 
 def upgrade() -> None:
+    """Añade productos vinculados a categorías existentes."""
     op.create_table(
         "shopping_products",
         sa.Column("id", sa.Uuid(), nullable=False),
@@ -26,4 +27,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """Elimina la tabla de productos al revertir esta revisión."""
     op.drop_table("shopping_products")

@@ -7,6 +7,7 @@ import MealPlanning from "./MealPlanning";
 import FoodCatalog from "./FoodCatalog";
 import Recipes from "./Recipes";
 import ShoppingList from "./ShoppingList";
+// Conecta la vista de la compra con el catálogo compartido de categorías y productos.
 import { getShoppingCategories, createShoppingCategory, getShoppingProducts, createShoppingProduct, type ShoppingCategory } from "./mealPlanningApi";
 import AppWorkspace, { type AppView } from "./AppWorkspace";
 import AppBrand from "./AppBrand";

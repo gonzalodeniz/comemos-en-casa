@@ -63,6 +63,7 @@ def test_food_catalog_migration_follows_meal_planning_and_auth_migrations():
     assert script.get_revision("0006_food_catalog_images").down_revision == "0005_meal_planning"
     assert script.get_revision("0007_recipes").down_revision == "0006_food_catalog_images"
     assert script.get_revision("0008_shopping_categories").down_revision == "0007_recipes"
+    # Los productos se incorporan después de crear las categorías.
     assert script.get_revision("0009_shopping_products").down_revision == "0008_shopping_categories"
 
 

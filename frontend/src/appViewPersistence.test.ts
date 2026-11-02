@@ -1,3 +1,4 @@
+// Comprueba la persistencia de la vista seleccionada.
 import { describe, expect, it } from "vitest";
 import { persistAppView, restoreAppView } from "./appViewPersistence";
 

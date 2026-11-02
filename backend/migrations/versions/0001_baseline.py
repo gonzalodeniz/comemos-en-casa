@@ -1,3 +1,4 @@
+# Establece el punto inicial del historial de migraciones.
 """Record the initial schema baseline without creating business tables.
 
 Revision ID: 0001_baseline

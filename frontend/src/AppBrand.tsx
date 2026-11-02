@@ -1,3 +1,4 @@
+// Presenta la identidad visual de la aplicación.
 export default function AppBrand() {
   return (
     <div className="app-brand">

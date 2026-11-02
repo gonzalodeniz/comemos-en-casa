@@ -1,3 +1,4 @@
+# Verifica la publicación, inspección y limpieza de imágenes de alimentos.
 import asyncio
 
 import pytest

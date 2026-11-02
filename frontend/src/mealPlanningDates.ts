@@ -1,3 +1,4 @@
+// Agrupa los cálculos de fechas usados en la planificación semanal.
 export type CalendarDate = `${number}-${string}-${string}`;
 export type CalendarView = "week" | "month";
 

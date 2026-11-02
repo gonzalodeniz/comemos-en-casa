@@ -1,3 +1,4 @@
+// Presenta y administra la planificación semanal de comidas.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { ApiError } from "./api";
 import AppIcon from "./AppIcon";

@@ -1,3 +1,4 @@
+// Verifica las peticiones del cliente de planificación y catálogos.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   applyMealPlanning,

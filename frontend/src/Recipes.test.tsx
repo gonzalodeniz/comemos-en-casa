@@ -1,3 +1,4 @@
+// Verifica los componentes del catálogo de recetas.
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { linkifyRecipeText } from "./Recipes";

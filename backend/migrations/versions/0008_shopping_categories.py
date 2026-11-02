@@ -1,3 +1,4 @@
+# Crea las categorías del catálogo compartido de compra.
 """Create shopping categories.
 
 Revision ID: 0008_shopping_categories

@@ -1,3 +1,4 @@
+// Verifica los componentes del catálogo de alimentos.
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { FoodCard, filterAndSortFoods } from "./FoodCatalog";

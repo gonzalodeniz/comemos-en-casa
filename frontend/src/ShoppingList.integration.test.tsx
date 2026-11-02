@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+// Comprueba los flujos de la lista de compra desde la interfaz con la API simulada.
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -53,6 +54,7 @@ describe("shopping list integration", () => {
     expect(JSON.parse(String(init?.body))).toEqual({ name: "Verduras" });
   });
 
+  // Simula la API para verificar el formulario, la petición y el producto visible.
   it("creates a product from its category", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -76,6 +78,7 @@ describe("shopping list integration", () => {
     expect(JSON.parse(String(init?.body))).toEqual({ name: "Manzanas" });
   });
 
+  // Comprueba que un error de la API se muestra y permite reintentar el envío.
   it("shows an error and preserves the product name when creation fails", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);

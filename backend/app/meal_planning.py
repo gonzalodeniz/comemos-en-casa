@@ -1,3 +1,4 @@
+# Calcula las fechas y operaciones de la planificación de comidas.
 """Pure date calculations for meal-planning operations."""
 
 from datetime import date, datetime, timedelta

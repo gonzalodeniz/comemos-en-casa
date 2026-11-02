@@ -1,3 +1,4 @@
+// Verifica la navegación y composición del espacio de trabajo.
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import AppWorkspace, { type AppView } from "./AppWorkspace";

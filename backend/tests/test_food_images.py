@@ -1,3 +1,4 @@
+# Comprueba el procesamiento y almacenamiento de imágenes de alimentos.
 import base64
 import io
 import stat

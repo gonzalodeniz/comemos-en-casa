@@ -1,3 +1,4 @@
+// Guarda y recupera la vista activa de la aplicación.
 import type { AppView } from "./AppWorkspace";
 
 const STORAGE_KEY = "comemos-en-casa:workspace-view";

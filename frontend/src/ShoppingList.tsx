@@ -1,3 +1,4 @@
+// Presenta categorías y productos del catálogo compartido de compra.
 import { useEffect, useState, type FormEvent } from "react";
 import type { ShoppingProduct } from "./mealPlanningApi";
 
@@ -10,12 +11,14 @@ type Props = {
   onCreateProduct: (categoryId: string, name: string) => Promise<ShoppingProduct>;
 };
 
+/** Presenta las categorías y permite consultar y crear sus productos. */
 export default function ShoppingList({ categories, onCreateCategory, onGetProducts, onCreateProduct }: Props) {
   const [name, setName] = useState("");
   const [products, setProducts] = useState<Record<string, ShoppingProduct[]>>({});
   const [productNames, setProductNames] = useState<Record<string, string>>({});
   const [productErrors, setProductErrors] = useState<Record<string, string>>({});
 
+  // Carga el catálogo de productos cuando cambia la lista de categorías.
   useEffect(() => {
     categories.forEach((category) => {
       void onGetProducts(category.id).then((items) => {

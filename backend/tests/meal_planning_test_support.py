@@ -1,3 +1,4 @@
+# Reúne las utilidades de base de datos y peticiones utilizadas por las pruebas de planificación.
 import asyncio
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4

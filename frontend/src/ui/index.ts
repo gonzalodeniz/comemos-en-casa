@@ -1,3 +1,4 @@
+// Exporta los componentes compartidos de interfaz.
 export { default as Button } from "./Button";
 export type { ButtonProps, ButtonVariant } from "./Button";
 export { default as Field } from "./Field";

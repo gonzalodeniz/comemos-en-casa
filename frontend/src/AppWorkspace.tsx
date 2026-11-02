@@ -1,3 +1,4 @@
+// Organiza la navegación y las vistas del espacio de trabajo.
 import { useState, type ReactNode } from "react";
 import AppBrand from "./AppBrand";
 import AppIcon from "./AppIcon";

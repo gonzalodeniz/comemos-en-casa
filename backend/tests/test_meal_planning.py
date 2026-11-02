@@ -1,3 +1,4 @@
+# Comprueba las consultas y operaciones de planificación de comidas.
 from datetime import date
 from uuid import uuid4
 

@@ -1,3 +1,4 @@
+// Comprueba la representación de los componentes compartidos de interfaz.
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { Button, Field, Message, Panel } from "./index";

@@ -1,3 +1,4 @@
+# Crea las tablas de planificación compartida y sus datos iniciales.
 """Create shared meal-planning tables and seed default food labels.
 
 Revision ID: 0005_meal_planning

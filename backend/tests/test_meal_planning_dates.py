@@ -1,3 +1,4 @@
+# Verifica los cálculos de fechas de la planificación.
 from datetime import date
 
 import pytest

@@ -1,3 +1,4 @@
+# Comprueba categorías y productos del catálogo compartido de compra.
 from sqlalchemy import create_engine, select
 
 
@@ -13,6 +14,7 @@ def test_authenticated_user_can_create_category(meal_database):
     assert response.json()["name"] == "Verduras"
 
 def test_create_product_in_category(meal_database):
+    """Comprueba la creación autenticada de un producto en una categoría."""
     cookies = authenticate(meal_database)
     category = post_with_session(
         "/api/v1/shopping-categories", {"name": "Verduras"}, cookies
@@ -28,6 +30,7 @@ def test_create_product_in_category(meal_database):
     assert response.json() == {"id": response.json()["id"], "name": "Manzanas"}
 
 def test_product_is_visible_to_another_user(meal_database):
+    """Comprueba que el producto creado forma parte del catálogo compartido."""
     creator = authenticate(meal_database)
     other_user = authenticate(meal_database)
     category = post_with_session(
@@ -48,6 +51,7 @@ def test_product_is_visible_to_another_user(meal_database):
     assert response.json()["products"] == [created.json()]
 
 def test_create_product_rejects_blank_name(meal_database):
+    """Comprueba que un nombre compuesto solo por espacios se rechaza."""
     cookies = authenticate(meal_database)
     category = post_with_session(
         "/api/v1/shopping-categories", {"name": "Verduras"}, cookies

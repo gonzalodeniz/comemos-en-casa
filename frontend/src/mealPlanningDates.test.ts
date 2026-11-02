@@ -1,3 +1,4 @@
+// Comprueba los cálculos de fechas usados en la planificación.
 import { describe, expect, it } from "vitest";
 import {
   addCalendarDays,

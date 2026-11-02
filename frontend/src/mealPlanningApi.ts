@@ -1,3 +1,4 @@
+// Define las peticiones HTTP de planificación, recetas y catálogos.
 import { apiRequest } from "./api";
 
 export type FoodLabel = { id: string; code: string; name: string; image_url?: string | null; recipe_count?: number };
@@ -12,10 +13,12 @@ export function createShoppingCategory(name: string, csrfToken: string): Promise
   return apiRequest("/shopping-categories", { method: "POST", csrfToken, body: { name } });
 }
 
+/** Consulta los productos compartidos de una categoría. */
 export function getShoppingProducts(categoryId: string): Promise<{ products: ShoppingProduct[] }> {
   return apiRequest(`/shopping-categories/${categoryId}/products`);
 }
 
+/** Crea un producto en la categoría usando la protección CSRF de la sesión. */
 export function createShoppingProduct(categoryId: string, name: string, csrfToken: string): Promise<ShoppingProduct> {
   return apiRequest(`/shopping-categories/${categoryId}/products`, { method: "POST", csrfToken, body: { name } });
 }

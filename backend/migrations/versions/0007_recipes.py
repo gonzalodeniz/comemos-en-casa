@@ -1,3 +1,4 @@
+# Crea las tablas de recetas y sus asociaciones con alimentos.
 """Create recipes and food associations.
 
 Revision ID: 0007_recipes

@@ -170,6 +170,8 @@ class ShoppingCategory(Base):
 
 
 class ShoppingProduct(Base):
+    """Representa un producto compartido asociado a una categoría de compra."""
+
     __tablename__ = "shopping_products"
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)

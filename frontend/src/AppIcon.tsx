@@ -1,3 +1,4 @@
+// Presenta los iconos utilizados por las vistas de la aplicación.
 type IconName = "calendar" | "repeat" | "users" | "chevron-left" | "chevron-right" | "plus" | "logout" | "utensils" | "menu" | "edit" | "trash" | "eye" | "shopping-cart";
 
 const paths: Record<IconName, string> = {

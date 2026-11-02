@@ -1,3 +1,4 @@
+# Expone las operaciones autenticadas de planificación y catálogo de alimentos.
 """Authenticated read and write endpoints for meal planning."""
 
 import asyncio

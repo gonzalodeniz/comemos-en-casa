@@ -1,3 +1,4 @@
+# Expone el catálogo compartido de categorías y productos de compra.
 """Authenticated API for the shared shopping catalog."""
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -29,6 +30,7 @@ async def create_category(
     session: ActiveSession = Depends(get_active_session),
     db: Session = Depends(get_database_session),
 ) -> dict[str, str]:
+    # Crea una categoría en el catálogo compartido.
     require_csrf(request, session)
     name = payload.get("name", "").strip()
     if set(payload) != {"name"} or not name:
@@ -52,6 +54,7 @@ async def create_product(
     session: ActiveSession = Depends(get_active_session),
     db: Session = Depends(get_database_session),
 ) -> dict[str, str]:
+    # Crea un producto en una categoría existente del catálogo compartido.
     require_csrf(request, session)
     name = payload.get("name", "").strip()
     if set(payload) != {"name"} or not name:
@@ -72,6 +75,7 @@ async def list_products(
     _session: ActiveSession = Depends(get_active_session),
     db: Session = Depends(get_database_session),
 ) -> dict[str, list[dict[str, str]]]:
+    # Devuelve los productos de una categoría a un usuario autenticado.
     if db.get(ShoppingCategory, category_id) is None:
         raise HTTPException(status_code=404, detail="Category not found")
     products = db.scalars(

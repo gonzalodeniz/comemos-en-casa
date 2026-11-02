@@ -1,3 +1,4 @@
+# Expone las operaciones del catálogo compartido de recetas.
 """Shared recipe catalog API."""
 import hashlib, os, shutil, unicodedata
 from pathlib import Path

@@ -1,9 +1,11 @@
+// Verifica la representación del catálogo de la compra.
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import ShoppingList from "./ShoppingList";
 
 describe("ShoppingList", () => {
   it("shows saved categories and a category creation form", () => {
+    // La representación estática necesita callbacks, pero no ejecuta la carga de productos.
     const markup = renderToStaticMarkup(
       <ShoppingList
         categories={[{ id: "1", name: "Verduras" }]}

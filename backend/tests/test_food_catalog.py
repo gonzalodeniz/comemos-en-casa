@@ -1,3 +1,4 @@
+# Comprueba las operaciones y validaciones del catálogo de alimentos.
 from datetime import date
 from uuid import UUID
 

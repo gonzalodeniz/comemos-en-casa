@@ -487,6 +487,22 @@ def test_authenticated_user_can_create_category(meal_database):
     assert response.json()["name"] == "Verduras"
 
 
+def test_create_product_in_category(meal_database):
+    cookies = authenticate(meal_database)
+    category = post_with_session(
+        "/api/v1/shopping-categories", {"name": "Verduras"}, cookies
+    )
+
+    response = post_with_session(
+        f"/api/v1/shopping-categories/{category.json()['id']}/products",
+        {"name": "Manzanas"},
+        cookies,
+    )
+
+    assert response.status_code == 201
+    assert response.json() == {"id": response.json()["id"], "name": "Manzanas"}
+
+
 def test_another_authenticated_user_can_list_created_category(meal_database):
     creator = authenticate(meal_database)
     other_user = authenticate(meal_database)

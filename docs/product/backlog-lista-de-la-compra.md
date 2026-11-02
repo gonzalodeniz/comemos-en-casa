@@ -8,7 +8,7 @@ Estados: `Pendiente`, `En curso`, `Hecha`.
 
 Las historias pendientes están ordenadas de mayor a menor prioridad para disponer cuanto antes de una lista básica y funcional. Los números identifican las historias y no indican su prioridad.
 
-- **#8 · Pendiente** — Como usuario, quiero crear productos dentro de una categoría desde la interfaz, para que todos podamos añadirlos a la compra.
+- **#8 · Hecha** — Como usuario, quiero crear productos dentro de una categoría desde la interfaz, para que todos podamos añadirlos a la compra.
 - **#1 · Pendiente** — Como usuario, quiero añadir productos por categoría indicando unidades o peso y verlos en la lista compartida, para registrar lo que necesitamos comprar.
 - **#2 · Pendiente** — Como usuario, quiero marcar productos pendientes como comprados y verlos en una sección inferior, para distinguir lo que falta comprar. Requiere: #1.
 - **#3 · Pendiente** — Como usuario, quiero desmarcar productos comprados y devolverlos a pendientes, para corregir marcados o volver a comprarlos. Requiere: #2.

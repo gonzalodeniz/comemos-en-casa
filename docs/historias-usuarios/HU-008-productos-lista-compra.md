@@ -1,6 +1,6 @@
 # HU-008 — Crear productos dentro de una categoría
 
-**Estado:** pendiente.
+**Estado:** completada.
 
 ## Historia de usuario
 
@@ -29,5 +29,6 @@ El usuario invocará `/pair` manualmente para implementar esta historia refinada
 
 ## Tareas antes del cierre
 
-- [ ] Refactorizar `backend/tests/test_meal_planning.py`.
-- [ ] Añadir comentarios en el código de todos los ficheros de la historia.
+- [x] Refactorizar `backend/tests/test_meal_planning.py`.
+- [x] Añadir comentarios en español al código relacionado con las historias.
+- [x] Verificar manualmente la creación de productos desde la lista de la compra.

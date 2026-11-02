@@ -524,6 +524,22 @@ def test_product_is_visible_to_another_user(meal_database):
     assert response.json()["products"] == [created.json()]
 
 
+def test_create_product_rejects_blank_name(meal_database):
+    cookies = authenticate(meal_database)
+    category = post_with_session(
+        "/api/v1/shopping-categories", {"name": "Verduras"}, cookies
+    )
+
+    response = post_with_session(
+        f"/api/v1/shopping-categories/{category.json()['id']}/products",
+        {"name": "   "},
+        cookies,
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Invalid product"
+
+
 def test_another_authenticated_user_can_list_created_category(meal_database):
     creator = authenticate(meal_database)
     other_user = authenticate(meal_database)

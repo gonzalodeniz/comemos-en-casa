@@ -20,6 +20,10 @@ Run database integration tests only against a fresh, isolated Compose project/da
 
 Follow the existing Python, TypeScript, and React patterns. Use clear descriptive names; React components use PascalCase, Python modules and functions use snake_case, and tests use `test_*.py` or `*.test.tsx`. Keep configuration and secrets out of source control; use environment variables for local database credentials. There is no repository-wide formatter or linter command currently documented, so avoid introducing one without updating project guidance.
 
+Siempre que sea posible, escribe el código en español, incluidos los nombres de variables, funciones, métodos, clases, módulos y archivos. Conserva en su idioma original los nombres exigidos por bibliotecas, protocolos, contratos públicos o convenciones existentes cuando traducirlos pueda romper la compatibilidad o la coherencia.
+
+Add a brief Spanish comment explaining the purpose of every new function, method, class, or other declaration written in a file. For especially important or complex functions and classes, the comment may be more detailed.
+
 ## Testing Guidelines
 
 Add or update focused tests alongside the code they cover. Backend tests use pytest; frontend tests use Vitest. Run the relevant suite and frontend production build before submitting. Integration tests require PostgreSQL and must verify migration behavior on an isolated database.

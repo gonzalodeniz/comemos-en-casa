@@ -45,6 +45,7 @@ async def add_shopping_list_item(
         select(ShoppingListItem).where(
             ShoppingListItem.product_id == payload.product_id,
             ShoppingListItem.unit == unit,
+            ShoppingListItem.purchased.is_(False),
         )
     )
     if item is None:
@@ -99,7 +100,19 @@ async def mark_shopping_list_item_as_purchased(
     item = db.get(ShoppingListItem, item_id)
     if item is None:
         raise HTTPException(status_code=404, detail="Shopping list item not found")
-    item.purchased = True
+    purchased_item = db.scalar(
+        select(ShoppingListItem).where(
+            ShoppingListItem.product_id == item.product_id,
+            ShoppingListItem.unit == item.unit,
+            ShoppingListItem.purchased.is_(True),
+        )
+    )
+    if purchased_item is not None:
+        purchased_item.quantity += item.quantity
+        db.delete(item)
+        item = purchased_item
+    else:
+        item.purchased = True
     db.commit()
     return {
         "id": str(item.id),

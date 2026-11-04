@@ -315,6 +315,127 @@ describe("shopping list integration", () => {
     expect(lista.querySelectorAll("li")).toHaveLength(1);
   });
 
+  // Comprueba que el estado comprado se recupera del servidor al volver a abrir la lista.
+  it("mantiene_el_estado_comprado_al_recargar_la_lista", async () => {
+    const item = { id: "item-1", product_id: "product-1", quantity: 3, unit: "unit" };
+    let comprado = false;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
+      if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Fruta" }] }), { status: 200 });
+      if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [{ id: "product-1", name: "Manzanas" }] }), { status: 200 });
+      if (url.endsWith("/item-1/purchase") && init?.method === "POST") {
+        comprado = true;
+        return new Response(JSON.stringify(item), { status: 200 });
+      }
+      if (url.endsWith("/shopping-list")) return new Response(JSON.stringify({ items: comprado ? [] : [item], purchased_items: comprado ? [item] : [] }), { status: 200 });
+      return new Response(JSON.stringify({}), { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await screen.findByRole("button", { name: "Marcar Manzanas como comprado" }));
+    await user.click(screen.getByRole("button", { name: "Plan semanal" }));
+    await user.click(screen.getByRole("button", { name: "Lista de la compra" }));
+
+    const lista = await screen.findByRole("region", { name: "Lista de la compra" });
+    await waitFor(() => expect(lista.textContent).toContain("Comprados"));
+    expect(lista.textContent).toContain("Manzanas: 3 unidad");
+    expect(lista.textContent!.indexOf("Pendientes")).toBeLessThan(lista.textContent!.indexOf("Comprados"));
+    expect(lista.querySelectorAll("li")).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([url, init]) => String(url).endsWith("/shopping-list") && init?.method !== "POST")).toHaveLength(2);
+  });
+
+  // Comprueba que volver a añadir un producto comprado crea una entrada pendiente distinta.
+  it("vuelve_a_anadir_un_producto_comprado_como_entrada_pendiente", async () => {
+    const comprado = { id: "item-bought", product_id: "product-1", quantity: 3, unit: "unit" };
+    const pendiente = { id: "item-pending", product_id: "product-1", quantity: 2, unit: "unit" };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
+      if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Fruta" }] }), { status: 200 });
+      if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [{ id: "product-1", name: "Manzanas" }] }), { status: 200 });
+      if (url.endsWith("/shopping-list") && init?.method === "POST") return new Response(JSON.stringify(pendiente), { status: 201 });
+      if (url.endsWith("/shopping-list")) return new Response(JSON.stringify({ items: [], purchased_items: [comprado] }), { status: 200 });
+      return new Response(JSON.stringify({}), { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.type(await screen.findByLabelText("Cantidad de Manzanas"), "2");
+    await user.click(screen.getByRole("button", { name: "Añadir Manzanas a la lista" }));
+
+    const lista = screen.getByRole("region", { name: "Lista de la compra" });
+    await waitFor(() => expect(lista.querySelectorAll("li")).toHaveLength(2));
+    expect(lista.textContent).toContain("Pendientes");
+    expect(lista.textContent).toContain("Comprados");
+    expect(lista.textContent).toContain("Manzanas: 2 unidad");
+    expect(lista.textContent).toContain("Manzanas: 3 unidad");
+    const [, request] = fetchMock.mock.calls.find(([url, options]) => String(url).endsWith("/shopping-list") && options?.method === "POST")!;
+    expect(JSON.parse(String(request?.body))).toEqual({ product_id: "product-1", quantity: 2, unit: "unit" });
+  });
+
+  // Comprueba que al marcar desde la interfaz se refleja la fusión devuelta por la API.
+  it("fusiona_cantidades_compradas_compatibles_al_marcar", async () => {
+    const comprado = { id: "item-bought", product_id: "product-1", quantity: 3, unit: "unit" };
+    const pendiente = { id: "item-pending", product_id: "product-1", quantity: 2, unit: "unit" };
+    const fusionado = { ...comprado, quantity: 5 };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
+      if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Fruta" }] }), { status: 200 });
+      if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [{ id: "product-1", name: "Manzanas" }] }), { status: 200 });
+      if (url.endsWith("/item-pending/purchase") && init?.method === "POST") return new Response(JSON.stringify(fusionado), { status: 200 });
+      if (url.endsWith("/shopping-list")) return new Response(JSON.stringify({ items: [pendiente], purchased_items: [comprado] }), { status: 200 });
+      return new Response(JSON.stringify({}), { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await screen.findByRole("button", { name: "Marcar Manzanas como comprado" }));
+
+    const lista = screen.getByRole("region", { name: "Lista de la compra" });
+    expect(lista.textContent).toContain("Manzanas: 5 unidad");
+    expect(lista.querySelectorAll("li")).toHaveLength(1);
+    expect(lista.querySelector("h4")?.textContent).toBe("Pendientes");
+    expect(lista.textContent!.indexOf("Pendientes")).toBeLessThan(lista.textContent!.indexOf("Comprados"));
+    expect(fetchMock.mock.calls.some(([url, init]) => String(url).endsWith("/item-pending/purchase") && init?.method === "POST")).toBe(true);
+  });
+
+  // Comprueba que unidades incompatibles continúan como entradas compradas distintas.
+  it("mantiene_separadas_las_medidas_incompatibles_al_marcar", async () => {
+    const comprado = { id: "item-bought", product_id: "product-1", quantity: 3, unit: "unit" };
+    const pendiente = { id: "item-pending", product_id: "product-1", quantity: 500, unit: "g" };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
+      if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Fruta" }] }), { status: 200 });
+      if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [{ id: "product-1", name: "Manzanas" }] }), { status: 200 });
+      if (url.endsWith("/item-pending/purchase") && init?.method === "POST") return new Response(JSON.stringify(pendiente), { status: 200 });
+      if (url.endsWith("/shopping-list")) return new Response(JSON.stringify({ items: [pendiente], purchased_items: [comprado] }), { status: 200 });
+      return new Response(JSON.stringify({}), { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await screen.findByRole("button", { name: "Marcar Manzanas como comprado" }));
+
+    const lista = screen.getByRole("region", { name: "Lista de la compra" });
+    await waitFor(() => expect(lista.querySelectorAll("li")).toHaveLength(2));
+    expect(lista.textContent).toContain("Manzanas: 3 unidad");
+    expect(lista.textContent).toContain("Manzanas: 500 g");
+    expect(lista.querySelector("h4")?.textContent).toBe("Pendientes");
+    expect(lista.textContent!.indexOf("Pendientes")).toBeLessThan(lista.textContent!.indexOf("Comprados"));
+  });
+
   // Comprueba que los fallos al consultar productos se comunican en la categoría correspondiente.
   it("shows an error when loading products fails", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {

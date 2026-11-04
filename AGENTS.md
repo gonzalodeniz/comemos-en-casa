@@ -35,3 +35,10 @@ Recent history uses Conventional Commit-style prefixes such as `docs:`, `fix:`, 
 ## Python test environment
 
 Run backend pytest commands with the repository virtual environment: `.venv/bin/python -m pytest ...` from the repository root, or `../.venv/bin/python -m pytest ...` from `backend/`.
+
+### Pruebas y sandbox
+
+- No ejecutes `make test`, `make test-backend` ni pruebas backend que utilicen `TestClient` dentro del sandbox. Solicita su ejecución fuera del sandbox mediante el mecanismo de aprobación del entorno.
+- Causa verificada: el sandbox bloquea con `EPERM` el envío por el socket local que asyncio utiliza para despertar su bucle desde otro hilo. AnyIO/TestClient queda esperando sin mostrar progreso; no es un fallo demostrado de la aplicación.
+- Si la ejecución fuera del sandbox no está autorizada o disponible, informa de la limitación. No repitas ejecuciones bloqueadas, no omitas pruebas ni modifiques asyncio/AnyIO para eludir la restricción.
+- Las pruebas frontend (`make test-frontend`) pueden ejecutarse dentro del sandbox.

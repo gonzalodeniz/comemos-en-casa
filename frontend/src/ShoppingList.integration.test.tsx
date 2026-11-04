@@ -285,6 +285,36 @@ describe("shopping list integration", () => {
     expect((input as HTMLInputElement).value).toBe("Manzanas");
   });
 
+  // Comprueba que una entrada pendiente se puede marcar desde la interfaz.
+  it("marca_un_producto_como_comprado_y_lo_mueve_a_la_seccion_inferior", async () => {
+    const item = { id: "item-1", product_id: "product-1", quantity: 3, unit: "unit" };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
+      if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Fruta" }] }), { status: 200 });
+      if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [{ id: "product-1", name: "Manzanas" }] }), { status: 200 });
+      if (url.endsWith("/item-1/purchase") && init?.method === "POST") return new Response(JSON.stringify(item), { status: 200 });
+      if (url.endsWith("/shopping-list")) return new Response(JSON.stringify({ items: [item], purchased_items: [] }), { status: 200 });
+      return new Response(JSON.stringify({}), { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+
+    await user.click(await screen.findByRole("button", { name: "Marcar Manzanas como comprado" }));
+
+    const [, init] = fetchMock.mock.calls.find(([url, options]) => String(url).endsWith("/item-1/purchase") && options?.method === "POST")!;
+    expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-1");
+    const lista = screen.getByRole("region", { name: "Lista de la compra" });
+    expect(lista.textContent).toContain("Pendientes");
+    expect(lista.textContent).toContain("Comprados");
+    expect(lista.textContent!.indexOf("Pendientes")).toBeLessThan(lista.textContent!.indexOf("Comprados"));
+    expect(lista.textContent).toContain("Manzanas: 3 unidad");
+    expect(lista.querySelectorAll("li")).toHaveLength(1);
+  });
+
   // Comprueba que los fallos al consultar productos se comunican en la categoría correspondiente.
   it("shows an error when loading products fails", async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {

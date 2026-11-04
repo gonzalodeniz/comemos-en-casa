@@ -96,7 +96,7 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
     <section aria-label="Lista de la compra"><h3>Lista de la compra</h3>
       {errorListaCompra && <p role="alert">{errorListaCompra}</p>}
       <ul>{Object.values(listaCompra).map((item) => <li key={`${item.product_id}:${item.unit}`}>
-        {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id}: {item.quantity} {item.unit}
+        {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id}: {item.quantity} {item.unit === "unit" ? "unidad" : item.unit}
       </li>)}</ul>
     </section>
   </section>;

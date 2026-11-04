@@ -62,7 +62,7 @@ describe("shopping list integration", () => {
     expect(JSON.parse(String(llamadas[0]?.[1]?.body))).toEqual({ product_id: "product-1", quantity: 2, unit: "unit" });
     expect(JSON.parse(String(llamadas[1]?.[1]?.body))).toEqual({ product_id: "product-1", quantity: 500, unit: "g" });
     const lista = screen.getByRole("region", { name: "Lista de la compra" });
-    await waitFor(() => expect(lista.textContent).toContain("Manzanas: 2 unit"));
+    await waitFor(() => expect(lista.textContent).toContain("Manzanas: 2 unidad"));
     expect(lista.textContent).toContain("Manzanas: 500 g");
     expect(lista.querySelectorAll("li")).toHaveLength(2);
   });
@@ -99,7 +99,7 @@ describe("shopping list integration", () => {
     expect(JSON.parse(String(llamadas[0]?.[1]?.body))).toEqual({ product_id: "product-1", quantity: 2, unit: "unit" });
     expect(JSON.parse(String(llamadas[1]?.[1]?.body))).toEqual({ product_id: "product-1", quantity: 3, unit: "unit" });
     const lista = screen.getByRole("region", { name: "Lista de la compra" });
-    await waitFor(() => expect(lista.textContent).toContain("Manzanas: 5 unit"));
+    await waitFor(() => expect(lista.textContent).toContain("Manzanas: 5 unidad"));
     expect(lista.querySelectorAll("li")).toHaveLength(1);
   });
 

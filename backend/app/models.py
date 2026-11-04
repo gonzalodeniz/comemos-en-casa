@@ -4,6 +4,7 @@ Las restricciones e índices respaldan invariantes de cuentas, planificación, r
 """
 
 from datetime import date, datetime
+from decimal import Decimal
 from uuid import UUID, uuid4
 import unicodedata
 
@@ -14,6 +15,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -160,6 +162,38 @@ class FoodLabel(Base):
         ).casefold(),
     )
     image_path: Mapped[str | None] = mapped_column(String(255))
+
+
+class ShoppingCategory(Base):
+    __tablename__ = "shopping_categories"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class ShoppingProduct(Base):
+    """Representa un producto compartido asociado a una categoría de compra."""
+
+    __tablename__ = "shopping_products"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    category_id: Mapped[UUID] = mapped_column(
+        ForeignKey("shopping_categories.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+
+
+class ShoppingListItem(Base):
+    """Representa un producto añadido a la lista con cantidad y unidad."""
+
+    __tablename__ = "shopping_list_items"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    product_id: Mapped[UUID] = mapped_column(
+        ForeignKey("shopping_products.id", ondelete="CASCADE"), nullable=False
+    )
+    quantity: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
+    unit: Mapped[str] = mapped_column(String(32), nullable=False)
 
 
 class Recipe(Base):

@@ -1,3 +1,4 @@
+// Comprueba la persistencia de la vista seleccionada.
 import { describe, expect, it } from "vitest";
 import { persistAppView, restoreAppView } from "./appViewPersistence";
 
@@ -17,6 +18,10 @@ function storageWith(value: string | null = null): Storage {
 describe("workspace view persistence", () => {
   it("restores the saved food catalog view", () => {
     expect(restoreAppView(storageWith("food-catalog"))).toBe("food-catalog");
+  });
+
+  it("restores the saved shopping list view", () => {
+    expect(restoreAppView(storageWith("shopping-list"))).toBe("shopping-list");
   });
 
   it("falls back to meal planning for an invalid stored value", () => {

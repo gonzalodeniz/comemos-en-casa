@@ -1,3 +1,4 @@
+// Presenta un botón reutilizable con estilos de la aplicación.
 import type { ButtonHTMLAttributes } from "react";
 
 export type ButtonVariant = "primary" | "secondary" | "danger" | "link";

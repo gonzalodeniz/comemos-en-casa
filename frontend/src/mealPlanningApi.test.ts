@@ -1,3 +1,4 @@
+// Verifica las peticiones del cliente de planificación y catálogos.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   applyMealPlanning,
@@ -18,6 +19,38 @@ const operation: MealPlanningOperation = {
 };
 
 describe("meal planning API client", () => {
+  // Comprueba que se consulta la lista de la compra con el cliente autenticado.
+  it("carga_lista_de_la_compra_con_sus_productos", async () => {
+    const response = { items: [{ product_id: "product-1", quantity: 1500, unit: "g" }] };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(response), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { obtenerListaCompra } = await import("./mealPlanningApi");
+    await expect(obtenerListaCompra()).resolves.toEqual(response);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/v1/shopping-list");
+    expect(init.method).toBe("GET");
+    expect(init.credentials).toBe("include");
+  });
+
+  // Comprueba que se añade un producto a la lista con CSRF y se devuelve el total agregado.
+  it("agrega_producto_a_la_lista_con_csrf_y_medida", async () => {
+    const response = { product_id: "product-1", quantity: 1500, unit: "g" };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(response), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { agregarProductoListaCompra } = await import("./mealPlanningApi");
+    await expect(agregarProductoListaCompra("product-1", 1.5, "kg", "csrf-1")).resolves.toEqual(response);
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/v1/shopping-list");
+    expect(init.method).toBe("POST");
+    expect(init.credentials).toBe("include");
+    expect(new Headers(init.headers).get("X-CSRF-Token")).toBe("csrf-1");
+    expect(JSON.parse(String(init.body))).toEqual({ product_id: "product-1", quantity: 1.5, unit: "kg" });
+  });
+
   it("loads the food-label catalog using the shared authenticated client", async () => {
     const response = { labels: [{ id: "label-1", code: "fish", name: "Fish" }] };
     const fetchMock = vi.fn().mockResolvedValue(
@@ -31,6 +64,25 @@ describe("meal planning API client", () => {
     expect(url).toContain("/api/v1/food-labels");
     expect(init.method).toBe("GET");
     expect(init.credentials).toBe("include");
+  });
+
+  it("loads and creates shopping categories through the shared API", async () => {
+    const response = { categories: [{ id: "category-1", name: "Verduras" }] };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(response), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(response.categories[0]), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { getShoppingCategories, createShoppingCategory } = await import("./mealPlanningApi");
+    await expect(getShoppingCategories()).resolves.toEqual(response);
+    await expect(createShoppingCategory("Verduras", "csrf-1")).resolves.toEqual(response.categories[0]);
+
+    expect(fetchMock.mock.calls[0]?.[0]).toContain("/api/v1/shopping-categories");
+    const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(url).toContain("/api/v1/shopping-categories");
+    expect(init.method).toBe("POST");
+    expect(new Headers(init.headers).get("X-CSRF-Token")).toBe("csrf-1");
+    expect(JSON.parse(String(init.body))).toEqual({ name: "Verduras" });
   });
 
   it("requests an inclusive planning range with encoded calendar-date parameters", async () => {

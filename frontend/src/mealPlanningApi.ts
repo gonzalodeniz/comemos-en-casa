@@ -1,6 +1,40 @@
+// Define las peticiones HTTP de planificación, recetas y catálogos.
 import { apiRequest } from "./api";
 
 export type FoodLabel = { id: string; code: string; name: string; image_url?: string | null; recipe_count?: number };
+export type ShoppingCategory = { id: string; name: string };
+export type ShoppingProduct = { id: string; name: string };
+// Representa un producto agregado a la lista de la compra.
+export type ShoppingListItem = { product_id: string; quantity: number; unit: string };
+
+/** Consulta los productos y cantidades de la lista de la compra. */
+export function obtenerListaCompra(): Promise<{ items: ShoppingListItem[] }> {
+  return apiRequest("/shopping-list");
+}
+
+export function getShoppingCategories(): Promise<{ categories: ShoppingCategory[] }> {
+  return apiRequest("/shopping-categories");
+}
+
+export function createShoppingCategory(name: string, csrfToken: string): Promise<ShoppingCategory> {
+  return apiRequest("/shopping-categories", { method: "POST", csrfToken, body: { name } });
+}
+
+/** Consulta los productos compartidos de una categoría. */
+export function getShoppingProducts(categoryId: string): Promise<{ products: ShoppingProduct[] }> {
+  return apiRequest(`/shopping-categories/${categoryId}/products`);
+}
+
+/** Crea un producto en la categoría usando la protección CSRF de la sesión. */
+export function createShoppingProduct(categoryId: string, name: string, csrfToken: string): Promise<ShoppingProduct> {
+  return apiRequest(`/shopping-categories/${categoryId}/products`, { method: "POST", csrfToken, body: { name } });
+}
+
+/** Añade un producto a la lista y devuelve su cantidad agregada. */
+export function agregarProductoListaCompra(productId: string, quantity: number, unit: string, csrfToken: string): Promise<ShoppingListItem> {
+  return apiRequest("/shopping-list", { method: "POST", csrfToken, body: { product_id: productId, quantity, unit } });
+}
+
 export type MealSlot = "lunch" | "dinner";
 export type MealAssignment = {
   id: string;

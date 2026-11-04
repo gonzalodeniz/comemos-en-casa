@@ -1,3 +1,4 @@
+// Presenta y administra el catálogo compartido de alimentos.
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import Cropper from "react-easy-crop";
 import { ApiError } from "./api";

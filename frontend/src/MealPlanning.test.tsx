@@ -1,3 +1,4 @@
+// Comprueba la representación de la planificación de comidas.
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import MealPlanning, { adjacentWeek, extendWeeks, filterFoodLabels, repeatFromInterval, snapshotOperation, weekLabel } from "./MealPlanning";

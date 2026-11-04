@@ -1,3 +1,4 @@
+// Presenta un campo de formulario con su etiqueta y mensajes.
 import type { ReactNode } from "react";
 
 export type FieldProps = {

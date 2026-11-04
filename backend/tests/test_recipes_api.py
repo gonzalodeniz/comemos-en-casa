@@ -1,3 +1,4 @@
+# Comprueba los contratos de la API del catálogo de recetas.
 import os
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4

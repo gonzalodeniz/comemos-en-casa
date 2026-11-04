@@ -1,3 +1,4 @@
+// Presenta mensajes de estado y error accesibles.
 import type { ReactNode } from "react";
 
 export type MessageTone = "error" | "success";

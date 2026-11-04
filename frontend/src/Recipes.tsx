@@ -1,3 +1,4 @@
+// Presenta y administra las recetas asociadas a los alimentos.
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { apiRequest, ApiError } from "./api";
 

@@ -33,7 +33,7 @@ Inicia servicios y aplica migraciones:
 ```sh
 make up
 make mailhog-up
-make migrate
+make alembic-upgrade
 ```
 
 Los valores entre `<...>` son marcadores, no valores válidos. No guardes secretos en el repositorio, logs o documentación. `AUTH_RATE_LIMIT_HMAC_KEY` debe ser exactamente 32 bytes representados en hexadecimal; conserva el mismo valor entre reinicios y compártelo entre instancias del mismo entorno para que los límites basados en HMAC sean consistentes. La rotación requiere evaluación operativa; no la hagas de forma casual.
@@ -68,7 +68,7 @@ La renovación se ejecuta con `make cert-renew`; Certbot reutiliza el webroot y 
 
 ## Esquema, persistencia y copias
 
-Aplica migraciones con `make migrate`; inspecciona la versión con `docker compose exec backend python -m alembic current`. El volumen `postgres_data` solo conserva datos locales entre reinicios: no equivale a una copia de seguridad. Las imágenes de comidas y recetas viven bajo `data/`, por lo que una copia válida incluye **la base PostgreSQL y todo `data/` en una misma ventana sin escrituras**. No guardes la copia dentro de `data/` ni en el repositorio.
+Aplica migraciones con `make alembic-upgrade`; consulta la versión con `make alembic-current`. El volumen `postgres_data` solo conserva datos locales entre reinicios: no equivale a una copia de seguridad. Las imágenes de comidas y recetas viven bajo `data/`, por lo que una copia válida incluye **la base PostgreSQL y todo `data/` en una misma ventana sin escrituras**. No guardes la copia dentro de `data/` ni en el repositorio.
 
 ### Copia coherente de base de datos e imágenes
 
@@ -156,7 +156,7 @@ docker compose exec -T postgres psql -U comemos -d postgres -Atc "SELECT datname
 docker compose exec -T postgres createdb -U comemos -O comemos comemos
 ```
 
-Si la consulta devuelve una base existente, inspecciona su esquema y sus datos antes de continuar; no ejecutes el segundo comando ni elimines datos. Ajusta los nombres si usas otro `POSTGRES_USER` o `POSTGRES_DB`. Cambia únicamente `POSTGRES_DB` en `.env`, conserva sus secretos y restringe sus permisos con `chmod 600 .env`. Después ejecuta `make up` y `make migrate`. La base heredada queda intacta; este procedimiento no importa sus cuentas.
+Si la consulta devuelve una base existente, inspecciona su esquema y sus datos antes de continuar; no ejecutes el segundo comando ni elimines datos. Ajusta los nombres si usas otro `POSTGRES_USER` o `POSTGRES_DB`. Cambia únicamente `POSTGRES_DB` en `.env`, conserva sus secretos y restringe sus permisos con `chmod 600 .env`. Después ejecuta `make up` y `make alembic-upgrade`. La base heredada queda intacta; este procedimiento no importa sus cuentas.
 
 Comprueba por separado la revisión **aplicada** y la cabeza **disponible**:
 

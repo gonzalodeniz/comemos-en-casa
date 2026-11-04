@@ -1,3 +1,4 @@
+/* Aplica los estilos compartidos a los componentes de interfaz. */
 /* Styles the Button, Field, Panel and Message components using the design tokens. */
 .ui-button, .ui-field, .ui-panel, .ui-message { box-sizing: border-box; font-family: var(--font-family-base); }
 .ui-field input, .ui-field select { box-sizing: border-box; }

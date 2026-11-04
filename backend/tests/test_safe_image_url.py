@@ -1,3 +1,4 @@
+# Verifica las restricciones de seguridad al descargar imágenes remotas.
 import socket
 import io
 

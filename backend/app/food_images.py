@@ -1,3 +1,4 @@
+# Gestiona la validación, publicación y limpieza de imágenes de alimentos.
 """Validate, crop and store user-provided food images."""
 from __future__ import annotations
 

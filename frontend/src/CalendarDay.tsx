@@ -1,3 +1,4 @@
+// Presenta un día y sus comidas dentro del calendario.
 import AppIcon from "./AppIcon";
 import { useEffect, useRef } from "react";
 import { formatDateLabel, type CalendarDate } from "./mealPlanningDates";

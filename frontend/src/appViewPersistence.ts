@@ -1,7 +1,8 @@
+// Guarda y recupera la vista activa de la aplicación.
 import type { AppView } from "./AppWorkspace";
 
 const STORAGE_KEY = "comemos-en-casa:workspace-view";
-const APP_VIEWS: readonly AppView[] = ["meal-planning", "food-catalog", "recipes", "users"];
+const APP_VIEWS: readonly AppView[] = ["meal-planning", "food-catalog", "recipes", "shopping-list", "users"];
 
 function getSessionStorage(): Storage | undefined {
   try {

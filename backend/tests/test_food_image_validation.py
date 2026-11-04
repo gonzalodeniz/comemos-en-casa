@@ -1,3 +1,4 @@
+# Verifica la validación de contenido de imágenes con datos sintéticos.
 """Content-validation boundaries using synthetic images and no network."""
 import base64
 import io

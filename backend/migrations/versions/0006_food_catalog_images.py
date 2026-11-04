@@ -1,3 +1,4 @@
+# Incorpora nombres normalizados e imágenes al catálogo de alimentos.
 """Add normalized names and optional food-label images.
 
 Revision ID: 0006_food_catalog_images

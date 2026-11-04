@@ -1,3 +1,4 @@
+// Presenta un contenedor reutilizable para el contenido.
 import type { HTMLAttributes } from "react";
 
 export type PanelProps = Omit<HTMLAttributes<HTMLElement>, "className"> & {

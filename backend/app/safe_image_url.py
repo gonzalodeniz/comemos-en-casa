@@ -1,3 +1,4 @@
+# Protege la descarga de imágenes frente a destinos de red no permitidos.
 """Fetch remote image bytes while pinning each HTTP(S) connection to validated DNS."""
 from __future__ import annotations
 

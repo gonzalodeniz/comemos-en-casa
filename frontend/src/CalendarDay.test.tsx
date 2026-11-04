@@ -1,3 +1,4 @@
+// Comprueba la presentación de un día del calendario.
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import CalendarDay from "./CalendarDay";

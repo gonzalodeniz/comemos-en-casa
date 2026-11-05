@@ -49,6 +49,16 @@ def api_get(path: str, *, params=None, cookies=None):
 
     return asyncio.run(send_request())
 
+def api_delete(path: str, *, cookies=None):
+    """Envía una petición DELETE autenticada al servidor ASGI de pruebas."""
+    async def send_request():
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver") as client:
+            if cookies:
+                client.cookies.update(cookies)
+            return await client.delete(path, headers={"Origin": "http://localhost:5173", "X-CSRF-Token": cookies.get("csrf_token", "") if cookies else ""})
+
+    return asyncio.run(send_request())
+
 def api_post(path: str, *, payload: dict, cookies=None, csrf_token=None, origin=True):
     async def send_request():
         async with AsyncClient(

@@ -2,6 +2,7 @@ from sqlalchemy import create_engine
 
 from meal_planning_test_support import (
     api_get,
+    api_delete,
     authenticate,
     meal_database,
     post_with_session,
@@ -553,3 +554,42 @@ def test_redondea_pesos_antes_de_responder_cantidades_enteras(meal_database):
     assert second.status_code == 201
     assert second.json()["quantity"] == 1511
     assert type(second.json()["quantity"]) is int
+
+
+def test_deleting_pending_item_preserves_other_entries(meal_database):
+    """Comprueba que borrar una entrada no altera las demás del mismo producto."""
+    cookies = authenticate(meal_database)
+    category = post_with_session(
+        "/api/v1/shopping-categories", {"name": "Frutas"}, cookies
+    )
+    product = post_with_session(
+        f"/api/v1/shopping-categories/{category.json()['id']}/products",
+        {"name": "Manzanas"},
+        cookies,
+    )
+    pendiente = post_with_session(
+        "/api/v1/shopping-list",
+        {"product_id": product.json()["id"], "quantity": 3, "unit": "unit"},
+        cookies,
+    )
+    gramos = post_with_session(
+        "/api/v1/shopping-list",
+        {"product_id": product.json()["id"], "quantity": 250, "unit": "g"},
+        cookies,
+    )
+
+    deleted = api_delete(
+        f"/api/v1/shopping-list/{pendiente.json()['id']}", cookies=cookies
+    )
+    response = api_get("/api/v1/shopping-list", cookies=cookies)
+
+    assert deleted.status_code == 204
+    assert response.json()["items"] == [
+        {
+            "id": gramos.json()["id"],
+            "product_id": product.json()["id"],
+            "quantity": 250,
+            "unit": "g",
+        }
+    ]
+    assert response.json()["purchased_items"] == []

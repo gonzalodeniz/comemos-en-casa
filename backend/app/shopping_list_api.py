@@ -3,7 +3,7 @@
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -86,6 +86,23 @@ async def list_shopping_list_items(
             article for item, article in zip(items, articulos) if item.purchased
         ],
     }
+
+
+@router.delete("/{item_id}", status_code=204)
+async def delete_shopping_list_item(
+    item_id: UUID,
+    request: Request,
+    session: ActiveSession = Depends(get_active_session),
+    db: Session = Depends(get_database_session),
+) -> Response:
+    """Elimina una entrada concreta de la lista de la compra compartida."""
+    require_csrf(request, session)
+    item = db.get(ShoppingListItem, item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Shopping list item not found")
+    db.delete(item)
+    db.commit()
+    return Response(status_code=204)
 
 
 @router.post("/{item_id}/purchase")

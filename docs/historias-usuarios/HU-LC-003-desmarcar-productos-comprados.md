@@ -1,6 +1,6 @@
 # HU-LC-003 — Desmarcar productos comprados
 
-**Estado:** refinada y aprobada; pendiente de implementación.
+**Estado:** completada; criterios de aceptación verificados.
 
 Corresponde a la [historia #3 del backlog de la lista de la compra](../product/backlog-lista-de-la-compra.md).
 
@@ -12,9 +12,9 @@ Como usuario, quiero desmarcar productos comprados y devolverlos a pendientes, p
 
 ## Criterios de aceptación
 
-- [ ] Dado un producto comprado sin entrada pendiente compatible, cuando lo desmarco, entonces desaparece de «Comprados» y aparece en «Pendientes», conservando producto, cantidad y medida.
-- [ ] Dado un producto comprado que también está pendiente, cuando lo desmarco, entonces las cantidades compatibles se suman en una única entrada pendiente; las medidas incompatibles permanecen separadas.
-- [ ] Dado un producto desmarcado, cuando recargo la lista o la consulta otro usuario, entonces se conserva el estado pendiente y la cantidad resultante.
+- [x] Dado un producto comprado sin entrada pendiente compatible, cuando lo desmarco, entonces desaparece de «Comprados» y aparece en «Pendientes», conservando producto, cantidad y medida.
+- [x] Dado un producto comprado que también está pendiente, cuando lo desmarco, entonces las cantidades compatibles se suman en una única entrada pendiente; las medidas incompatibles permanecen separadas.
+- [x] Dado un producto desmarcado, cuando recargo la lista o la consulta otro usuario, entonces se conserva el estado pendiente y la cantidad resultante.
 
 ## Plan
 

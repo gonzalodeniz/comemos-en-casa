@@ -126,6 +126,43 @@ def test_mark_item_as_purchased_moves_it_to_purchased_section(meal_database):
     ]
 
 
+def test_unmarking_purchased_item_moves_it_to_pending(meal_database):
+    """Comprueba que desmarcar conserva producto, cantidad y medida."""
+    cookies = authenticate(meal_database)
+    category = post_with_session(
+        "/api/v1/shopping-categories", {"name": "Frutas"}, cookies
+    )
+    product = post_with_session(
+        f"/api/v1/shopping-categories/{category.json()['id']}/products",
+        {"name": "Manzanas"},
+        cookies,
+    )
+    added = post_with_session(
+        "/api/v1/shopping-list",
+        {"product_id": product.json()["id"], "quantity": 3, "unit": "g"},
+        cookies,
+    )
+    post_with_session(
+        f"/api/v1/shopping-list/{added.json()['id']}/purchase", {}, cookies
+    )
+
+    unmarked = post_with_session(
+        f"/api/v1/shopping-list/{added.json()['id']}/unpurchase", {}, cookies
+    )
+
+    assert unmarked.status_code == 200
+    response = api_get("/api/v1/shopping-list", cookies=cookies)
+    assert response.json()["purchased_items"] == []
+    assert response.json()["items"] == [
+        {
+            "id": added.json()["id"],
+            "product_id": product.json()["id"],
+            "quantity": 3,
+            "unit": "g",
+        }
+    ]
+
+
 def test_adding_purchased_product_creates_new_pending_item(meal_database):
     """Comprueba que añadir un producto comprado crea una entrada pendiente."""
     cookies = authenticate(meal_database)

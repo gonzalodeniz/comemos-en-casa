@@ -120,3 +120,25 @@ async def mark_shopping_list_item_as_purchased(
         "quantity": int(item.quantity),
         "unit": item.unit,
     }
+
+
+@router.post("/{item_id}/unpurchase")
+async def unmark_shopping_list_item_as_purchased(
+    item_id: UUID,
+    request: Request,
+    session: ActiveSession = Depends(get_active_session),
+    db: Session = Depends(get_database_session),
+) -> dict[str, str | int]:
+    """Devuelve un elemento comprado al estado pendiente."""
+    require_csrf(request, session)
+    item = db.get(ShoppingListItem, item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Shopping list item not found")
+    item.purchased = False
+    db.commit()
+    return {
+        "id": str(item.id),
+        "product_id": str(item.product_id),
+        "quantity": int(item.quantity),
+        "unit": item.unit,
+    }

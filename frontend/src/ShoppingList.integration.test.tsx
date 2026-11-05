@@ -528,4 +528,35 @@ describe("shopping list integration", () => {
 
     expect((await screen.findByRole("alert")).textContent).toContain("No se pudieron cargar los productos");
   });
+
+  // Comprueba que eliminar desde ambas secciones afecta solo a la entrada elegida.
+  it("deleting_item_from_either_section_updates_only_that_entry", async () => {
+    const pendiente = { id: "item-pending", product_id: "product-1", quantity: 2, unit: "unit" };
+    const comprado = { id: "item-bought", product_id: "product-1", quantity: 3, unit: "unit" };
+    const lista = { items: [pendiente], purchased_items: [comprado] };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
+      if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Fruta" }] }), { status: 200 });
+      if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [{ id: "product-1", name: "Manzanas" }] }), { status: 200 });
+      if (init?.method === "DELETE" && url.endsWith("/item-pending")) { lista.items = []; return new Response(null, { status: 204 }); }
+      if (init?.method === "DELETE" && url.endsWith("/item-bought")) { lista.purchased_items = []; return new Response(null, { status: 204 }); }
+      if (url.endsWith("/shopping-list")) return new Response(JSON.stringify(lista), { status: 200 });
+      return new Response(JSON.stringify({}), { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    const region = await screen.findByRole("region", { name: "Lista de la compra" });
+    const pending = within(region).getByRole("heading", { name: "Pendientes" }).nextElementSibling as HTMLElement;
+    const purchased = within(region).getByRole("heading", { name: "Comprados" }).nextElementSibling as HTMLElement;
+
+    await user.click(await within(pending).findByRole("button", { name: /Eliminar/ }));
+    await waitFor(() => expect(within(pending).queryByText("Manzanas: 2 unidad")).toBeNull());
+    expect(within(purchased).getByText("Manzanas: 3 unidad")).toBeTruthy();
+    await user.click(await within(purchased).findByRole("button", { name: /Eliminar/ }));
+    await waitFor(() => expect(within(purchased).queryByText("Manzanas: 3 unidad")).toBeNull());
+  });
 });

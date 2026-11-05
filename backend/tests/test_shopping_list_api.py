@@ -593,3 +593,75 @@ def test_deleting_pending_item_preserves_other_entries(meal_database):
         }
     ]
     assert response.json()["purchased_items"] == []
+
+
+def test_deleting_purchased_item_preserves_catalog_product(meal_database):
+    """Comprueba que borrar una entrada comprada no elimina el producto del catálogo."""
+    cookies = authenticate(meal_database)
+    category = post_with_session(
+        "/api/v1/shopping-categories", {"name": "Frutas"}, cookies
+    )
+    product = post_with_session(
+        f"/api/v1/shopping-categories/{category.json()['id']}/products",
+        {"name": "Manzanas"},
+        cookies,
+    )
+    added = post_with_session(
+        "/api/v1/shopping-list",
+        {"product_id": product.json()["id"], "quantity": 2, "unit": "unit"},
+        cookies,
+    )
+    post_with_session(
+        f"/api/v1/shopping-list/{added.json()['id']}/purchase", {}, cookies
+    )
+
+    deleted = api_delete(
+        f"/api/v1/shopping-list/{added.json()['id']}", cookies=cookies
+    )
+
+    assert deleted.status_code == 204
+    assert api_get("/api/v1/shopping-list", cookies=cookies).json()["purchased_items"] == []
+    assert api_get(
+        f"/api/v1/shopping-categories/{category.json()['id']}/products",
+        cookies=cookies,
+    ).json()["products"] == [{"id": product.json()["id"], "name": "Manzanas"}]
+
+
+def test_deleted_item_stays_absent_for_shared_list_readers(meal_database):
+    """Comprueba que el borrado persiste para otros usuarios y conserva otras entradas."""
+    cookies = authenticate(meal_database)
+    other_user = authenticate(meal_database)
+    category = post_with_session(
+        "/api/v1/shopping-categories", {"name": "Frutas"}, cookies
+    )
+    product = post_with_session(
+        f"/api/v1/shopping-categories/{category.json()['id']}/products",
+        {"name": "Manzanas"},
+        cookies,
+    )
+    deleted_item = post_with_session(
+        "/api/v1/shopping-list",
+        {"product_id": product.json()["id"], "quantity": 2, "unit": "unit"},
+        cookies,
+    )
+    remaining_item = post_with_session(
+        "/api/v1/shopping-list",
+        {"product_id": product.json()["id"], "quantity": 150, "unit": "g"},
+        cookies,
+    )
+
+    deleted = api_delete(
+        f"/api/v1/shopping-list/{deleted_item.json()['id']}", cookies=cookies
+    )
+    response = api_get("/api/v1/shopping-list", cookies=other_user)
+
+    assert deleted.status_code == 204
+    assert response.json()["items"] == [
+        {
+            "id": remaining_item.json()["id"],
+            "product_id": product.json()["id"],
+            "quantity": 150,
+            "unit": "g",
+        }
+    ]
+    assert response.json()["purchased_items"] == []

@@ -8,7 +8,7 @@ import FoodCatalog from "./FoodCatalog";
 import Recipes from "./Recipes";
 import ShoppingList from "./ShoppingList";
 // Conecta la vista de la compra con el catálogo compartido de categorías y productos.
-import { getShoppingCategories, createShoppingCategory, getShoppingProducts, createShoppingProduct, agregarProductoListaCompra, obtenerListaCompra, marcarProductoComprado, desmarcarProductoComprado, type ShoppingCategory } from "./mealPlanningApi";
+import { getShoppingCategories, createShoppingCategory, getShoppingProducts, createShoppingProduct, agregarProductoListaCompra, obtenerListaCompra, marcarProductoComprado, desmarcarProductoComprado, eliminarEntradaListaCompra, type ShoppingCategory } from "./mealPlanningApi";
 import AppWorkspace, { type AppView } from "./AppWorkspace";
 import AppBrand from "./AppBrand";
 import AppIcon from "./AppIcon";
@@ -327,7 +327,7 @@ export default function App() {
           mealPlanning={<MealPlanning csrfToken={csrfToken} onSessionExpired={mealSessionExpired} onOpenRecipes={(foodId) => { setRecipeFoodId(foodId); setView("recipes"); persistAppView("recipes"); }} />}
           foodCatalog={<FoodCatalog csrfToken={csrfToken} onSessionExpired={mealSessionExpired} onOpenRecipes={(foodId) => { setRecipeFoodId(foodId); setView("recipes"); persistAppView("recipes"); }} />}
           recipes={<Recipes key={recipeListReset} csrfToken={csrfToken} onSessionExpired={mealSessionExpired} initialFoodId={recipeFoodId} />}
-          shoppingList={<ShoppingList categories={shoppingCategories} onGetProducts={async (categoryId) => (await getShoppingProducts(categoryId)).products} onCreateProduct={(categoryId, name) => createShoppingProduct(categoryId, name, csrfToken)} onAddToShoppingList={(productoId, cantidad, unidad) => agregarProductoListaCompra(productoId, cantidad, unidad, csrfToken)} onGetShoppingList={obtenerListaCompra} onMarkPurchased={(itemId) => marcarProductoComprado(itemId, csrfToken)} onUnmarkPurchased={(itemId) => desmarcarProductoComprado(itemId, csrfToken)} onCreateCategory={(name) => void perform(async () => {
+          shoppingList={<ShoppingList categories={shoppingCategories} onGetProducts={async (categoryId) => (await getShoppingProducts(categoryId)).products} onCreateProduct={(categoryId, name) => createShoppingProduct(categoryId, name, csrfToken)} onAddToShoppingList={(productoId, cantidad, unidad) => agregarProductoListaCompra(productoId, cantidad, unidad, csrfToken)} onGetShoppingList={obtenerListaCompra} onMarkPurchased={(itemId) => marcarProductoComprado(itemId, csrfToken)} onUnmarkPurchased={(itemId) => desmarcarProductoComprado(itemId, csrfToken)} onDeleteItem={(itemId) => eliminarEntradaListaCompra(itemId, csrfToken)} onCreateCategory={(name) => void perform(async () => {
             const category = await createShoppingCategory(name, csrfToken);
             setShoppingCategories((current) => [...current, category]);
           })} />}

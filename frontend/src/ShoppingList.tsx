@@ -16,10 +16,11 @@ type Props = {
   onGetShoppingList?: () => Promise<{ items: ShoppingListItem[]; purchased_items?: ShoppingListItem[] }>;
   onMarkPurchased?: (itemId: string) => Promise<ShoppingListItem>;
   onUnmarkPurchased?: (itemId: string) => Promise<ShoppingListItem>;
+  onDeleteItem?: (itemId: string) => Promise<null>;
 };
 
 /** Presenta las categorías y permite consultar y crear sus productos. */
-export default function ShoppingList({ categories, onCreateCategory, onGetProducts, onCreateProduct, onAddToShoppingList, onGetShoppingList, onMarkPurchased, onUnmarkPurchased }: Props) {
+export default function ShoppingList({ categories, onCreateCategory, onGetProducts, onCreateProduct, onAddToShoppingList, onGetShoppingList, onMarkPurchased, onUnmarkPurchased, onDeleteItem }: Props) {
   const [name, setName] = useState("");
   const [products, setProducts] = useState<Record<string, ShoppingProduct[]>>({});
   const [productNames, setProductNames] = useState<Record<string, string>>({});
@@ -93,6 +94,15 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
     setListaCompra((current) => ({ ...current, [key]: updated }));
   }
 
+  /** Elimina una entrada de la sección correspondiente tras confirmarla en la API. */
+  async function deleteItem(item: ShoppingListItem, purchased: boolean) {
+    if (!item.id || !onDeleteItem) return;
+    await onDeleteItem(item.id);
+    const key = `${item.product_id}:${item.unit}`;
+    if (purchased) setComprados((current) => { const next = { ...current }; delete next[key]; return next; });
+    else setListaCompra((current) => { const next = { ...current }; delete next[key]; return next; });
+  }
+
   return <section className="panel">
     <h2>Lista de la compra</h2>
     <form onSubmit={submit}>
@@ -120,10 +130,12 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
       <h4>Pendientes</h4><ul>{Object.values(listaCompra).map((item) => <li key={`${item.product_id}:${item.unit}`}>
         {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id}: {item.quantity} {item.unit === "unit" ? "unidad" : item.unit}
         {item.id && <button type="button" onClick={() => void markPurchased(item)}>Marcar {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id} como comprado</button>}
+        {item.id && onDeleteItem && <button type="button" onClick={() => void deleteItem(item, false)}>Eliminar {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id} de Pendientes</button>}
       </li>)}</ul>
       <h4>Comprados</h4><ul>{Object.values(comprados).map((item) => <li key={`${item.product_id}:${item.unit}`}>
         {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id}: {item.quantity} {item.unit === "unit" ? "unidad" : item.unit}
         {item.id && onUnmarkPurchased && <button type="button" onClick={() => void unmarkPurchased(item)}>Desmarcar {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id} como pendiente</button>}
+        {item.id && onDeleteItem && <button type="button" onClick={() => void deleteItem(item, true)}>Eliminar {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id} de Comprados</button>}
       </li>)}</ul>
     </section>
   </section>;

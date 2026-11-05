@@ -22,6 +22,11 @@ export function desmarcarProductoComprado(itemId: string, csrfToken: string): Pr
   return apiRequest(`/shopping-list/${itemId}/unpurchase`, { method: "POST", csrfToken });
 }
 
+/** Elimina una entrada concreta de la lista compartida con protección CSRF. */
+export function eliminarEntradaListaCompra(itemId: string, csrfToken: string): Promise<null> {
+  return apiRequest<null>(`/shopping-list/${itemId}`, { method: "DELETE", csrfToken });
+}
+
 export function getShoppingCategories(): Promise<{ categories: ShoppingCategory[] }> {
   return apiRequest("/shopping-categories");
 }

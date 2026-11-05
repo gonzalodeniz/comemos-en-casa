@@ -242,6 +242,50 @@ def test_unmarking_preserves_incompatible_units_separately(meal_database):
     ) == [(2, "unit"), (3, "g")]
 
 
+def test_unmarked_item_persists_for_another_user(meal_database):
+    """Comprueba que otro usuario ve pendiente la cantidad resultante al desmarcar."""
+    creator = authenticate(meal_database)
+    other_user = authenticate(meal_database)
+    category = post_with_session(
+        "/api/v1/shopping-categories", {"name": "Frutas"}, creator
+    )
+    product = post_with_session(
+        f"/api/v1/shopping-categories/{category.json()['id']}/products",
+        {"name": "Manzanas"},
+        creator,
+    )
+    bought = post_with_session(
+        "/api/v1/shopping-list",
+        {"product_id": product.json()["id"], "quantity": 3, "unit": "unit"},
+        creator,
+    )
+    post_with_session(
+        f"/api/v1/shopping-list/{bought.json()['id']}/purchase", {}, creator
+    )
+    pending = post_with_session(
+        "/api/v1/shopping-list",
+        {"product_id": product.json()["id"], "quantity": 2, "unit": "unit"},
+        creator,
+    )
+
+    unmarked = post_with_session(
+        f"/api/v1/shopping-list/{bought.json()['id']}/unpurchase", {}, creator
+    )
+    response = api_get("/api/v1/shopping-list", cookies=other_user)
+
+    assert unmarked.status_code == 200
+    assert response.status_code == 200
+    assert response.json()["purchased_items"] == []
+    assert response.json()["items"] == [
+        {
+            "id": pending.json()["id"],
+            "product_id": product.json()["id"],
+            "quantity": 5,
+            "unit": "unit",
+        }
+    ]
+
+
 def test_adding_purchased_product_creates_new_pending_item(meal_database):
     """Comprueba que añadir un producto comprado crea una entrada pendiente."""
     cookies = authenticate(meal_database)

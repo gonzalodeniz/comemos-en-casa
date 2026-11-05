@@ -17,6 +17,11 @@ export function marcarProductoComprado(itemId: string, csrfToken: string): Promi
   return apiRequest(`/shopping-list/${itemId}/purchase`, { method: "POST", csrfToken });
 }
 
+/** Devuelve un elemento comprado a la lista pendiente con protección CSRF. */
+export function desmarcarProductoComprado(itemId: string, csrfToken: string): Promise<ShoppingListItem> {
+  return apiRequest(`/shopping-list/${itemId}/unpurchase`, { method: "POST", csrfToken });
+}
+
 export function getShoppingCategories(): Promise<{ categories: ShoppingCategory[] }> {
   return apiRequest("/shopping-categories");
 }

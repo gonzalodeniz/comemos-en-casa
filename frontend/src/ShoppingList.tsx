@@ -15,10 +15,11 @@ type Props = {
   onAddToShoppingList?: (productId: string, quantity: number, unit: ShoppingUnit) => Promise<ShoppingListItem>;
   onGetShoppingList?: () => Promise<{ items: ShoppingListItem[]; purchased_items?: ShoppingListItem[] }>;
   onMarkPurchased?: (itemId: string) => Promise<ShoppingListItem>;
+  onUnmarkPurchased?: (itemId: string) => Promise<ShoppingListItem>;
 };
 
 /** Presenta las categorías y permite consultar y crear sus productos. */
-export default function ShoppingList({ categories, onCreateCategory, onGetProducts, onCreateProduct, onAddToShoppingList, onGetShoppingList, onMarkPurchased }: Props) {
+export default function ShoppingList({ categories, onCreateCategory, onGetProducts, onCreateProduct, onAddToShoppingList, onGetShoppingList, onMarkPurchased, onUnmarkPurchased }: Props) {
   const [name, setName] = useState("");
   const [products, setProducts] = useState<Record<string, ShoppingProduct[]>>({});
   const [productNames, setProductNames] = useState<Record<string, string>>({});
@@ -83,6 +84,15 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
     setComprados((current) => ({ ...current, [key]: updated }));
   }
 
+  /** Desmarca un producto comprado y lo devuelve a la sección de pendientes. */
+  async function unmarkPurchased(item: ShoppingListItem) {
+    if (!item.id || !onUnmarkPurchased) return;
+    const updated = await onUnmarkPurchased(item.id);
+    const key = `${item.product_id}:${item.unit}`;
+    setComprados((current) => { const next = { ...current }; delete next[key]; return next; });
+    setListaCompra((current) => ({ ...current, [key]: updated }));
+  }
+
   return <section className="panel">
     <h2>Lista de la compra</h2>
     <form onSubmit={submit}>
@@ -113,6 +123,7 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
       </li>)}</ul>
       <h4>Comprados</h4><ul>{Object.values(comprados).map((item) => <li key={`${item.product_id}:${item.unit}`}>
         {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id}: {item.quantity} {item.unit === "unit" ? "unidad" : item.unit}
+        {item.id && onUnmarkPurchased && <button type="button" onClick={() => void unmarkPurchased(item)}>Desmarcar {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id} como pendiente</button>}
       </li>)}</ul>
     </section>
   </section>;

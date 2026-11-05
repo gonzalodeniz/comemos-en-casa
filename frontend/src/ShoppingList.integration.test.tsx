@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 // Comprueba los flujos de la lista de compra desde la interfaz con la API simulada.
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import ShoppingList from "./ShoppingList";
 
 vi.mock("./MealPlanning", () => ({ default: () => <div>Plan semanal</div> }));
 
@@ -346,6 +347,79 @@ describe("shopping list integration", () => {
     expect(lista.textContent!.indexOf("Pendientes")).toBeLessThan(lista.textContent!.indexOf("Comprados"));
     expect(lista.querySelectorAll("li")).toHaveLength(1);
     expect(fetchMock.mock.calls.filter(([url, init]) => String(url).endsWith("/shopping-list") && init?.method !== "POST")).toHaveLength(2);
+  });
+
+  // Comprueba que los productos comprados ofrecen la acción para volver a pendientes.
+  it("renders_unmark_action_for_purchased_items", async () => {
+    const comprado = { id: "item-1", product_id: "product-1", quantity: 3, unit: "unit" };
+    render(<ShoppingList
+      categories={[{ id: "category-1", name: "Fruta" }]}
+      onCreateCategory={() => {}}
+      onGetProducts={async () => [{ id: "product-1", name: "Manzanas", category_id: "category-1" }]}
+      onCreateProduct={async () => ({ id: "product-1", name: "Manzanas", category_id: "category-1" })}
+      onGetShoppingList={async () => ({ items: [], purchased_items: [comprado] })}
+      onUnmarkPurchased={async () => comprado}
+    />);
+
+    expect(await screen.findByRole("button", { name: "Desmarcar Manzanas como pendiente" })).toBeTruthy();
+  });
+
+  // Comprueba que desmarcar mueve el producto desde Comprados a Pendientes.
+  it("unmarking_refreshes_pending_and_purchased_sections", async () => {
+    const comprado = { id: "item-1", product_id: "product-1", quantity: 3, unit: "unit" };
+    const user = userEvent.setup();
+    render(<ShoppingList
+      categories={[{ id: "category-1", name: "Fruta" }]}
+      onCreateCategory={() => {}}
+      onGetProducts={async () => [{ id: "product-1", name: "Manzanas", category_id: "category-1" }]}
+      onCreateProduct={async () => ({ id: "product-1", name: "Manzanas", category_id: "category-1" })}
+      onGetShoppingList={async () => ({ items: [], purchased_items: [comprado] })}
+      onUnmarkPurchased={async () => comprado}
+    />);
+    const lista = await screen.findByRole("region", { name: "Lista de la compra" });
+
+    await user.click(await within(lista).findByRole("button", { name: "Desmarcar Manzanas como pendiente" }));
+
+    const seccionPendientes = within(lista).getByRole("heading", { name: "Pendientes" }).nextElementSibling;
+    const seccionComprados = within(lista).getByRole("heading", { name: "Comprados" }).nextElementSibling;
+    if (!(seccionPendientes instanceof HTMLElement) || !(seccionComprados instanceof HTMLElement)) {
+      throw new Error("No se encontraron las listas de pendientes y comprados.");
+    }
+    expect(within(seccionPendientes).getByText("Manzanas: 3 unidad")).toBeTruthy();
+    expect(within(seccionComprados).queryByText("Manzanas: 3 unidad")).toBeNull();
+  });
+
+  // Comprueba que la aplicación envía el desmarcado a la API y actualiza ambas secciones.
+  it("unmarking_posts_to_api_and_updates_sections", async () => {
+    const comprado = { id: "item-1", product_id: "product-1", quantity: 3, unit: "unit" };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
+      if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Fruta" }] }), { status: 200 });
+      if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [{ id: "product-1", name: "Manzanas" }] }), { status: 200 });
+      if (url.endsWith("/item-1/unpurchase") && init?.method === "POST") return new Response(JSON.stringify(comprado), { status: 200 });
+      if (url.endsWith("/shopping-list")) return new Response(JSON.stringify({ items: [], purchased_items: [comprado] }), { status: 200 });
+      return new Response(JSON.stringify({}), { status: 404 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    const lista = await screen.findByRole("region", { name: "Lista de la compra" });
+
+    await user.click(await within(lista).findByRole("button", { name: "Desmarcar Manzanas como pendiente" }));
+
+    const llamada = fetchMock.mock.calls.find(([url, options]) => String(url).endsWith("/item-1/unpurchase") && options?.method === "POST");
+    expect(llamada).toBeTruthy();
+    expect(new Headers(llamada?.[1]?.headers).get("X-CSRF-Token")).toBe("csrf-1");
+    const seccionPendientes = within(lista).getByRole("heading", { name: "Pendientes" }).nextElementSibling;
+    const seccionComprados = within(lista).getByRole("heading", { name: "Comprados" }).nextElementSibling;
+    if (!(seccionPendientes instanceof HTMLElement) || !(seccionComprados instanceof HTMLElement)) {
+      throw new Error("No se encontraron las listas de pendientes y comprados.");
+    }
+    expect(within(seccionPendientes).getByText("Manzanas: 3 unidad")).toBeTruthy();
+    expect(within(seccionComprados).queryByText("Manzanas: 3 unidad")).toBeNull();
   });
 
   // Comprueba que volver a añadir un producto comprado crea una entrada pendiente distinta.

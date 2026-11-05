@@ -10,6 +10,7 @@ import unicodedata
 
 from sqlalchemy import (
     CheckConstraint,
+    Boolean,
     Date,
     DateTime,
     ForeignKey,
@@ -194,6 +195,9 @@ class ShoppingListItem(Base):
     )
     quantity: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
     unit: Mapped[str] = mapped_column(String(32), nullable=False)
+    purchased: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
 
 
 class Recipe(Base):

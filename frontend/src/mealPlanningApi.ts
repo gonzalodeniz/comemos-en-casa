@@ -5,11 +5,16 @@ export type FoodLabel = { id: string; code: string; name: string; image_url?: st
 export type ShoppingCategory = { id: string; name: string };
 export type ShoppingProduct = { id: string; name: string };
 // Representa un producto agregado a la lista de la compra.
-export type ShoppingListItem = { product_id: string; quantity: number; unit: string };
+export type ShoppingListItem = { id?: string; product_id: string; quantity: number; unit: string };
 
 /** Consulta los productos y cantidades de la lista de la compra. */
-export function obtenerListaCompra(): Promise<{ items: ShoppingListItem[] }> {
+export function obtenerListaCompra(): Promise<{ items: ShoppingListItem[]; purchased_items?: ShoppingListItem[] }> {
   return apiRequest("/shopping-list");
+}
+
+/** Marca un elemento de la lista como comprado usando la protección CSRF. */
+export function marcarProductoComprado(itemId: string, csrfToken: string): Promise<ShoppingListItem> {
+  return apiRequest(`/shopping-list/${itemId}/purchase`, { method: "POST", csrfToken });
 }
 
 export function getShoppingCategories(): Promise<{ categories: ShoppingCategory[] }> {

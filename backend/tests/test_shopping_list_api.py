@@ -26,7 +26,7 @@ def test_database_schema_contains_shopping_list_items_with_quantity_and_unit(
     try:
         inspector = inspect(engine)
         assert "shopping_list_items" in inspector.get_table_names()
-        assert {"quantity", "unit"}.issubset(
+        assert {"id", "quantity", "unit", "purchased"}.issubset(
             {column["name"] for column in inspector.get_columns("shopping_list_items")}
         )
         quantity_column = next(
@@ -68,6 +68,199 @@ def test_adds_product_to_shopping_list_with_quantity_and_unit(meal_database):
     )
     assert item["quantity"] == 3
     assert item["unit"] == "unit"
+
+
+def test_shopping_list_items_have_stable_ids(meal_database):
+    """Comprueba que la API expone la identidad persistente del elemento."""
+    cookies = authenticate(meal_database)
+    category = post_with_session(
+        "/api/v1/shopping-categories", {"name": "Frutas"}, cookies
+    )
+    product = post_with_session(
+        f"/api/v1/shopping-categories/{category.json()['id']}/products",
+        {"name": "Manzanas"},
+        cookies,
+    )
+    added = post_with_session(
+        "/api/v1/shopping-list",
+        {"product_id": product.json()["id"], "quantity": 3, "unit": "unit"},
+        cookies,
+    )
+
+    response = api_get("/api/v1/shopping-list", cookies=cookies)
+    assert added.json()["id"]
+    assert response.json()["items"][0]["id"] == added.json()["id"]
+
+
+def test_mark_item_as_purchased_moves_it_to_purchased_section(meal_database):
+    """Comprueba que marcar comprado conserva datos y persiste el estado."""
+    cookies = authenticate(meal_database)
+    category = post_with_session(
+        "/api/v1/shopping-categories", {"name": "Frutas"}, cookies
+    )
+    product = post_with_session(
+        f"/api/v1/shopping-categories/{category.json()['id']}/products",
+        {"name": "Manzanas"},
+        cookies,
+    )
+    added = post_with_session(
+        "/api/v1/shopping-list",
+        {"product_id": product.json()["id"], "quantity": 3, "unit": "unit"},
+        cookies,
+    )
+
+    marked = post_with_session(
+        f"/api/v1/shopping-list/{added.json()['id']}/purchase", {}, cookies
+    )
+
+    assert marked.status_code == 200
+    response = api_get("/api/v1/shopping-list", cookies=cookies)
+    assert response.json()["items"] == []
+    assert response.json()["purchased_items"] == [
+        {
+            "id": added.json()["id"],
+            "product_id": product.json()["id"],
+            "quantity": 3,
+            "unit": "unit",
+        }
+    ]
+
+
+def test_adding_purchased_product_creates_new_pending_item(meal_database):
+    """Comprueba que añadir un producto comprado crea una entrada pendiente."""
+    cookies = authenticate(meal_database)
+    category = post_with_session(
+        "/api/v1/shopping-categories", {"name": "Frutas"}, cookies
+    )
+    product = post_with_session(
+        f"/api/v1/shopping-categories/{category.json()['id']}/products",
+        {"name": "Manzanas"},
+        cookies,
+    )
+    purchased = post_with_session(
+        "/api/v1/shopping-list",
+        {"product_id": product.json()["id"], "quantity": 3, "unit": "unit"},
+        cookies,
+    )
+    post_with_session(
+        f"/api/v1/shopping-list/{purchased.json()['id']}/purchase", {}, cookies
+    )
+
+    pending = post_with_session(
+        "/api/v1/shopping-list",
+        {"product_id": product.json()["id"], "quantity": 2, "unit": "unit"},
+        cookies,
+    )
+
+    response = api_get("/api/v1/shopping-list", cookies=cookies)
+    assert response.json()["purchased_items"] == [
+        {
+            "id": purchased.json()["id"],
+            "product_id": product.json()["id"],
+            "quantity": 3,
+            "unit": "unit",
+        }
+    ]
+    assert response.json()["items"] == [
+        {
+            "id": pending.json()["id"],
+            "product_id": product.json()["id"],
+            "quantity": 2,
+            "unit": "unit",
+        }
+    ]
+
+
+def test_marking_item_merges_compatible_purchased_quantities(meal_database):
+    """Comprueba que al marcar se fusionan solo medidas compatibles."""
+    cookies = authenticate(meal_database)
+    category = post_with_session(
+        "/api/v1/shopping-categories", {"name": "Frutas"}, cookies
+    )
+    product = post_with_session(
+        f"/api/v1/shopping-categories/{category.json()['id']}/products",
+        {"name": "Manzanas"},
+        cookies,
+    )
+    purchased = post_with_session(
+        "/api/v1/shopping-list",
+        {"product_id": product.json()["id"], "quantity": 3, "unit": "unit"},
+        cookies,
+    )
+    post_with_session(
+        f"/api/v1/shopping-list/{purchased.json()['id']}/purchase", {}, cookies
+    )
+    pending = post_with_session(
+        "/api/v1/shopping-list",
+        {"product_id": product.json()["id"], "quantity": 2, "unit": "unit"},
+        cookies,
+    )
+
+    marked = post_with_session(
+        f"/api/v1/shopping-list/{pending.json()['id']}/purchase", {}, cookies
+    )
+
+    response = api_get("/api/v1/shopping-list", cookies=cookies)
+    assert marked.status_code == 200
+    assert response.json()["items"] == []
+    assert response.json()["purchased_items"] == [
+        {
+            "id": purchased.json()["id"],
+            "product_id": product.json()["id"],
+            "quantity": 5,
+            "unit": "unit",
+        }
+    ]
+
+
+def test_marking_item_keeps_incompatible_units_separate(meal_database):
+    """Comprueba que marcar no fusiona unidades incompatibles."""
+    cookies = authenticate(meal_database)
+    category = post_with_session(
+        "/api/v1/shopping-categories", {"name": "Frutas"}, cookies
+    )
+    product = post_with_session(
+        f"/api/v1/shopping-categories/{category.json()['id']}/products",
+        {"name": "Manzanas"},
+        cookies,
+    )
+    purchased = post_with_session(
+        "/api/v1/shopping-list",
+        {"product_id": product.json()["id"], "quantity": 3, "unit": "unit"},
+        cookies,
+    )
+    post_with_session(
+        f"/api/v1/shopping-list/{purchased.json()['id']}/purchase", {}, cookies
+    )
+    pending = post_with_session(
+        "/api/v1/shopping-list",
+        {"product_id": product.json()["id"], "quantity": 500, "unit": "g"},
+        cookies,
+    )
+
+    post_with_session(
+        f"/api/v1/shopping-list/{pending.json()['id']}/purchase", {}, cookies
+    )
+
+    response = api_get("/api/v1/shopping-list", cookies=cookies)
+    assert response.json()["items"] == []
+    items_by_unit = {
+        item["unit"]: item for item in response.json()["purchased_items"]
+    }
+    assert items_by_unit == {
+        "unit": {
+            "id": purchased.json()["id"],
+            "product_id": product.json()["id"],
+            "quantity": 3,
+            "unit": "unit",
+        },
+        "g": {
+            "id": pending.json()["id"],
+            "product_id": product.json()["id"],
+            "quantity": 500,
+            "unit": "g",
+        },
+    }
 
 
 def test_aggregates_compatible_quantities_and_keeps_units_separate_from_weight(
@@ -127,7 +320,12 @@ def test_shows_shopping_list_entries_to_another_user(meal_database):
 
     assert response.status_code == 200
     assert response.json()["items"] == [
-        {"product_id": product.json()["id"], "quantity": 3, "unit": "unit"}
+        {
+            "id": added.json()["id"],
+            "product_id": product.json()["id"],
+            "quantity": 3,
+            "unit": "unit",
+        }
     ]
 
 
@@ -143,6 +341,7 @@ def test_converts_between_grams_and_kilograms_when_aggregating(meal_database):
         cookies,
     )
 
+    added_ids = []
     for quantity, unit in ((0.5, "kg"), (250, "g")):
         added = post_with_session(
             "/api/v1/shopping-list",
@@ -150,12 +349,18 @@ def test_converts_between_grams_and_kilograms_when_aggregating(meal_database):
             cookies,
         )
         assert added.status_code == 201
+        added_ids.append(added.json()["id"])
 
     response = api_get("/api/v1/shopping-list", cookies=cookies)
 
     assert response.status_code == 200
     assert response.json()["items"] == [
-        {"product_id": product.json()["id"], "quantity": 750, "unit": "g"}
+        {
+            "id": added_ids[0],
+            "product_id": product.json()["id"],
+            "quantity": 750,
+            "unit": "g",
+        }
     ]
 
 

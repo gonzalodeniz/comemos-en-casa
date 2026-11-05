@@ -45,6 +45,7 @@ async def add_shopping_list_item(
         select(ShoppingListItem).where(
             ShoppingListItem.product_id == payload.product_id,
             ShoppingListItem.unit == unit,
+            ShoppingListItem.purchased.is_(False),
         )
     )
     if item is None:
@@ -55,7 +56,12 @@ async def add_shopping_list_item(
     else:
         item.quantity += quantity
     db.commit()
-    return {"product_id": str(item.product_id), "quantity": int(item.quantity), "unit": item.unit}
+    return {
+        "id": str(item.id),
+        "product_id": str(item.product_id),
+        "quantity": int(item.quantity),
+        "unit": item.unit,
+    }
 
 
 @router.get("")
@@ -65,9 +71,52 @@ async def list_shopping_list_items(
 ) -> dict[str, list[dict[str, str | int]]]:
     """Devuelve los productos y cantidades de la lista de compra."""
     items = db.scalars(select(ShoppingListItem)).all()
+    articulos = [
+        {
+            "id": str(item.id),
+            "product_id": str(item.product_id),
+            "quantity": int(item.quantity),
+            "unit": item.unit,
+        }
+        for item in items
+    ]
     return {
-        "items": [
-            {"product_id": str(item.product_id), "quantity": int(item.quantity), "unit": item.unit}
-            for item in items
-        ]
+        "items": [article for item, article in zip(items, articulos) if not item.purchased],
+        "purchased_items": [
+            article for item, article in zip(items, articulos) if item.purchased
+        ],
+    }
+
+
+@router.post("/{item_id}/purchase")
+async def mark_shopping_list_item_as_purchased(
+    item_id: UUID,
+    request: Request,
+    session: ActiveSession = Depends(get_active_session),
+    db: Session = Depends(get_database_session),
+) -> dict[str, str | int]:
+    """Marca como comprado un elemento pendiente de la lista."""
+    require_csrf(request, session)
+    item = db.get(ShoppingListItem, item_id)
+    if item is None:
+        raise HTTPException(status_code=404, detail="Shopping list item not found")
+    purchased_item = db.scalar(
+        select(ShoppingListItem).where(
+            ShoppingListItem.product_id == item.product_id,
+            ShoppingListItem.unit == item.unit,
+            ShoppingListItem.purchased.is_(True),
+        )
+    )
+    if purchased_item is not None:
+        purchased_item.quantity += item.quantity
+        db.delete(item)
+        item = purchased_item
+    else:
+        item.purchased = True
+    db.commit()
+    return {
+        "id": str(item.id),
+        "product_id": str(item.product_id),
+        "quantity": int(item.quantity),
+        "unit": item.unit,
     }

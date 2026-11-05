@@ -13,23 +13,26 @@ type Props = {
   onGetProducts: (categoryId: string) => Promise<ShoppingProduct[]>;
   onCreateProduct: (categoryId: string, name: string) => Promise<ShoppingProduct>;
   onAddToShoppingList?: (productId: string, quantity: number, unit: ShoppingUnit) => Promise<ShoppingListItem>;
-  onGetShoppingList?: () => Promise<{ items: ShoppingListItem[] }>;
+  onGetShoppingList?: () => Promise<{ items: ShoppingListItem[]; purchased_items?: ShoppingListItem[] }>;
+  onMarkPurchased?: (itemId: string) => Promise<ShoppingListItem>;
 };
 
 /** Presenta las categorías y permite consultar y crear sus productos. */
-export default function ShoppingList({ categories, onCreateCategory, onGetProducts, onCreateProduct, onAddToShoppingList, onGetShoppingList }: Props) {
+export default function ShoppingList({ categories, onCreateCategory, onGetProducts, onCreateProduct, onAddToShoppingList, onGetShoppingList, onMarkPurchased }: Props) {
   const [name, setName] = useState("");
   const [products, setProducts] = useState<Record<string, ShoppingProduct[]>>({});
   const [productNames, setProductNames] = useState<Record<string, string>>({});
   const [productErrors, setProductErrors] = useState<Record<string, string>>({});
   const [listaCompra, setListaCompra] = useState<Record<string, ShoppingListItem>>({});
+  const [comprados, setComprados] = useState<Record<string, ShoppingListItem>>({});
   const [errorListaCompra, setErrorListaCompra] = useState("");
 
   // Carga los elementos compartidos al entrar en la vista.
   useEffect(() => {
     if (!onGetShoppingList) return;
-    void onGetShoppingList().then(({ items }) => {
+    void onGetShoppingList().then(({ items, purchased_items = [] }) => {
       setListaCompra(Object.fromEntries(items.map((item) => [`${item.product_id}:${item.unit}`, item])));
+      setComprados(Object.fromEntries(purchased_items.map((item) => [`${item.product_id}:${item.unit}`, item])));
     }).catch(() => setErrorListaCompra("No se pudo cargar la lista de la compra."));
   }, [onGetShoppingList]);
 
@@ -71,6 +74,15 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
     if (item) setListaCompra((actual) => ({ ...actual, [`${item.product_id}:${item.unit}`]: item }));
   }
 
+  /** Marca una entrada pendiente como comprada y la conserva en la sección inferior. */
+  async function markPurchased(item: ShoppingListItem) {
+    if (!item.id || !onMarkPurchased) return;
+    const updated = await onMarkPurchased(item.id);
+    const key = `${item.product_id}:${item.unit}`;
+    setListaCompra((current) => { const next = { ...current }; delete next[key]; return next; });
+    setComprados((current) => ({ ...current, [key]: updated }));
+  }
+
   return <section className="panel">
     <h2>Lista de la compra</h2>
     <form onSubmit={submit}>
@@ -95,7 +107,11 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
     </li>)}</ul>
     <section aria-label="Lista de la compra"><h3>Lista de la compra</h3>
       {errorListaCompra && <p role="alert">{errorListaCompra}</p>}
-      <ul>{Object.values(listaCompra).map((item) => <li key={`${item.product_id}:${item.unit}`}>
+      <h4>Pendientes</h4><ul>{Object.values(listaCompra).map((item) => <li key={`${item.product_id}:${item.unit}`}>
+        {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id}: {item.quantity} {item.unit === "unit" ? "unidad" : item.unit}
+        {item.id && <button type="button" onClick={() => void markPurchased(item)}>Marcar {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id} como comprado</button>}
+      </li>)}</ul>
+      <h4>Comprados</h4><ul>{Object.values(comprados).map((item) => <li key={`${item.product_id}:${item.unit}`}>
         {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id}: {item.quantity} {item.unit === "unit" ? "unidad" : item.unit}
       </li>)}</ul>
     </section>

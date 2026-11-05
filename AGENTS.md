@@ -32,6 +32,8 @@ Add or update focused tests alongside the code they cover. Backend tests use pyt
 
 Recent history uses Conventional Commit-style prefixes such as `docs:`, `fix:`, and `test:`. Use a concise imperative subject (for example, `fix: bind local development ports to loopback`). Pull requests should explain the change and rationale, link related issues or planning documents, list validation commands and outcomes, and include screenshots for visible UI changes. Call out migration or configuration impacts explicitly.
 
+Escribe en español las recomendaciones y los comentarios incluidos en los mensajes de commit; conserva los prefijos exigidos por Conventional Commits.
+
 ## Python test environment
 
 Run backend pytest commands with the repository virtual environment: `.venv/bin/python -m pytest ...` from the repository root, or `../.venv/bin/python -m pytest ...` from `backend/`.

@@ -1,6 +1,6 @@
 # HU-LC-004 — Borrar productos de la lista
 
-**Estado:** refinada y aprobada; pendiente de implementación.
+**Estado:** completada y verificada.
 
 Corresponde a la [historia #4 del backlog de la lista de la compra](../product/backlog-lista-de-la-compra.md).
 
@@ -12,9 +12,9 @@ Como usuario, quiero borrar productos de la lista, para retirar lo que ya no nec
 
 ## Criterios de aceptación
 
-- [ ] Dada una entrada en «Pendientes» o «Comprados», cuando la borro, entonces desaparece únicamente esa entrada; las demás entradas del mismo producto conservan su estado, cantidad y medida.
-- [ ] Dado un producto cuya entrada he borrado, cuando consulto el catálogo, entonces sigue disponible para añadirlo nuevamente.
-- [ ] Dada una entrada borrada, cuando recargo la lista o la consulta otro usuario, entonces continúa ausente y las demás entradas permanecen intactas.
+- [x] Dada una entrada en «Pendientes» o «Comprados», cuando la borro, entonces desaparece únicamente esa entrada; las demás entradas del mismo producto conservan su estado, cantidad y medida.
+- [x] Dado un producto cuya entrada he borrado, cuando consulto el catálogo, entonces sigue disponible para añadirlo nuevamente.
+- [x] Dada una entrada borrada, cuando recargo la lista o la consulta otro usuario, entonces continúa ausente y las demás entradas permanecen intactas.
 
 ## Plan
 

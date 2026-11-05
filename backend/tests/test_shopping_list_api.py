@@ -163,6 +163,48 @@ def test_unmarking_purchased_item_moves_it_to_pending(meal_database):
     ]
 
 
+def test_unmarking_merges_compatible_pending_quantity(meal_database):
+    """Comprueba que desmarcar suma cantidades de igual producto y unidad."""
+    cookies = authenticate(meal_database)
+    category = post_with_session(
+        "/api/v1/shopping-categories", {"name": "Frutas"}, cookies
+    )
+    product = post_with_session(
+        f"/api/v1/shopping-categories/{category.json()['id']}/products",
+        {"name": "Manzanas"},
+        cookies,
+    )
+    bought = post_with_session(
+        "/api/v1/shopping-list",
+        {"product_id": product.json()["id"], "quantity": 3, "unit": "unit"},
+        cookies,
+    )
+    post_with_session(
+        f"/api/v1/shopping-list/{bought.json()['id']}/purchase", {}, cookies
+    )
+    pending = post_with_session(
+        "/api/v1/shopping-list",
+        {"product_id": product.json()["id"], "quantity": 2, "unit": "unit"},
+        cookies,
+    )
+
+    unmarked = post_with_session(
+        f"/api/v1/shopping-list/{bought.json()['id']}/unpurchase", {}, cookies
+    )
+
+    assert unmarked.status_code == 200
+    response = api_get("/api/v1/shopping-list", cookies=cookies)
+    assert response.json()["purchased_items"] == []
+    assert response.json()["items"] == [
+        {
+            "id": pending.json()["id"],
+            "product_id": product.json()["id"],
+            "quantity": 5,
+            "unit": "unit",
+        }
+    ]
+
+
 def test_adding_purchased_product_creates_new_pending_item(meal_database):
     """Comprueba que añadir un producto comprado crea una entrada pendiente."""
     cookies = authenticate(meal_database)

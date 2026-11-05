@@ -134,7 +134,19 @@ async def unmark_shopping_list_item_as_purchased(
     item = db.get(ShoppingListItem, item_id)
     if item is None:
         raise HTTPException(status_code=404, detail="Shopping list item not found")
-    item.purchased = False
+    pending_item = db.scalar(
+        select(ShoppingListItem).where(
+            ShoppingListItem.product_id == item.product_id,
+            ShoppingListItem.unit == item.unit,
+            ShoppingListItem.purchased.is_(False),
+        )
+    )
+    if pending_item is not None:
+        pending_item.quantity += item.quantity
+        db.delete(item)
+        item = pending_item
+    else:
+        item.purchased = False
     db.commit()
     return {
         "id": str(item.id),

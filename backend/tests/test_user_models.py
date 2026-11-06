@@ -55,7 +55,7 @@ def test_food_catalog_migration_follows_meal_planning_and_auth_migrations():
     root = Path(__file__).resolve().parents[1]
     script = ScriptDirectory(dir=str(root / "migrations"))
 
-    assert script.get_heads() == ["0011_shopping_item_purchased"]
+    assert script.get_heads() == ["0012_recipe_shopping_sections"]
     assert script.get_revision("0002_user_auth").down_revision == "0001_baseline"
     assert script.get_revision("0003_login_attempt_events").down_revision == "0002_user_auth"
     assert script.get_revision("0004_password_reset_rate_scopes").down_revision == "0003_login_attempt_events"
@@ -121,3 +121,26 @@ def test_meal_assignment_slot_and_date_uniqueness_are_enforced():
                 session.commit()
     finally:
         engine.dispose()
+def test_recipe_shopping_ingredient_persists_text_order_and_purchase_state():
+    """Verifica que cada ingrediente conserva texto, orden y estado al persistirse."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from app.models import Base, RecipeShoppingIngredient, RecipeShoppingSection
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        section = RecipeShoppingSection(name="Sopa")
+        session.add(section)
+        session.flush()
+        ingredient = RecipeShoppingIngredient(
+            section_id=section.id, text="2 tomates", position=1, purchased=False
+        )
+        session.add_all([section, ingredient])
+        session.commit()
+        persisted = session.get(RecipeShoppingIngredient, ingredient.id)
+        assert (persisted.text, persisted.position, persisted.purchased) == (
+            "2 tomates", 1, False
+        )
+    engine.dispose()

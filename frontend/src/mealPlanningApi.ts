@@ -12,6 +12,26 @@ export function obtenerListaCompra(): Promise<{ items: ShoppingListItem[]; purch
   return apiRequest("/shopping-list");
 }
 
+/** Cambia el estado de compra de un ingrediente de receta. */
+export function marcarIngredienteReceta(id: string, csrfToken: string): Promise<unknown> {
+  return apiRequest(`/shopping-list/recipe-ingredients/${id}/purchase`, { method: "POST", csrfToken });
+}
+
+/** Devuelve a pendiente un ingrediente de receta. */
+export function desmarcarIngredienteReceta(id: string, csrfToken: string): Promise<unknown> {
+  return apiRequest(`/shopping-list/recipe-ingredients/${id}/unpurchase`, { method: "POST", csrfToken });
+}
+
+/** Elimina un ingrediente de receta. */
+export function eliminarIngredienteReceta(id: string, csrfToken: string): Promise<null> {
+  return apiRequest<null>(`/shopping-list/recipe-ingredients/${id}`, { method: "DELETE", csrfToken });
+}
+
+/** Elimina una sección completa de receta. */
+export function eliminarSeccionReceta(id: string, csrfToken: string): Promise<null> {
+  return apiRequest<null>(`/shopping-list/recipe-sections/${id}`, { method: "DELETE", csrfToken });
+}
+
 /** Marca un elemento de la lista como comprado usando la protección CSRF. */
 export function marcarProductoComprado(itemId: string, csrfToken: string): Promise<ShoppingListItem> {
   return apiRequest(`/shopping-list/${itemId}/purchase`, { method: "POST", csrfToken });

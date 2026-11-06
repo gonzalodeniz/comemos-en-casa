@@ -12,7 +12,7 @@ from app.auth import ActiveSession, get_active_session, require_csrf
 from app.database import get_database_session
 import app.meal_planning_api as meal_planning_api
 from app.food_images import publication_lock, temporary_path
-from app.models import Recipe, RecipeFoodLabel, FoodLabel
+from app.models import Recipe, RecipeFoodLabel, FoodLabel, RecipeShoppingSection, RecipeShoppingIngredient
 
 router=APIRouter(prefix="/api/v1", tags=["recipes"])
 
@@ -99,6 +99,24 @@ def get_recipe(rid:UUID,_:ActiveSession=Depends(get_active_session),db:Session=D
     r=db.get(Recipe,rid)
     if not r:raise HTTPException(404,"Recipe not found")
     return {"recipe":serialize(r,db)}
+
+@router.post("/recipes/{rid}/shopping-section", status_code=201)
+def add_recipe_to_shopping_section(rid: UUID, request: Request, s: ActiveSession = Depends(get_active_session), db: Session = Depends(get_database_session)):
+    """Copia una receta y sus líneas de ingredientes a una sección independiente."""
+    require_csrf(request, s)
+    recipe = db.get(Recipe, rid)
+    if recipe is None:
+        raise HTTPException(404, "Recipe not found")
+    section = RecipeShoppingSection(name=recipe.title)
+    db.add(section)
+    db.flush()
+    lines = (recipe.ingredients or "").splitlines()
+    db.add_all([
+        RecipeShoppingIngredient(section_id=section.id, text=line, position=index)
+        for index, line in enumerate(lines)
+    ])
+    db.commit()
+    return {"id": str(section.id), "name": section.name}
 
 @router.post("/recipes",status_code=201)
 def create_recipe(data:dict,request:Request,s:ActiveSession=Depends(get_active_session),db:Session=Depends(get_database_session)):

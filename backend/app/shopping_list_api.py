@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import ActiveSession, get_active_session, require_csrf
 from app.database import get_database_session
-from app.models import ShoppingListItem, ShoppingProduct
+from app.models import RecipeShoppingIngredient, RecipeShoppingSection, ShoppingListItem, ShoppingProduct
 
 router = APIRouter(prefix="/api/v1/shopping-list", tags=["shopping-list"])
 
@@ -68,9 +68,13 @@ async def add_shopping_list_item(
 async def list_shopping_list_items(
     _session: ActiveSession = Depends(get_active_session),
     db: Session = Depends(get_database_session),
-) -> dict[str, list[dict[str, str | int]]]:
-    """Devuelve los productos y cantidades de la lista de compra."""
+) -> dict:
+    """Devuelve los productos y las secciones de recetas de la lista."""
     items = db.scalars(select(ShoppingListItem)).all()
+    secciones = db.scalars(select(RecipeShoppingSection)).all()
+    ingredientes = db.scalars(
+        select(RecipeShoppingIngredient).order_by(RecipeShoppingIngredient.position)
+    ).all()
     articulos = [
         {
             "id": str(item.id),
@@ -84,6 +88,18 @@ async def list_shopping_list_items(
         "items": [article for item, article in zip(items, articulos) if not item.purchased],
         "purchased_items": [
             article for item, article in zip(items, articulos) if item.purchased
+        ],
+        "recipe_sections": [
+            {
+                "id": str(seccion.id),
+                "name": seccion.name,
+                "ingredients": [
+                    {"id": str(ingrediente.id), "text": ingrediente.text,
+                     "purchased": ingrediente.purchased}
+                    for ingrediente in ingredientes if ingrediente.section_id == seccion.id
+                ],
+            }
+            for seccion in secciones
         ],
     }
 
@@ -171,3 +187,72 @@ async def unmark_shopping_list_item_as_purchased(
         "quantity": int(item.quantity),
         "unit": item.unit,
     }
+
+
+@router.post("/recipe-ingredients/{ingredient_id}/purchase")
+async def mark_recipe_ingredient_as_purchased(
+    ingredient_id: UUID,
+    request: Request,
+    session: ActiveSession = Depends(get_active_session),
+    db: Session = Depends(get_database_session),
+) -> dict[str, str | bool]:
+    """Marca como comprado un ingrediente de receta concreto."""
+    require_csrf(request, session)
+    ingredient = db.get(RecipeShoppingIngredient, ingredient_id)
+    if ingredient is None:
+        raise HTTPException(status_code=404, detail="Recipe ingredient not found")
+    ingredient.purchased = True
+    db.commit()
+    return {"id": str(ingredient.id), "purchased": ingredient.purchased}
+
+
+@router.post("/recipe-ingredients/{ingredient_id}/unpurchase")
+async def unmark_recipe_ingredient_as_purchased(
+    ingredient_id: UUID,
+    request: Request,
+    session: ActiveSession = Depends(get_active_session),
+    db: Session = Depends(get_database_session),
+) -> dict[str, str | bool]:
+    """Devuelve a pendiente un ingrediente de receta concreto."""
+    require_csrf(request, session)
+    ingredient = db.get(RecipeShoppingIngredient, ingredient_id)
+    if ingredient is None:
+        raise HTTPException(status_code=404, detail="Recipe ingredient not found")
+    ingredient.purchased = False
+    db.commit()
+    return {"id": str(ingredient.id), "purchased": ingredient.purchased}
+
+
+@router.delete("/recipe-ingredients/{ingredient_id}", status_code=204)
+async def delete_recipe_ingredient(
+    ingredient_id: UUID,
+    request: Request,
+    session: ActiveSession = Depends(get_active_session),
+    db: Session = Depends(get_database_session),
+) -> Response:
+    """Elimina una línea concreta de una sección de receta."""
+    require_csrf(request, session)
+    ingredient = db.get(RecipeShoppingIngredient, ingredient_id)
+    if ingredient is None:
+        raise HTTPException(status_code=404, detail="Recipe ingredient not found")
+    db.delete(ingredient)
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.delete("/recipe-sections/{section_id}", status_code=204)
+async def delete_recipe_shopping_section(
+    section_id: UUID,
+    request: Request,
+    session: ActiveSession = Depends(get_active_session),
+    db: Session = Depends(get_database_session),
+) -> Response:
+    """Elimina una sección de receta y sus ingredientes asociados."""
+    require_csrf(request, session)
+    section = db.get(RecipeShoppingSection, section_id)
+    if section is None:
+        raise HTTPException(status_code=404, detail="Recipe shopping section not found")
+    db.query(RecipeShoppingIngredient).filter_by(section_id=section_id).delete()
+    db.delete(section)
+    db.commit()
+    return Response(status_code=204)

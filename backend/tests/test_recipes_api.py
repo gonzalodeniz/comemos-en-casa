@@ -11,6 +11,7 @@ from app.database import get_database_session
 from app.main import app
 from app.models import Base, FoodLabel, Recipe, RecipeFoodLabel, User, UserSession
 from app.security import digest_token
+from meal_planning_test_support import authenticate, api_post
 
 
 @pytest.fixture
@@ -36,6 +37,112 @@ def recipe_db(tmp_path, monkeypatch):
     finally:
         app.dependency_overrides.pop(get_database_session, None)
         engine.dispose()
+
+
+def test_add_recipe_to_shopping_section_copies_name_and_ordered_ingredients(recipe_db):
+    """Comprueba que añadir una receta copia el nombre y sus ingredientes en orden."""
+    from app.models import RecipeShoppingIngredient, RecipeShoppingSection
+
+    cookies = authenticate(recipe_db)
+    with recipe_db() as db:
+        receta = Recipe(title="Sopa", title_canonical="sopa", ingredients="agua\nsal\npasta")
+        db.add(receta)
+        db.commit()
+        recipe_id = receta.id
+
+    response = api_post(
+        f"/api/v1/recipes/{recipe_id}/shopping-section",
+        payload={}, cookies=cookies, csrf_token=cookies["csrf_token"],
+    )
+    assert response.status_code == 201
+    with recipe_db() as db:
+        seccion = db.get(RecipeShoppingSection, UUID(response.json()["id"]))
+        ingredientes = db.query(RecipeShoppingIngredient).filter_by(section_id=seccion.id).order_by(RecipeShoppingIngredient.position).all()
+        assert seccion.name == "Sopa"
+        assert [item.text for item in ingredientes] == ["agua", "sal", "pasta"]
+        assert all(not item.purchased for item in ingredientes)
+
+
+def test_editing_recipe_preserves_existing_shopping_section(recipe_db):
+    """Comprueba que editar la receta no cambia su copia en la compra."""
+    from meal_planning_test_support import api_get, api_patch
+
+    cookies = authenticate(recipe_db)
+    with recipe_db() as db:
+        receta = Recipe(title="Sopa", title_canonical="sopa", ingredients="agua\nsal")
+        db.add(receta)
+        db.commit()
+        receta_id = receta.id
+
+    creada = api_post(
+        f"/api/v1/recipes/{receta_id}/shopping-section",
+        payload={}, cookies=cookies, csrf_token=cookies["csrf_token"],
+    )
+    assert creada.status_code == 201
+    editada = api_patch(
+        f"/api/v1/recipes/{receta_id}",
+        payload={"title": "Caldo", "ingredients": "pasta"},
+        cookies=cookies, csrf_token=cookies["csrf_token"],
+    )
+    assert editada.status_code == 200
+    lista = api_get("/api/v1/shopping-list", cookies=cookies)
+    seccion = lista.json()["recipe_sections"][0]
+    assert seccion["id"] == creada.json()["id"]
+    assert seccion["name"] == "Sopa"
+    assert [ingrediente["text"] for ingrediente in seccion["ingredients"]] == ["agua", "sal"]
+
+
+def test_deleting_recipe_preserves_existing_shopping_section(recipe_db):
+    """Comprueba que borrar la receta no elimina su copia de la compra."""
+    from meal_planning_test_support import api_delete, api_get
+
+    cookies = authenticate(recipe_db)
+    with recipe_db() as db:
+        receta = Recipe(title="Sopa", title_canonical="sopa", ingredients="agua\nsal")
+        db.add(receta)
+        db.commit()
+        receta_id = receta.id
+
+    creada = api_post(
+        f"/api/v1/recipes/{receta_id}/shopping-section",
+        payload={}, cookies=cookies, csrf_token=cookies["csrf_token"],
+    )
+    assert creada.status_code == 201
+    borrada = api_delete(f"/api/v1/recipes/{receta_id}", cookies=cookies)
+    assert borrada.status_code == 204
+    lista = api_get("/api/v1/shopping-list", cookies=cookies)
+    seccion = lista.json()["recipe_sections"][0]
+    assert seccion["id"] == creada.json()["id"]
+    assert seccion["name"] == "Sopa"
+    assert [ingrediente["text"] for ingrediente in seccion["ingredients"]] == ["agua", "sal"]
+
+
+def test_adding_recipe_twice_creates_independent_shopping_sections(recipe_db):
+    """Comprueba que cada incorporación crea una copia independiente."""
+    from meal_planning_test_support import api_get, api_delete
+    from app.models import RecipeShoppingSection
+
+    cookies = authenticate(recipe_db)
+    with recipe_db() as db:
+        receta = Recipe(title="Sopa", title_canonical="sopa", ingredients="agua\nsal")
+        db.add(receta)
+        db.commit()
+        receta_id = receta.id
+    ruta = f"/api/v1/recipes/{receta_id}/shopping-section"
+    primera = api_post(ruta, payload={}, cookies=cookies, csrf_token=cookies["csrf_token"])
+    segunda = api_post(ruta, payload={}, cookies=cookies, csrf_token=cookies["csrf_token"])
+    assert primera.status_code == segunda.status_code == 201
+    lista = api_get("/api/v1/shopping-list", cookies=cookies).json()["recipe_sections"]
+    assert len(lista) == 2
+    assert lista[0]["id"] != lista[1]["id"]
+    eliminada = api_delete(
+        f"/api/v1/shopping-list/recipe-sections/{lista[0]['id']}", cookies=cookies
+    )
+    assert eliminada.status_code == 204
+    restante = api_get("/api/v1/shopping-list", cookies=cookies).json()["recipe_sections"]
+    assert len(restante) == 1
+    assert restante[0]["id"] == lista[1]["id"]
+    assert [item["text"] for item in restante[0]["ingredients"]] == ["agua", "sal"]
 
 
 def test_search_ranks_by_field_matches_and_uses_alphabetical_ties(recipe_db):

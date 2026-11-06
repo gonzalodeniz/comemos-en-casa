@@ -2,7 +2,7 @@
 
 **Estado:** hecha; refinamiento aprobado y criterios de aceptación verificados.
 
-Corresponde a la [historia #1 del backlog de la lista de la compra](../../product/backlog-lista-de-la-compra.md).
+Corresponde a la [historia #1 del backlog de la lista de la compra](../../product/lista-de-la-compra/backlog.md).
 
 ## Historia de usuario
 

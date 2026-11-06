@@ -3,7 +3,7 @@ import { useState, type ReactNode } from "react";
 import AppBrand from "./AppBrand";
 import AppIcon from "./AppIcon";
 
-export type AppView = "meal-planning" | "food-catalog" | "recipes" | "shopping-list" | "users";
+export type AppView = "meal-planning" | "food-catalog" | "recipes" | "shopping-list" | "product-catalog" | "users";
 
 type Props = {
   view: AppView;
@@ -14,11 +14,12 @@ type Props = {
   foodCatalog?: ReactNode;
   recipes?: ReactNode;
   shoppingList?: ReactNode;
+  productCatalog?: ReactNode;
   sessionTools?: ReactNode;
   notifications?: ReactNode;
 };
 
-export default function AppWorkspace({ view, onViewChange, disabled, mealPlanning, userManagement, foodCatalog, recipes, shoppingList, sessionTools, notifications }: Props) {
+export default function AppWorkspace({ view, onViewChange, disabled, mealPlanning, userManagement, foodCatalog, recipes, shoppingList, productCatalog, sessionTools, notifications }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div className="app-workspace">
@@ -53,6 +54,9 @@ export default function AppWorkspace({ view, onViewChange, disabled, mealPlannin
         >
           <AppIcon name="shopping-cart" /><span>Lista de la compra</span>
         </button>
+        <button type="button" aria-current={view === "product-catalog" ? "page" : undefined} disabled={disabled} onClick={() => { onViewChange("product-catalog"); setMenuOpen(false); }}>
+          <AppIcon name="shopping-cart" /><span>Catálogo de productos</span>
+        </button>
         <button
           type="button"
           aria-current={view === "users" ? "page" : undefined}
@@ -67,7 +71,7 @@ export default function AppWorkspace({ view, onViewChange, disabled, mealPlannin
       </aside>
       <div className="workspace-content" id="workspace-content" tabIndex={-1}>
         {notifications}
-        {view === "meal-planning" ? mealPlanning : view === "food-catalog" ? foodCatalog : view === "recipes" ? recipes : view === "shopping-list" ? shoppingList : userManagement}
+        {view === "meal-planning" ? mealPlanning : view === "food-catalog" ? foodCatalog : view === "recipes" ? recipes : view === "shopping-list" ? shoppingList : view === "product-catalog" ? productCatalog : userManagement}
       </div>
     </div>
   );

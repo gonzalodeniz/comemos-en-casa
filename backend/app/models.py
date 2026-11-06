@@ -170,6 +170,7 @@ class ShoppingCategory(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
+    image_path: Mapped[str | None] = mapped_column(String(255))
 
 
 class ShoppingProduct(Base):
@@ -182,6 +183,7 @@ class ShoppingProduct(Base):
         ForeignKey("shopping_categories.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
+    image_path: Mapped[str | None] = mapped_column(String(255))
 
 
 class ShoppingListItem(Base):

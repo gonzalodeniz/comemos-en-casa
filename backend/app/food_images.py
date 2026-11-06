@@ -243,16 +243,19 @@ def temporary_path(root: Path, session_id: UUID, token: str) -> Path | None:
     return path
 
 
-def publish_temporary(root: Path, session_id: UUID, token: str) -> str | None:
+def publish_temporary(root: Path, session_id: UUID, token: str, *, category: str = "comidas") -> str | None:
+    """Publica una imagen temporal en el directorio autorizado del catálogo."""
+    if category not in {"comidas", "productos"}:
+        raise ValueError("Invalid image category")
     with _quota_guard:
         source = temporary_path(root, session_id, token)
         if source is None:
             return None
-        folder = root / "comidas"
+        folder = root / category
         _private_directory(folder)
         target = folder / f"{uuid4().hex}.webp"
         os.replace(source, target)
-        return f"comidas/{target.name}"
+        return f"{category}/{target.name}"
 
 
 def inspect_possible_orphans(root: Path, db, *, now: float | None = None) -> list[str]:

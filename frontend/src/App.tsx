@@ -7,8 +7,9 @@ import MealPlanning from "./MealPlanning";
 import FoodCatalog from "./FoodCatalog";
 import Recipes from "./Recipes";
 import ShoppingList from "./ShoppingList";
+import ProductCatalog from "./ProductCatalog";
 // Conecta la vista de la compra con el catálogo compartido de categorías y productos.
-import { getShoppingCategories, createShoppingCategory, getShoppingProducts, createShoppingProduct, agregarProductoListaCompra, obtenerListaCompra, marcarProductoComprado, desmarcarProductoComprado, eliminarEntradaListaCompra, marcarIngredienteReceta, desmarcarIngredienteReceta, eliminarIngredienteReceta, eliminarSeccionReceta, type ShoppingCategory } from "./mealPlanningApi";
+import { getShoppingCategories, createShoppingCategory, updateShoppingCategoryImage, getShoppingProducts, createShoppingProduct, updateShoppingProductImage, agregarProductoListaCompra, obtenerListaCompra, marcarProductoComprado, desmarcarProductoComprado, eliminarEntradaListaCompra, marcarIngredienteReceta, desmarcarIngredienteReceta, eliminarIngredienteReceta, eliminarSeccionReceta, type ShoppingCategory } from "./mealPlanningApi";
 import AppWorkspace, { type AppView } from "./AppWorkspace";
 import AppBrand from "./AppBrand";
 import AppIcon from "./AppIcon";
@@ -32,6 +33,9 @@ export default function App() {
   const [csrfToken, setCsrfToken] = useState("");
   const [users, setUsers] = useState<User[]>([]);
   const [shoppingCategories, setShoppingCategories] = useState<ShoppingCategory[]>([]);
+  const [cargandoCategorias, setCargandoCategorias] = useState(false);
+  const [errorCategorias, setErrorCategorias] = useState("");
+  const [revisionCategorias, setRevisionCategorias] = useState(0);
   const [resetToken, setResetToken] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -95,17 +99,20 @@ export default function App() {
   }, [refreshSession]);
 
   useEffect(() => {
-    if (screen !== "app" || view !== "shopping-list") return;
+    if (screen !== "app" || view !== "shopping-list" && view !== "product-catalog") return;
     let cancelled = false;
+    setCargandoCategorias(true);
+    setErrorCategorias("");
     void getShoppingCategories().then((result) => {
       if (!cancelled) setShoppingCategories(result.categories);
     }).catch((cause) => {
       if (cancelled) return;
       if (cause instanceof ApiError && cause.status === 401) mealSessionExpired();
+      else if (view === "product-catalog") setErrorCategorias("No se pudieron cargar las categorías.");
       else setError("No se pudieron cargar las categorías.");
-    });
+    }).finally(() => { if (!cancelled) setCargandoCategorias(false); });
     return () => { cancelled = true; };
-  }, [screen, view, mealSessionExpired]);
+  }, [screen, view, mealSessionExpired, revisionCategorias]);
 
   async function perform(action: () => Promise<void>) {
     setLoading(true);
@@ -327,10 +334,16 @@ export default function App() {
           mealPlanning={<MealPlanning csrfToken={csrfToken} onSessionExpired={mealSessionExpired} onOpenRecipes={(foodId) => { setRecipeFoodId(foodId); setView("recipes"); persistAppView("recipes"); }} />}
           foodCatalog={<FoodCatalog csrfToken={csrfToken} onSessionExpired={mealSessionExpired} onOpenRecipes={(foodId) => { setRecipeFoodId(foodId); setView("recipes"); persistAppView("recipes"); }} />}
           recipes={<Recipes key={recipeListReset} csrfToken={csrfToken} onSessionExpired={mealSessionExpired} initialFoodId={recipeFoodId} />}
-          shoppingList={<ShoppingList categories={shoppingCategories} onGetProducts={async (categoryId) => (await getShoppingProducts(categoryId)).products} onCreateProduct={(categoryId, name) => createShoppingProduct(categoryId, name, csrfToken)} onAddToShoppingList={(productoId, cantidad, unidad) => agregarProductoListaCompra(productoId, cantidad, unidad, csrfToken)} onGetShoppingList={obtenerListaCompra} onMarkRecipeIngredient={(id) => marcarIngredienteReceta(id, csrfToken)} onUnmarkRecipeIngredient={(id) => desmarcarIngredienteReceta(id, csrfToken)} onDeleteRecipeIngredient={(id) => eliminarIngredienteReceta(id, csrfToken)} onDeleteRecipeSection={(id) => eliminarSeccionReceta(id, csrfToken)} onMarkPurchased={(itemId) => marcarProductoComprado(itemId, csrfToken)} onUnmarkPurchased={(itemId) => desmarcarProductoComprado(itemId, csrfToken)} onDeleteItem={(itemId) => eliminarEntradaListaCompra(itemId, csrfToken)} onCreateCategory={(name) => void perform(async () => {
-            const category = await createShoppingCategory(name, csrfToken);
-            setShoppingCategories((current) => [...current, category]);
-          })} />}
+          productCatalog={<ProductCatalog onSessionExpired={mealSessionExpired} categories={shoppingCategories} cargandoCategorias={cargandoCategorias} errorCategorias={errorCategorias} onReintentarCategorias={() => setRevisionCategorias((actual) => actual + 1)} onCreateCategory={async (name, token) => { const category = await createShoppingCategory(name, csrfToken, token); setShoppingCategories((current) => [...current, category]); }} onCreateProduct={(id, name, token) => createShoppingProduct(id, name, csrfToken, token)} onGetProducts={async (id) => (await getShoppingProducts(id)).products} onUpdateCategoryImage={async (id, change) => { const updated = await updateShoppingCategoryImage(id, csrfToken, change); setShoppingCategories((current) => current.map((category) => category.id === id ? updated : category)); return updated; }} onUpdateProductImage={(categoryId, id, change) => updateShoppingProductImage(categoryId, id, csrfToken, change)} onImportImage={async (url) => (await apiRequest<{ data_url: string }>("/food-labels/images/import-url", { method: "POST", csrfToken, body: { url } })).data_url} onPrepareImage={async (dataUrl, crop) => (await apiRequest<{ image_token: string }>("/food-labels/images/prepare", { method: "POST", csrfToken, body: { data_url: dataUrl, crop } })).image_token} />}
+          shoppingList={<ShoppingList categories={shoppingCategories} onGetProducts={async (categoryId) => (await getShoppingProducts(categoryId)).products} onCreateProduct={(categoryId, name, imageToken) => createShoppingProduct(categoryId, name, csrfToken, imageToken)} onUpdateCategoryImage={async (categoryId, change) => { const updated = await updateShoppingCategoryImage(categoryId, csrfToken, change); setShoppingCategories((current) => current.map((category) => category.id === categoryId ? updated : category)); return updated; }} onUpdateProductImage={(categoryId, productId, change) => updateShoppingProductImage(categoryId, productId, csrfToken, change)} onImportImage={async (url) => (await apiRequest<{ data_url: string }>("/food-labels/images/import-url", { method: "POST", csrfToken, body: { url } })).data_url} onPrepareImage={async (dataUrl, crop) => (await apiRequest<{ image_token: string }>("/food-labels/images/prepare", { method: "POST", csrfToken, body: { data_url: dataUrl, crop } })).image_token} onAddToShoppingList={(productoId, cantidad, unidad) => agregarProductoListaCompra(productoId, cantidad, unidad, csrfToken)} onGetShoppingList={obtenerListaCompra} onMarkRecipeIngredient={(id) => marcarIngredienteReceta(id, csrfToken)} onUnmarkRecipeIngredient={(id) => desmarcarIngredienteReceta(id, csrfToken)} onDeleteRecipeIngredient={(id) => eliminarIngredienteReceta(id, csrfToken)} onDeleteRecipeSection={(id) => eliminarSeccionReceta(id, csrfToken)} onMarkPurchased={(itemId) => marcarProductoComprado(itemId, csrfToken)} onUnmarkPurchased={(itemId) => desmarcarProductoComprado(itemId, csrfToken)} onDeleteItem={(itemId) => eliminarEntradaListaCompra(itemId, csrfToken)} onCreateCategory={async (name, imageToken) => {
+            try {
+              const category = await createShoppingCategory(name, csrfToken, imageToken);
+              setShoppingCategories((current) => [...current, category]);
+            } catch (cause) {
+              if (cause instanceof ApiError && cause.status === 401) { setCurrentUser(null); setCsrfToken(""); setUsers([]); setScreen("login"); }
+              throw cause;
+            }
+          }} />}
           userManagement={<div className="dashboard">
             <section className="panel">
               <p className="eyebrow">Tu familia</p>

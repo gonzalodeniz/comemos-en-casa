@@ -67,8 +67,8 @@ def _food_image_url(label: FoodLabel) -> str | None:
     return f"/food-labels/{label.id}/image?v={version}"
 
 
-def _remove_food_image(relative_path: str) -> None:
-    path = _managed_food_image_path(relative_path)
+def _remove_food_image(relative_path: str, category: str = "comidas") -> None:
+    path = _managed_food_image_path(relative_path, category)
     if path is None:
         logger.warning("food_image_cleanup_rejected_path")
         return

@@ -19,6 +19,56 @@ const operation: MealPlanningOperation = {
 };
 
 describe("meal planning API client", () => {
+  it("updates_existing_category_image_with_token", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "category-1", name: "Fruta" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { updateShoppingCategoryImage } = await import("./mealPlanningApi");
+    await updateShoppingCategoryImage("category-1", "csrf-1", { image_token: "image-token" });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/shopping-categories/category-1");
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(String(init.body))).toEqual({ image_token: "image-token" });
+    expect(new Headers(init.headers).get("X-CSRF-Token")).toBe("csrf-1");
+  });
+
+  it("updates_existing_product_image_with_token", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "product-1", name: "Manzana" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { updateShoppingProductImage } = await import("./mealPlanningApi");
+    await updateShoppingProductImage("category-1", "product-1", "csrf-1", { image_token: "image-token" });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/shopping-categories/category-1/products/product-1");
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(String(init.body))).toEqual({ image_token: "image-token" });
+    expect(new Headers(init.headers).get("X-CSRF-Token")).toBe("csrf-1");
+  });
+
+  // Comprueba que la creación de categoría envía el token de imagen preparado.
+  it("creates_shopping_category_with_prepared_image_token", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "category-1", name: "Fruta" }), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { createShoppingCategory } = await import("./mealPlanningApi");
+
+    await createShoppingCategory("Fruta", "csrf-1", "image-token");
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/shopping-categories");
+    expect(JSON.parse(String(init.body))).toEqual({ name: "Fruta", image_token: "image-token" });
+    expect(new Headers(init.headers).get("X-CSRF-Token")).toBe("csrf-1");
+  });
+  // Comprueba que el token de imagen preparado acompaña a la creación del producto.
+  it("creates_shopping_product_with_prepared_image_token", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ id: "product-1", name: "Manzana" }), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { createShoppingProduct } = await import("./mealPlanningApi");
+
+    await createShoppingProduct("category-1", "Manzana", "csrf-1", "image-token");
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/shopping-categories/category-1/products");
+    expect(JSON.parse(String(init.body))).toEqual({ name: "Manzana", image_token: "image-token" });
+    expect(new Headers(init.headers).get("X-CSRF-Token")).toBe("csrf-1");
+  });
   // Comprueba que se consulta la lista de la compra con el cliente autenticado.
   it("carga_lista_de_la_compra_con_sus_productos", async () => {
     const response = { items: [{ product_id: "product-1", quantity: 1500, unit: "g" }] };

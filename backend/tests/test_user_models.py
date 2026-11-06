@@ -55,7 +55,7 @@ def test_food_catalog_migration_follows_meal_planning_and_auth_migrations():
     root = Path(__file__).resolve().parents[1]
     script = ScriptDirectory(dir=str(root / "migrations"))
 
-    assert script.get_heads() == ["0013_product_image"]
+    assert script.get_heads() == ["0014_category_image"]
     assert script.get_revision("0002_user_auth").down_revision == "0001_baseline"
     assert script.get_revision("0003_login_attempt_events").down_revision == "0002_user_auth"
     assert script.get_revision("0004_password_reset_rate_scopes").down_revision == "0003_login_attempt_events"
@@ -66,6 +66,7 @@ def test_food_catalog_migration_follows_meal_planning_and_auth_migrations():
     # Los productos se incorporan después de crear las categorías.
     assert script.get_revision("0009_shopping_products").down_revision == "0008_shopping_categories"
     assert script.get_revision("0013_product_image").down_revision == "0012_recipe_shopping_sections"
+    assert script.get_revision("0014_category_image").down_revision == "0013_product_image"
 
 
 def test_meal_assignments_have_slot_check_and_unique_date_slot():

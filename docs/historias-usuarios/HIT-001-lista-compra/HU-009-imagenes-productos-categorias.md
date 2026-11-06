@@ -1,6 +1,6 @@
 # HU-009 — Imágenes de productos y categorías
 
-**Estado:** refinada y aprobada; pendiente de implementación.
+**Estado:** implementada y verificada.
 
 Corresponde a la [historia #9 del backlog de la lista de la compra](../../product/lista-de-la-compra/backlog.md).
 
@@ -10,9 +10,9 @@ Como usuario, quiero añadir imágenes a productos y categorías, para identific
 
 ## Criterios de aceptación
 
-- [ ] Dado que creo un producto o categoría, cuando selecciono, arrastro, pego o importo por URL una imagen, entonces puedo previsualizarla, ajustar su recorte y guardarla; añadir imagen es opcional.
-- [ ] Dado un producto o categoría existente, cuando añado, sustituyo o quito su imagen y guardo, entonces el cambio se conserva y es visible para todos los usuarios al consultar la lista de la compra y su catálogo.
-- [ ] Dado que intento incorporar una imagen no válida o cuya carga falla, cuando se produce el error, entonces veo un mensaje explicativo y la imagen guardada anteriormente se conserva.
+- [x] Dado que creo un producto o categoría, cuando selecciono, arrastro, pego o importo por URL una imagen, entonces puedo previsualizarla, ajustar su recorte y guardarla; añadir imagen es opcional.
+- [x] Dado un producto o categoría existente, cuando añado, sustituyo o quito su imagen y guardo, entonces el cambio se conserva y es visible para todos los usuarios al consultar la lista de la compra y su catálogo.
+- [x] Dado que intento incorporar una imagen no válida o cuya carga falla, cuando se produce el error, entonces veo un mensaje explicativo y la imagen guardada anteriormente se conserva.
 
 ## Plan
 
@@ -33,6 +33,8 @@ Como usuario, quiero añadir imágenes a productos y categorías, para identific
 - Cambiar nombres, mover productos entre categorías o eliminar elementos del catálogo.
 - Modificar la gestión de imágenes de recetas y comidas.
 
-## Siguiente paso
+## Verificación
 
-El usuario invocará `/pair` manualmente para implementar esta historia refinada. No se inicia automáticamente.
+- Pruebas backend: 168 pasaron; 15 pruebas de integración se ejecutaron aparte contra PostgreSQL aislado y pasaron.
+- Pruebas frontend: 145 pasaron; compilación de producción correcta.
+- La comprobación visual manual en navegador queda como revisión opcional.

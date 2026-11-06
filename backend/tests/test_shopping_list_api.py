@@ -261,7 +261,7 @@ def test_migration_adds_optional_product_image_path(tmp_path, monkeypatch):
             conexion.execute(text("INSERT INTO shopping_products (id, name) VALUES (1, 'Manzana')"))
         config = Config("alembic.ini")
         command.stamp(config, "0012_recipe_shopping_sections")
-        command.upgrade(config, "head")
+        command.upgrade(config, "0013_product_image")
         columna = next(c for c in inspect(engine).get_columns("shopping_products") if c["name"] == "image_path")
         assert columna["nullable"]
         with engine.begin() as conexion:
@@ -298,6 +298,316 @@ def test_create_product_with_image_persists_image(meal_database):
     imagen_guardada = api_get(f"/api/v1{producto['image_url']}", cookies=cookies)
     assert imagen_guardada.status_code == 200
     assert imagen_guardada.headers["content-type"] == "image/webp"
+
+
+def test_removing_product_image_deletes_published_file(meal_database, tmp_path):
+    """Comprueba que quitar una imagen elimina el archivo publicado del producto."""
+    from sqlalchemy import select
+    from app.auth import SESSION_COOKIE
+    from app.food_images import save_temporary
+    from app.models import UserSession
+    from app.security import digest_token
+    from meal_planning_test_support import api_patch
+
+    cookies = authenticate(meal_database)
+    root = tmp_path / "image-data"
+    with meal_database() as db:
+        session = db.scalar(select(UserSession).where(UserSession.token_digest == digest_token(cookies[SESSION_COOKIE])))
+        token = save_temporary(root, session.id, b"imagen preparada")
+    category = post_with_session("/api/v1/shopping-categories", {"name": "Frutas"}, cookies).json()
+    ruta = f"/api/v1/shopping-categories/{category['id']}/products"
+    product = post_with_session(ruta, {"name": "Manzana", "image_token": token}, cookies).json()
+    archivos = list((root / "productos").glob("*.webp"))
+    assert len(archivos) == 1
+
+    respuesta = api_patch(f"{ruta}/{product['id']}", payload={"remove_image": True}, cookies=cookies, csrf_token=cookies["csrf_token"])
+
+    assert respuesta.status_code == 200
+    assert not archivos[0].exists()
+
+
+def test_replacing_category_image_deletes_previous_file(meal_database, tmp_path):
+    """Comprueba que sustituir la imagen conserva solo el archivo nuevo."""
+    from sqlalchemy import select
+    from app.auth import SESSION_COOKIE
+    from app.food_images import save_temporary
+    from app.models import UserSession
+    from app.security import digest_token
+    from meal_planning_test_support import api_patch
+
+    cookies = authenticate(meal_database)
+    root = tmp_path / "image-data"
+    with meal_database() as db:
+        session = db.scalar(select(UserSession).where(UserSession.token_digest == digest_token(cookies[SESSION_COOKIE])))
+        anterior = save_temporary(root, session.id, b"imagen anterior")
+        nueva = save_temporary(root, session.id, b"imagen nueva")
+    categoria = post_with_session("/api/v1/shopping-categories", {"name": "Frutas", "image_token": anterior}, cookies).json()
+    archivo_anterior = next((root / "productos").glob("*.webp"))
+
+    respuesta = api_patch(f"/api/v1/shopping-categories/{categoria['id']}", payload={"image_token": nueva}, cookies=cookies, csrf_token=cookies["csrf_token"])
+
+    assert respuesta.status_code == 200
+    assert not archivo_anterior.exists()
+    archivos = list((root / "productos").glob("*.webp"))
+    assert len(archivos) == 1
+    assert archivos[0].read_bytes() == b"imagen nueva"
+
+
+def test_replacing_product_image_deletes_previous_file(meal_database, tmp_path):
+    """Comprueba que reemplazar una imagen de producto elimina el archivo anterior."""
+    from sqlalchemy import select
+    from app.auth import SESSION_COOKIE
+    from app.food_images import save_temporary
+    from app.models import UserSession
+    from app.security import digest_token
+    from meal_planning_test_support import api_patch
+
+    cookies = authenticate(meal_database)
+    root = tmp_path / "image-data"
+    with meal_database() as db:
+        session = db.scalar(select(UserSession).where(UserSession.token_digest == digest_token(cookies[SESSION_COOKIE])))
+        anterior = save_temporary(root, session.id, b"imagen anterior")
+        nueva = save_temporary(root, session.id, b"imagen nueva")
+    categoria = post_with_session("/api/v1/shopping-categories", {"name": "Frutas"}, cookies).json()
+    ruta = f"/api/v1/shopping-categories/{categoria['id']}/products"
+    producto = post_with_session(ruta, {"name": "Manzana", "image_token": anterior}, cookies).json()
+    archivo_anterior = next((root / "productos").glob("*.webp"))
+
+    respuesta = api_patch(f"{ruta}/{producto['id']}", payload={"image_token": nueva}, cookies=cookies, csrf_token=cookies["csrf_token"])
+
+    assert respuesta.status_code == 200
+    assert not archivo_anterior.exists()
+    archivos = list((root / "productos").glob("*.webp"))
+    assert len(archivos) == 1
+    assert archivos[0].read_bytes() == b"imagen nueva"
+
+
+def test_invalid_category_image_preserves_previous_image(meal_database, tmp_path):
+    """Comprueba que un token inválido no altera la imagen guardada."""
+    from sqlalchemy import select
+    from app.auth import SESSION_COOKIE
+    from app.food_images import save_temporary
+    from app.models import UserSession
+    from app.security import digest_token
+    from meal_planning_test_support import api_patch
+
+    cookies = authenticate(meal_database)
+    root = tmp_path / "image-data"
+    with meal_database() as db:
+        session = db.scalar(select(UserSession).where(UserSession.token_digest == digest_token(cookies[SESSION_COOKIE])))
+        token = save_temporary(root, session.id, b"imagen original")
+    categoria = post_with_session("/api/v1/shopping-categories", {"name": "Frutas", "image_token": token}, cookies).json()
+    url = categoria["image_url"]
+
+    respuesta = api_patch(f"/api/v1/shopping-categories/{categoria['id']}", payload={"image_token": "0" * 32}, cookies=cookies, csrf_token=cookies["csrf_token"])
+
+    assert respuesta.status_code == 422
+    categorias = api_get("/api/v1/shopping-categories", cookies=cookies).json()["categories"]
+    assert categorias[0]["image_url"] == url
+    assert api_get(f"/api/v1{url}", cookies=cookies).content == b"imagen original"
+
+
+def test_rejects_non_string_product_image_token(meal_database):
+    """Comprueba que un token inválido produce un error de validación."""
+    from meal_planning_test_support import api_patch
+
+    cookies = authenticate(meal_database)
+    category = post_with_session("/api/v1/shopping-categories", {"name": "Frutas"}, cookies).json()
+    ruta = f"/api/v1/shopping-categories/{category['id']}/products"
+    product = post_with_session(ruta, {"name": "Manzana"}, cookies).json()
+
+    respuesta = api_patch(f"{ruta}/{product['id']}", payload={"image_token": 123}, cookies=cookies, csrf_token=cookies["csrf_token"])
+
+    assert respuesta.status_code == 422
+
+
+def test_rejects_non_string_category_image_token(meal_database):
+    """Comprueba que una categoría rechaza un token de imagen no textual."""
+    from meal_planning_test_support import api_patch
+
+    cookies = authenticate(meal_database)
+    category = post_with_session("/api/v1/shopping-categories", {"name": "Frutas"}, cookies).json()
+    respuesta = api_patch(f"/api/v1/shopping-categories/{category['id']}", payload={"image_token": 123}, cookies=cookies, csrf_token=cookies["csrf_token"])
+
+    assert respuesta.status_code == 422
+
+
+def test_migration_adds_optional_category_image_path(tmp_path, monkeypatch):
+    """Verifica que una categoría existente admite una imagen opcional."""
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import inspect, text
+
+    database = tmp_path / "categorias.sqlite"
+    url = f"sqlite+pysqlite:///{database}"
+    monkeypatch.setenv("DATABASE_URL", url)
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conexion:
+            conexion.execute(text("CREATE TABLE shopping_categories (id INTEGER PRIMARY KEY, name VARCHAR(100) NOT NULL)"))
+        config = Config("alembic.ini")
+        command.stamp(config, "0013_product_image")
+        command.upgrade(config, "head")
+        columna = next(c for c in inspect(engine).get_columns("shopping_categories") if c["name"] == "image_path")
+        assert columna["nullable"]
+    finally:
+        engine.dispose()
+
+
+def test_create_category_with_image_persists_image(meal_database):
+    """Comprueba que una categoría creada publica y devuelve su imagen."""
+    import base64
+    import io
+    from PIL import Image
+
+    cookies = authenticate(meal_database)
+    contenido = io.BytesIO()
+    Image.new("RGB", (10, 10), "blue").save(contenido, format="PNG")
+    data_url = "data:image/png;base64," + base64.b64encode(contenido.getvalue()).decode("ascii")
+    preparada = post_with_session("/api/v1/food-labels/images/prepare", {
+        "data_url": data_url, "crop": {"x": 0, "y": 0, "width": 10, "height": 10},
+    }, cookies)
+    creada = post_with_session("/api/v1/shopping-categories", {
+        "name": "Frutas", "image_token": preparada.json()["image_token"],
+    }, cookies)
+
+    assert creada.status_code == 201
+    assert creada.json().get("image_url")
+    imagen = api_get(f"/api/v1{creada.json()['image_url']}", cookies=cookies)
+    assert imagen.status_code == 200
+    assert imagen.headers["content-type"] == "image/webp"
+
+
+def test_replace_and_remove_product_image(meal_database):
+    """Comprueba que sustituir y quitar una imagen se refleja en el catálogo."""
+    import base64
+    import io
+    from PIL import Image
+    from meal_planning_test_support import api_patch
+
+    cookies = authenticate(meal_database)
+
+    def preparar(color):
+        contenido = io.BytesIO()
+        Image.new("RGB", (10, 10), color).save(contenido, format="PNG")
+        url = "data:image/png;base64," + base64.b64encode(contenido.getvalue()).decode("ascii")
+        respuesta = post_with_session("/api/v1/food-labels/images/prepare", {
+            "data_url": url, "crop": {"x": 0, "y": 0, "width": 10, "height": 10},
+        }, cookies)
+        return respuesta.json()["image_token"]
+
+    categoria = post_with_session("/api/v1/shopping-categories", {"name": "Frutas"}, cookies)
+    ruta = f"/api/v1/shopping-categories/{categoria.json()['id']}/products"
+    producto = post_with_session(ruta, {"name": "Manzana", "image_token": preparar("red")}, cookies).json()
+    endpoint = f"{ruta}/{producto['id']}"
+    reemplazo = api_patch(endpoint, payload={"image_token": preparar("blue")}, cookies=cookies, csrf_token=cookies["csrf_token"])
+    assert reemplazo.status_code == 200
+    lista = api_get(ruta, cookies=cookies).json()["products"]
+    actualizado = next(item for item in lista if item["id"] == producto["id"])
+    imagen = api_get(f"/api/v1{actualizado['image_url']}", cookies=cookies)
+    assert imagen.status_code == 200
+
+    eliminado = api_patch(endpoint, payload={"remove_image": True}, cookies=cookies, csrf_token=cookies["csrf_token"])
+    assert eliminado.status_code == 200
+    final = next(item for item in api_get(ruta, cookies=cookies).json()["products"] if item["id"] == producto["id"])
+    assert final.get("image_url") is None
+
+
+def test_invalid_image_preserves_previous_product_image(meal_database):
+    """Comprueba que un token inválido no elimina la imagen previamente guardada."""
+    import base64
+    import io
+    from PIL import Image
+    from meal_planning_test_support import api_patch
+
+    cookies = authenticate(meal_database)
+    imagen = io.BytesIO()
+    Image.new("RGB", (10, 10), "green").save(imagen, format="PNG")
+    data_url = "data:image/png;base64," + base64.b64encode(imagen.getvalue()).decode("ascii")
+    preparada = post_with_session("/api/v1/food-labels/images/prepare", {
+        "data_url": data_url, "crop": {"x": 0, "y": 0, "width": 10, "height": 10},
+    }, cookies)
+    category = post_with_session("/api/v1/shopping-categories", {"name": "Frutas"}, cookies)
+    products_url = f"/api/v1/shopping-categories/{category.json()['id']}/products"
+    product = post_with_session(products_url, {
+        "name": "Manzana", "image_token": preparada.json()["image_token"],
+    }, cookies).json()
+    endpoint = f"{products_url}/{product['id']}"
+
+    response = api_patch(endpoint, payload={"image_token": "0" * 32}, cookies=cookies, csrf_token=cookies["csrf_token"])
+
+    assert response.status_code == 422
+    listed = next(item for item in api_get(products_url, cookies=cookies).json()["products"] if item["id"] == product["id"])
+    assert listed.get("image_url")
+
+
+def test_replace_and_remove_category_image(meal_database):
+    """Comprueba que sustituir y quitar una imagen se refleja en la categoría."""
+    import base64
+    import io
+    from PIL import Image
+    from meal_planning_test_support import api_patch
+
+    cookies = authenticate(meal_database)
+
+    def preparar(color):
+        contenido = io.BytesIO()
+        Image.new("RGB", (10, 10), color).save(contenido, format="PNG")
+        data_url = "data:image/png;base64," + base64.b64encode(contenido.getvalue()).decode("ascii")
+        respuesta = post_with_session("/api/v1/food-labels/images/prepare", {
+            "data_url": data_url, "crop": {"x": 0, "y": 0, "width": 10, "height": 10},
+        }, cookies)
+        return respuesta.json()["image_token"]
+
+    category = post_with_session("/api/v1/shopping-categories", {"name": "Frutas", "image_token": preparar("red")}, cookies).json()
+    endpoint = f"/api/v1/shopping-categories/{category['id']}"
+    replaced = api_patch(endpoint, payload={"image_token": preparar("blue")}, cookies=cookies, csrf_token=cookies["csrf_token"])
+    assert replaced.status_code == 200
+    listed = next(item for item in api_get("/api/v1/shopping-categories", cookies=cookies).json()["categories"] if item["id"] == category["id"])
+    assert api_get(f"/api/v1{listed['image_url']}", cookies=cookies).status_code == 200
+
+    removed = api_patch(endpoint, payload={"remove_image": True}, cookies=cookies, csrf_token=cookies["csrf_token"])
+    assert removed.status_code == 200
+    final = next(item for item in api_get("/api/v1/shopping-categories", cookies=cookies).json()["categories"] if item["id"] == category["id"])
+    assert final.get("image_url") is None
+
+
+def test_product_and_category_images_are_visible_in_catalog_and_shopping_list(meal_database):
+    """Comprueba que el catálogo y la lista exponen las imágenes almacenadas."""
+    import base64
+    import io
+    from PIL import Image
+
+    cookies = authenticate(meal_database)
+    contenido = io.BytesIO()
+    Image.new("RGB", (10, 10), "orange").save(contenido, format="PNG")
+    data_url = "data:image/png;base64," + base64.b64encode(contenido.getvalue()).decode("ascii")
+    def token_preparado():
+        return post_with_session("/api/v1/food-labels/images/prepare", {
+            "data_url": data_url, "crop": {"x": 0, "y": 0, "width": 10, "height": 10},
+        }, cookies).json()["image_token"]
+
+    category = post_with_session("/api/v1/shopping-categories", {
+        "name": "Frutas", "image_token": token_preparado(),
+    }, cookies).json()
+    product_url = f"/api/v1/shopping-categories/{category['id']}/products"
+    product = post_with_session(product_url, {
+        "name": "Manzana", "image_token": token_preparado(),
+    }, cookies).json()
+    post_with_session("/api/v1/shopping-list", {
+        "product_id": product["id"], "quantity": 1, "unit": "unit",
+    }, cookies)
+
+    catalog_category = api_get("/api/v1/shopping-categories", cookies=cookies).json()["categories"][0]
+    catalog_product = api_get(product_url, cookies=cookies).json()["products"][0]
+    listed = api_get("/api/v1/shopping-list", cookies=cookies).json()["items"][0]
+
+    assert catalog_category["name"] == "Frutas"
+    assert catalog_category["image_url"]
+    assert catalog_product["name"] == "Manzana"
+    assert catalog_product["image_url"]
+    assert listed["product_id"] == product["id"]
+    assert listed.get("image_url")
 
 
 def test_shopping_list_items_have_stable_ids(meal_database):
@@ -350,6 +660,8 @@ def test_mark_item_as_purchased_moves_it_to_purchased_section(meal_database):
         {
             "id": added.json()["id"],
             "product_id": product.json()["id"],
+            "product_name": "Manzanas",
+            "image_url": None,
             "quantity": 3,
             "unit": "unit",
         }
@@ -387,6 +699,8 @@ def test_unmarking_purchased_item_moves_it_to_pending(meal_database):
         {
             "id": added.json()["id"],
             "product_id": product.json()["id"],
+            "product_name": "Manzanas",
+            "image_url": None,
             "quantity": 3,
             "unit": "g",
         }
@@ -429,6 +743,8 @@ def test_unmarking_merges_compatible_pending_quantity(meal_database):
         {
             "id": pending.json()["id"],
             "product_id": product.json()["id"],
+            "product_name": "Manzanas",
+            "image_url": None,
             "quantity": 5,
             "unit": "unit",
         }
@@ -510,6 +826,8 @@ def test_unmarked_item_persists_for_another_user(meal_database):
         {
             "id": pending.json()["id"],
             "product_id": product.json()["id"],
+            "product_name": "Manzanas",
+            "image_url": None,
             "quantity": 5,
             "unit": "unit",
         }
@@ -547,6 +865,8 @@ def test_adding_purchased_product_creates_new_pending_item(meal_database):
         {
             "id": purchased.json()["id"],
             "product_id": product.json()["id"],
+            "product_name": "Manzanas",
+            "image_url": None,
             "quantity": 3,
             "unit": "unit",
         }
@@ -555,6 +875,8 @@ def test_adding_purchased_product_creates_new_pending_item(meal_database):
         {
             "id": pending.json()["id"],
             "product_id": product.json()["id"],
+            "product_name": "Manzanas",
+            "image_url": None,
             "quantity": 2,
             "unit": "unit",
         }
@@ -597,6 +919,8 @@ def test_marking_item_merges_compatible_purchased_quantities(meal_database):
         {
             "id": purchased.json()["id"],
             "product_id": product.json()["id"],
+            "product_name": "Manzanas",
+            "image_url": None,
             "quantity": 5,
             "unit": "unit",
         }
@@ -641,12 +965,16 @@ def test_marking_item_keeps_incompatible_units_separate(meal_database):
         "unit": {
             "id": purchased.json()["id"],
             "product_id": product.json()["id"],
+            "product_name": "Manzanas",
+            "image_url": None,
             "quantity": 3,
             "unit": "unit",
         },
         "g": {
             "id": pending.json()["id"],
             "product_id": product.json()["id"],
+            "product_name": "Manzanas",
+            "image_url": None,
             "quantity": 500,
             "unit": "g",
         },
@@ -713,6 +1041,8 @@ def test_shows_shopping_list_entries_to_another_user(meal_database):
         {
             "id": added.json()["id"],
             "product_id": product.json()["id"],
+            "product_name": "Manzanas",
+            "image_url": None,
             "quantity": 3,
             "unit": "unit",
         }
@@ -748,6 +1078,8 @@ def test_converts_between_grams_and_kilograms_when_aggregating(meal_database):
         {
             "id": added_ids[0],
             "product_id": product.json()["id"],
+            "product_name": "Manzanas",
+            "image_url": None,
             "quantity": 750,
             "unit": "g",
         }
@@ -817,6 +1149,8 @@ def test_deleting_pending_item_preserves_other_entries(meal_database):
         {
             "id": gramos.json()["id"],
             "product_id": product.json()["id"],
+            "product_name": "Manzanas",
+            "image_url": None,
             "quantity": 250,
             "unit": "g",
         }
@@ -889,6 +1223,8 @@ def test_deleted_item_stays_absent_for_shared_list_readers(meal_database):
         {
             "id": remaining_item.json()["id"],
             "product_id": product.json()["id"],
+            "product_name": "Manzanas",
+            "image_url": None,
             "quantity": 150,
             "unit": "g",
         }

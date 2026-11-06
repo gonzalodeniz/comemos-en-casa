@@ -2,10 +2,10 @@
 import { apiRequest } from "./api";
 
 export type FoodLabel = { id: string; code: string; name: string; image_url?: string | null; recipe_count?: number };
-export type ShoppingCategory = { id: string; name: string };
-export type ShoppingProduct = { id: string; name: string };
+export type ShoppingCategory = { id: string; name: string; image_url?: string | null };
+export type ShoppingProduct = { id: string; name: string; image_url?: string | null };
 // Representa un producto agregado a la lista de la compra.
-export type ShoppingListItem = { id?: string; product_id: string; quantity: number; unit: string };
+export type ShoppingListItem = { id?: string; product_id: string; product_name?: string; image_url?: string | null; quantity: number; unit: string };
 
 /** Consulta los productos y cantidades de la lista de la compra. */
 export function obtenerListaCompra(): Promise<{ items: ShoppingListItem[]; purchased_items?: ShoppingListItem[] }> {
@@ -51,8 +51,13 @@ export function getShoppingCategories(): Promise<{ categories: ShoppingCategory[
   return apiRequest("/shopping-categories");
 }
 
-export function createShoppingCategory(name: string, csrfToken: string): Promise<ShoppingCategory> {
-  return apiRequest("/shopping-categories", { method: "POST", csrfToken, body: { name } });
+export function createShoppingCategory(name: string, csrfToken: string, imageToken?: string): Promise<ShoppingCategory> {
+  return apiRequest("/shopping-categories", { method: "POST", csrfToken, body: { name, ...(imageToken ? { image_token: imageToken } : {}) } });
+}
+
+/** Actualiza la imagen de una categoría existente. */
+export function updateShoppingCategoryImage(categoryId: string, csrfToken: string, change: { image_token: string } | { remove_image: true }): Promise<ShoppingCategory> {
+  return apiRequest(`/shopping-categories/${categoryId}`, { method: "PATCH", csrfToken, body: change });
 }
 
 /** Consulta los productos compartidos de una categoría. */
@@ -61,8 +66,13 @@ export function getShoppingProducts(categoryId: string): Promise<{ products: Sho
 }
 
 /** Crea un producto en la categoría usando la protección CSRF de la sesión. */
-export function createShoppingProduct(categoryId: string, name: string, csrfToken: string): Promise<ShoppingProduct> {
-  return apiRequest(`/shopping-categories/${categoryId}/products`, { method: "POST", csrfToken, body: { name } });
+export function createShoppingProduct(categoryId: string, name: string, csrfToken: string, imageToken?: string): Promise<ShoppingProduct> {
+  return apiRequest(`/shopping-categories/${categoryId}/products`, { method: "POST", csrfToken, body: { name, ...(imageToken ? { image_token: imageToken } : {}) } });
+}
+
+/** Actualiza la imagen de un producto existente. */
+export function updateShoppingProductImage(categoryId: string, productId: string, csrfToken: string, change: { image_token: string } | { remove_image: true }): Promise<ShoppingProduct> {
+  return apiRequest(`/shopping-categories/${categoryId}/products/${productId}`, { method: "PATCH", csrfToken, body: change });
 }
 
 /** Añade un producto a la lista y devuelve su cantidad agregada. */

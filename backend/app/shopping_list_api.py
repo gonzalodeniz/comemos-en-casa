@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import ActiveSession, get_active_session, require_csrf
 from app.database import get_database_session
-from app.models import RecipeShoppingIngredient, RecipeShoppingSection, ShoppingListItem, ShoppingProduct
+from app.models import RecipeShoppingIngredient, RecipeShoppingSection, ShoppingCategory, ShoppingListItem, ShoppingProduct
 
 router = APIRouter(prefix="/api/v1/shopping-list", tags=["shopping-list"])
 
@@ -79,6 +79,8 @@ async def list_shopping_list_items(
         {
             "id": str(item.id),
             "product_id": str(item.product_id),
+            "product_name": db.get(ShoppingProduct, item.product_id).name,
+            "image_url": shopping_product_image_url(db.get(ShoppingProduct, item.product_id)),
             "quantity": int(item.quantity),
             "unit": item.unit,
         }
@@ -102,6 +104,15 @@ async def list_shopping_list_items(
             for seccion in secciones
         ],
     }
+
+
+def shopping_product_image_url(product: ShoppingProduct) -> str | None:
+    """Construye la URL autenticada de imagen para una línea de compra."""
+    if not product.image_path:
+        return None
+    import hashlib
+    version = hashlib.sha256(product.image_path.encode("utf-8")).hexdigest()
+    return f"/shopping-categories/{product.category_id}/products/{product.id}/image?v={version}"
 
 
 @router.delete("/{item_id}", status_code=204)

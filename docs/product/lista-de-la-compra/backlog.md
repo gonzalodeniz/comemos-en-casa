@@ -8,7 +8,7 @@ Estados: `Pendiente`, `En curso`, `Hecha`.
 
 Las historias pendientes están ordenadas de mayor a menor prioridad para disponer cuanto antes de una lista básica y funcional. Los números identifican las historias y no indican su prioridad.
 
-- **#9 · Pendiente** — Como usuario, quiero añadir imágenes a productos y categorías, para identificarlos visualmente.
+- **#9 · Pendiente** — Como usuario, quiero añadir imágenes a productos y categorías, para identificarlos visualmente. [Historia y criterios aprobados](../../historias-usuarios/HIT-001-lista-compra/HU-009-imagenes-productos-categorias.md).
 
 ## Completadas
 

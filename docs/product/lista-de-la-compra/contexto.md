@@ -17,6 +17,7 @@ La funcionalidad ofrece una lista de la compra común para todos los usuarios de
 - Los productos manuales se organizarán en categorías (por ejemplo, verduras, frutas y productos de limpieza), que contendrán productos (por ejemplo, manzanas, peras y lejía).
 - Al añadir manualmente un producto a la lista se podrá indicar una cantidad en unidades o en peso.
 - Desde la interfaz se podrán crear productos y categorías. Tanto los productos como las categorías podrán tener una imagen.
+- El catálogo tendrá una entrada propia en el menú lateral y permitirá editar y eliminar categorías y productos. El comportamiento detallado está en la [especificación del catálogo de productos del hito HIT-001](../../historias-usuarios/HIT-001-lista-compra/especificacion-catalogo-productos.md).
 
 ## Decisiones
 
@@ -35,6 +36,5 @@ Se utilizará el stack actual del proyecto. Las tecnologías concretas no se det
 - Gestión de precios, importes o monedas.
 - Reglas para combinar productos repetidos o sumar cantidades en la lista.
 - Cómo se trasladan o calculan cantidades de ingredientes al añadirlos desde una receta.
-- Edición o eliminación de productos y categorías del catálogo (solo se ha confirmado su creación).
 
 El backlog de historias de usuario se mantiene en el tracker; este documento recoge el contexto y las decisiones de producto.

@@ -513,3 +513,27 @@ button.today-button-fixed { position: fixed; right: max(1rem, env(safe-area-inse
 .food-card-open { display:flex; width:100%; min-height:0; flex-direction:column; align-items:stretch; gap:.35rem; padding:0; border:0; color:inherit; background:transparent; text-align:left; }
 span.meal-thumbnail[role="button"] { cursor:pointer; }
 span.meal-thumbnail[role="button"]:focus-visible { outline:3px solid #00854a; outline-offset:2px; }
+
+/* Presenta el catálogo con cabecera despejada y tarjetas similares al prototipo. */
+.catalogo-productos { min-width: 0; color: #123647; }
+.catalogo-cabecera { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; margin-bottom: 3.25rem; }
+.catalogo-cabecera h2 { margin: 0; color: #103547; font-size: clamp(1.8rem, 3vw, 2.4rem); line-height: 1.15; letter-spacing: -.035em; }
+.catalogo-cabecera p { margin: .65rem 0 0; color: #718e9e; font-size: 1.15rem; font-weight: 600; }
+.catalogo-productos .catalogo-crear { display: inline-flex; align-items: center; justify-content: center; gap: .65rem; min-height: 48px; padding: .7rem 1.4rem; border-radius: .7rem; background: #00783f; color: white; white-space: nowrap; }
+.catalogo-crear .app-icon, .catalogo-volver .app-icon { width: 20px; height: 20px; }
+.catalogo-productos .catalogo-volver { display: inline-flex; align-items: center; gap: .35rem; margin: 0 0 1rem; padding: .35rem 0; background: transparent; color: #52788b; }
+.catalogo-productos-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.15rem; }
+.catalogo-productos-tarjeta { position: relative; display: flex; min-width: 0; min-height: 245px; flex-direction: column; align-items: center; gap: 1rem; padding: 1.6rem 1.4rem 1.4rem; border: 1px solid #d8e5eb; border-radius: 1.15rem; background: #fbfcfd; }
+.catalogo-productos-tarjeta img, .catalogo-productos-imagen { display: block; width: min(100%, 160px); aspect-ratio: 1; height: auto; border-radius: 50%; object-fit: cover; }
+.catalogo-productos-imagen { display: grid; place-items: center; background: #e1f1e8; color: #79a894; }
+.catalogo-productos-imagen .app-icon { width: 38%; height: 38%; }
+.catalogo-productos .catalogo-tarjeta-contenido { display: flex; width: 100%; flex: 1; flex-direction: column; align-items: center; justify-content: flex-start; gap: 1rem; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; }
+.catalogo-productos-tarjeta strong { align-self: stretch; color: #123647; font-size: 1.35rem; line-height: 1.2; }
+.catalogo-productos .catalogo-accion { position: absolute; top: .8rem; right: .8rem; display: grid; width: 36px; height: 36px; place-items: center; padding: 0; border-radius: .5rem; background: transparent; color: #123647; font-size: 1.6rem; line-height: 1; }
+.catalogo-productos .catalogo-accion:hover, .catalogo-productos .catalogo-tarjeta-contenido:hover { background: #eef6f3; }
+.catalogo-editor { max-width: 42rem; margin-top: 2rem; padding: 1.5rem; border: 1px solid #d8e5eb; border-radius: 1rem; background: #fff; }
+.catalogo-editor h3 { margin-top: 0; }
+.catalogo-editor > button { margin: 1rem .75rem 0 0; }
+@media (max-width: 1100px) { .catalogo-productos-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .catalogo-productos-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .catalogo-cabecera { margin-bottom: 2rem; } }
+@media (max-width: 480px) { .catalogo-cabecera { flex-direction: column; } .catalogo-productos-grid { gap: .75rem; } .catalogo-productos-tarjeta { min-height: 180px; padding: 1.1rem .8rem; } .catalogo-productos-tarjeta strong { font-size: 1.1rem; } }

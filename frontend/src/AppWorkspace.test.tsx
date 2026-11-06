@@ -47,7 +47,7 @@ describe("AppWorkspace", () => {
   it("disables navigation while an account operation is pending", () => {
     const markup = renderToStaticMarkup(workspace("users", true));
 
-    expect(markup.match(/disabled=""/g)).toHaveLength(5);
+    expect(markup.match(/disabled=""/g)).toHaveLength(6);
   });
 
   it("provides branded navigation, a working skip-link target and only supported views", () => {
@@ -56,7 +56,7 @@ describe("AppWorkspace", () => {
     expect(markup).toContain("Comemos en casa");
     expect(markup).toContain('href="#workspace-content"');
     expect(markup).toContain('id="workspace-content" tabindex="-1"');
-    expect(markup.match(/<button/g)).toHaveLength(6);
+    expect(markup.match(/<button/g)).toHaveLength(7);
     expect(markup).toContain('aria-expanded="false"');
     expect(markup).toContain("Recetas");
     expect(markup).toContain("Lista de la compra");

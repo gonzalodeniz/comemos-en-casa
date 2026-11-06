@@ -4,6 +4,10 @@ Este fichero es el tracker local de historias de usuario para la lista de la com
 
 Estados: `Pendiente`, `En curso`, `Hecha`.
 
+## Especificaciones relacionadas
+
+- [Catálogo de productos — HIT-001](../../historias-usuarios/HIT-001-lista-compra/especificacion-catalogo-productos.md): requisitos confirmados y alcance implementable con las API actuales. Renombrar, mover y borrar elementos queda pendiente de ampliar las API y, para el borrado, adaptar la persistencia. Este documento no cambia los estados de las historias existentes.
+
 ## Historias
 
 Las historias pendientes están ordenadas de mayor a menor prioridad para disponer cuanto antes de una lista básica y funcional. Los números identifican las historias y no indican su prioridad.

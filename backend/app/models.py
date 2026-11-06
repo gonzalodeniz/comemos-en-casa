@@ -200,6 +200,31 @@ class ShoppingListItem(Base):
     )
 
 
+class RecipeShoppingSection(Base):
+    """Representa una copia independiente del nombre de una receta en la compra."""
+
+    __tablename__ = "recipe_shopping_sections"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
+
+
+class RecipeShoppingIngredient(Base):
+    """Representa una línea independiente de ingredientes en una sección de compra."""
+
+    __tablename__ = "recipe_shopping_ingredients"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    section_id: Mapped[UUID] = mapped_column(
+        ForeignKey("recipe_shopping_sections.id", ondelete="CASCADE"), nullable=False
+    )
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    purchased: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false", nullable=False
+    )
+
+
 class Recipe(Base):
     __tablename__ = "recipes"
     __table_args__ = (UniqueConstraint("title_canonical", name="uq_recipes_title_canonical"),)

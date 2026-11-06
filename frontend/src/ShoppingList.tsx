@@ -7,34 +7,43 @@ export type ShoppingCategory = { id: string; name: string };
 // Unidades aceptadas por la lista de la compra.
 type ShoppingUnit = "unit" | "kg" | "g";
 
+// Describe una copia de receta incluida en la compra.
+type RecipeSection = { id: string; name: string; ingredients: { id: string; text: string; purchased: boolean }[] };
+
 type Props = {
   categories: ShoppingCategory[];
   onCreateCategory: (name: string) => void;
   onGetProducts: (categoryId: string) => Promise<ShoppingProduct[]>;
   onCreateProduct: (categoryId: string, name: string) => Promise<ShoppingProduct>;
   onAddToShoppingList?: (productId: string, quantity: number, unit: ShoppingUnit) => Promise<ShoppingListItem>;
-  onGetShoppingList?: () => Promise<{ items: ShoppingListItem[]; purchased_items?: ShoppingListItem[] }>;
+  onGetShoppingList?: () => Promise<{ items: ShoppingListItem[]; purchased_items?: ShoppingListItem[]; recipe_sections?: RecipeSection[] }>;
+  onMarkRecipeIngredient?: (ingredientId: string) => Promise<unknown>;
+  onUnmarkRecipeIngredient?: (ingredientId: string) => Promise<unknown>;
+  onDeleteRecipeIngredient?: (ingredientId: string) => Promise<unknown>;
+  onDeleteRecipeSection?: (sectionId: string) => Promise<unknown>;
   onMarkPurchased?: (itemId: string) => Promise<ShoppingListItem>;
   onUnmarkPurchased?: (itemId: string) => Promise<ShoppingListItem>;
   onDeleteItem?: (itemId: string) => Promise<null>;
 };
 
 /** Presenta las categorías y permite consultar y crear sus productos. */
-export default function ShoppingList({ categories, onCreateCategory, onGetProducts, onCreateProduct, onAddToShoppingList, onGetShoppingList, onMarkPurchased, onUnmarkPurchased, onDeleteItem }: Props) {
+export default function ShoppingList({ categories, onCreateCategory, onGetProducts, onCreateProduct, onAddToShoppingList, onGetShoppingList, onMarkPurchased, onUnmarkPurchased, onDeleteItem, onMarkRecipeIngredient, onUnmarkRecipeIngredient, onDeleteRecipeIngredient, onDeleteRecipeSection }: Props) {
   const [name, setName] = useState("");
   const [products, setProducts] = useState<Record<string, ShoppingProduct[]>>({});
   const [productNames, setProductNames] = useState<Record<string, string>>({});
   const [productErrors, setProductErrors] = useState<Record<string, string>>({});
   const [listaCompra, setListaCompra] = useState<Record<string, ShoppingListItem>>({});
   const [comprados, setComprados] = useState<Record<string, ShoppingListItem>>({});
+  const [seccionesRecetas, setSeccionesRecetas] = useState<RecipeSection[]>([]);
   const [errorListaCompra, setErrorListaCompra] = useState("");
 
   // Carga los elementos compartidos al entrar en la vista.
   useEffect(() => {
     if (!onGetShoppingList) return;
-    void onGetShoppingList().then(({ items, purchased_items = [] }) => {
+    void onGetShoppingList().then(({ items, purchased_items = [], recipe_sections = [] }) => {
       setListaCompra(Object.fromEntries(items.map((item) => [`${item.product_id}:${item.unit}`, item])));
       setComprados(Object.fromEntries(purchased_items.map((item) => [`${item.product_id}:${item.unit}`, item])));
+      setSeccionesRecetas(recipe_sections);
     }).catch(() => setErrorListaCompra("No se pudo cargar la lista de la compra."));
   }, [onGetShoppingList]);
 
@@ -103,8 +112,53 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
     else setListaCompra((current) => { const next = { ...current }; delete next[key]; return next; });
   }
 
+  /** Marca como comprado un ingrediente de receta concreto. */
+  async function marcarIngredienteReceta(ingredientId: string) {
+    await onMarkRecipeIngredient?.(ingredientId);
+    setSeccionesRecetas((actuales) => actuales.map((seccion) => ({
+      ...seccion,
+      ingredients: seccion.ingredients.map((ingrediente) =>
+        ingrediente.id === ingredientId ? { ...ingrediente, purchased: true } : ingrediente),
+    })));
+  }
+
+  /** Devuelve a pendiente un ingrediente comprado de receta. */
+  async function desmarcarIngredienteReceta(ingredientId: string) {
+    await onUnmarkRecipeIngredient?.(ingredientId);
+    setSeccionesRecetas((actuales) => actuales.map((seccion) => ({
+      ...seccion,
+      ingredients: seccion.ingredients.map((ingrediente) =>
+        ingrediente.id === ingredientId ? { ...ingrediente, purchased: false } : ingrediente),
+    })));
+  }
+
+  /** Elimina una línea concreta de ingredientes de receta. */
+  async function eliminarIngredienteReceta(ingredientId: string) {
+    await onDeleteRecipeIngredient?.(ingredientId);
+    setSeccionesRecetas((actuales) => actuales.map((seccion) => ({
+      ...seccion,
+      ingredients: seccion.ingredients.filter((ingrediente) => ingrediente.id !== ingredientId),
+    })));
+  }
+
+  /** Elimina una sección completa de receta. */
+  async function eliminarSeccionReceta(sectionId: string) {
+    await onDeleteRecipeSection?.(sectionId);
+    setSeccionesRecetas((actuales) => actuales.filter((seccion) => seccion.id !== sectionId));
+  }
+
   return <section className="panel">
     <h2>Lista de la compra</h2>
+    {seccionesRecetas.map((seccion) => <section key={seccion.id} aria-label={seccion.name}>
+      <h3>{seccion.name}</h3>
+      <button type="button" onClick={() => void eliminarSeccionReceta(seccion.id)}>Eliminar sección {seccion.name}</button>
+      <ul>{seccion.ingredients.map((ingrediente) => <li key={ingrediente.id}>{ingrediente.text}
+        {ingrediente.purchased
+          ? <button type="button" onClick={() => void desmarcarIngredienteReceta(ingrediente.id)}>Desmarcar {ingrediente.text} como comprado</button>
+          : <button type="button" onClick={() => void marcarIngredienteReceta(ingrediente.id)}>Marcar {ingrediente.text} como comprado</button>}
+        <button type="button" onClick={() => void eliminarIngredienteReceta(ingrediente.id)}>Eliminar {ingrediente.text}</button>
+      </li>)}</ul>
+    </section>)}
     <form onSubmit={submit}>
       <label>Nombre de la categoría<input aria-label="Nombre de la categoría" value={name} onChange={(event) => setName(event.target.value)} required /></label>
       <button type="submit">Crear categoría</button>

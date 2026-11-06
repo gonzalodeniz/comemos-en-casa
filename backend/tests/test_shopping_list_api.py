@@ -1,4 +1,5 @@
 from sqlalchemy import create_engine
+from app.models import (RecipeShoppingIngredient, RecipeShoppingSection, ShoppingCategory, ShoppingProduct, ShoppingListItem)
 
 from meal_planning_test_support import (
     api_get,
@@ -7,6 +8,131 @@ from meal_planning_test_support import (
     meal_database,
     post_with_session,
 )
+
+
+def test_list_shows_recipe_sections_with_ordered_ingredients(meal_database):
+    """Comprueba que la lista muestra las secciones y sus ingredientes ordenados."""
+    cookies = authenticate(meal_database)
+    with meal_database() as db:
+        seccion = RecipeShoppingSection(name="Sopa")
+        db.add(seccion)
+        db.flush()
+        segundo = RecipeShoppingIngredient(section_id=seccion.id, text="Sal", position=1, purchased=True)
+        primero = RecipeShoppingIngredient(section_id=seccion.id, text="Agua", position=0, purchased=False)
+        db.add_all([segundo, primero])
+        db.commit()
+
+    respuesta = api_get("/api/v1/shopping-list", cookies=cookies)
+
+    assert respuesta.status_code == 200
+    assert respuesta.json()["recipe_sections"] == [{
+        "id": str(seccion.id), "name": "Sopa", "ingredients": [
+            {"id": str(primero.id), "text": "Agua", "purchased": False},
+            {"id": str(segundo.id), "text": "Sal", "purchased": True},
+        ],
+    }]
+
+
+def test_mark_recipe_ingredient_purchased_only_changes_selected_ingredient(meal_database):
+    """Comprueba que comprar una línea no modifica las demás líneas."""
+    from meal_planning_test_support import api_post
+
+    cookies = authenticate(meal_database)
+    with meal_database() as db:
+        section = RecipeShoppingSection(name="Sopa")
+        db.add(section)
+        db.flush()
+        selected = RecipeShoppingIngredient(section_id=section.id, text="2 zanahorias", position=0)
+        sibling = RecipeShoppingIngredient(section_id=section.id, text="1 cebolla", position=1)
+        db.add_all([selected, sibling])
+        db.commit()
+
+    response = api_post(
+        f"/api/v1/shopping-list/recipe-ingredients/{selected.id}/purchase",
+        payload={}, cookies=cookies, csrf_token=cookies["csrf_token"],
+    )
+
+    assert response.status_code == 200
+    with meal_database() as db:
+        assert db.get(RecipeShoppingIngredient, selected.id).purchased is True
+        assert db.get(RecipeShoppingIngredient, sibling.id).purchased is False
+
+
+def test_unmark_recipe_ingredient_purchased_only_changes_selected_ingredient(meal_database):
+    """Comprueba que desmarcar una línea no modifica las demás líneas."""
+    from meal_planning_test_support import api_post
+
+    cookies = authenticate(meal_database)
+    with meal_database() as db:
+        section = RecipeShoppingSection(name="Sopa")
+        db.add(section)
+        db.flush()
+        selected = RecipeShoppingIngredient(section_id=section.id, text="2 zanahorias", position=0, purchased=True)
+        sibling = RecipeShoppingIngredient(section_id=section.id, text="1 cebolla", position=1, purchased=True)
+        db.add_all([selected, sibling])
+        db.commit()
+
+    response = api_post(
+        f"/api/v1/shopping-list/recipe-ingredients/{selected.id}/unpurchase",
+        payload={}, cookies=cookies, csrf_token=cookies["csrf_token"],
+    )
+
+    assert response.status_code == 200
+    with meal_database() as db:
+        assert db.get(RecipeShoppingIngredient, selected.id).purchased is False
+        assert db.get(RecipeShoppingIngredient, sibling.id).purchased is True
+
+
+def test_delete_recipe_ingredient_preserves_sibling_ingredient(meal_database):
+    """Comprueba que eliminar una línea conserva las demás de la sección."""
+    cookies = authenticate(meal_database)
+    with meal_database() as db:
+        section = RecipeShoppingSection(name="Sopa")
+        db.add(section)
+        db.flush()
+        selected = RecipeShoppingIngredient(section_id=section.id, text="Zanahoria", position=0)
+        sibling = RecipeShoppingIngredient(section_id=section.id, text="Cebolla", position=1)
+        db.add_all([selected, sibling])
+        db.commit()
+
+    response = api_delete(
+        f"/api/v1/shopping-list/recipe-ingredients/{selected.id}", cookies=cookies
+    )
+
+    assert response.status_code == 204
+    with meal_database() as db:
+        assert db.get(RecipeShoppingIngredient, selected.id) is None
+        assert db.get(RecipeShoppingIngredient, sibling.id).text == "Cebolla"
+
+
+def test_delete_recipe_section_preserves_other_sections_and_manual_items(meal_database):
+    """Comprueba que eliminar una sección conserva las demás compras."""
+    cookies = authenticate(meal_database)
+    with meal_database() as db:
+        section = RecipeShoppingSection(name="Sopa")
+        other = RecipeShoppingSection(name="Ensalada")
+        category = ShoppingCategory(name="Verduras")
+        db.add_all([section, other, category])
+        db.flush()
+        ingredient = RecipeShoppingIngredient(section_id=section.id, text="Zanahoria", position=0)
+        other_ingredient = RecipeShoppingIngredient(section_id=other.id, text="Tomate", position=0)
+        product = ShoppingProduct(category_id=category.id, name="Pan")
+        db.add_all([ingredient, other_ingredient, product])
+        db.flush()
+        manual = ShoppingListItem(product_id=product.id, quantity=1, unit="unit")
+        db.add(manual)
+        db.commit()
+
+    response = api_delete(
+        f"/api/v1/shopping-list/recipe-sections/{section.id}", cookies=cookies
+    )
+
+    assert response.status_code == 204
+    with meal_database() as db:
+        assert db.get(RecipeShoppingSection, section.id) is None
+        assert db.get(RecipeShoppingIngredient, ingredient.id) is None
+        assert db.get(RecipeShoppingIngredient, other_ingredient.id).text == "Tomate"
+        assert db.get(ShoppingListItem, manual.id).quantity == 1
 
 
 def test_database_schema_contains_shopping_list_items_with_quantity_and_unit(
@@ -36,6 +162,51 @@ def test_database_schema_contains_shopping_list_items_with_quantity_and_unit(
             if column["name"] == "quantity"
         )
         assert isinstance(quantity_column["type"], Numeric)
+    finally:
+        engine.dispose()
+
+
+def test_database_schema_contains_recipe_shopping_sections_with_name(tmp_path, monkeypatch):
+    """Comprueba que la migración crea secciones independientes con nombre."""
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import inspect
+
+    database = tmp_path / "recipe-shopping.sqlite"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite+pysqlite:///{database}")
+    config = Config("alembic.ini")
+    command.stamp(config, "0011_shopping_item_purchased")
+    command.upgrade(config, "head")
+
+    engine = create_engine(f"sqlite+pysqlite:///{database}")
+    try:
+        inspector = inspect(engine)
+        assert "recipe_shopping_sections" in inspector.get_table_names()
+        assert {"id", "name"}.issubset(
+            {column["name"] for column in inspector.get_columns("recipe_shopping_sections")}
+        )
+    finally:
+        engine.dispose()
+
+
+def test_database_schema_contains_ordered_recipe_shopping_ingredients(tmp_path, monkeypatch):
+    """Comprueba que la migración persiste texto y posición de cada ingrediente."""
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import inspect
+
+    database = tmp_path / "recipe-shopping-ingredients.sqlite"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite+pysqlite:///{database}")
+    config = Config("alembic.ini")
+    command.stamp(config, "0011_shopping_item_purchased")
+    command.upgrade(config, "head")
+
+    engine = create_engine(f"sqlite+pysqlite:///{database}")
+    try:
+        inspector = inspect(engine)
+        assert "recipe_shopping_ingredients" in inspector.get_table_names()
+        columns = {column["name"] for column in inspector.get_columns("recipe_shopping_ingredients")}
+        assert {"id", "section_id", "text", "position", "purchased"}.issubset(columns)
     finally:
         engine.dispose()
 

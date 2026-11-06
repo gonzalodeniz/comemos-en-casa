@@ -6,9 +6,9 @@ Como usuario, quiero añadir los ingredientes de una receta a la lista de compra
 
 ## Criterios de aceptación
 
-- [ ] Dada una receta con ingredientes, cuando la añado a la compra, aparece una nueva sección con su nombre y una entrada pendiente por cada línea de ingredientes, conservando texto y orden, sin mezclarse con los productos manuales.
-- [ ] Dada una sección de receta, cuando marco o desmarco un ingrediente como comprado, elimino un ingrediente o elimino toda la sección, solo se modifica lo seleccionado, sin afectar a otras secciones ni a productos manuales.
-- [ ] Dada una receta ya añadida, cuando la añado otra vez, aparece otra sección independiente; editar o borrar la receta original no modifica ninguna de las secciones existentes.
+- [x] Dada una receta con ingredientes, cuando la añado a la compra, aparece una nueva sección con su nombre y una entrada pendiente por cada línea de ingredientes, conservando texto y orden, sin mezclarse con los productos manuales.
+- [x] Dada una sección de receta, cuando marco o desmarco un ingrediente como comprado, elimino un ingrediente o elimino toda la sección, solo se modifica lo seleccionado, sin afectar a otras secciones ni a productos manuales.
+- [x] Dada una receta ya añadida, cuando la añado otra vez, aparece otra sección independiente; editar o borrar la receta original no modifica ninguna de las secciones existentes.
 
 ## Plan
 

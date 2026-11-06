@@ -182,6 +182,7 @@ class ShoppingProduct(Base):
         ForeignKey("shopping_categories.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
+    image_path: Mapped[str | None] = mapped_column(String(255))
 
 
 class ShoppingListItem(Base):

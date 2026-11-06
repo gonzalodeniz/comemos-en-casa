@@ -42,16 +42,16 @@ def serialized_image_publication(function):
     return wrapped
 
 
-def _managed_food_image_path(relative_path: str) -> Path | None:
+def _managed_food_image_path(relative_path: str, category: str = "comidas") -> Path | None:
     """Accept only opaque files directly inside the managed directory."""
     try:
         relative = Path(relative_path)
-        if len(relative.parts) != 2 or relative.parts[0] != "comidas":
+        if category not in {"comidas", "productos"} or len(relative.parts) != 2 or relative.parts[0] != category:
             return None
         name = relative.parts[1]
         if len(name) != 37 or not name.endswith(".webp") or any(c not in "0123456789abcdef" for c in name[:32]):
             return None
-        directory = DATA_ROOT / "comidas"
+        directory = DATA_ROOT / category
         path = directory / name
         if directory.is_symlink() or path.is_symlink():
             return None

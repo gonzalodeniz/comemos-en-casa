@@ -146,7 +146,8 @@ def test_database_schema_contains_shopping_list_items_with_quantity_and_unit(
     database = tmp_path / "shopping-list.sqlite"
     monkeypatch.setenv("DATABASE_URL", f"sqlite+pysqlite:///{database}")
     config = Config("alembic.ini")
-    command.stamp(config, "0009_shopping_products")
+    command.stamp(config, "0007_recipes")
+    command.upgrade(config, "0009_shopping_products")
     command.upgrade(config, "head")
 
     engine = create_engine(f"sqlite+pysqlite:///{database}")
@@ -175,7 +176,8 @@ def test_database_schema_contains_recipe_shopping_sections_with_name(tmp_path, m
     database = tmp_path / "recipe-shopping.sqlite"
     monkeypatch.setenv("DATABASE_URL", f"sqlite+pysqlite:///{database}")
     config = Config("alembic.ini")
-    command.stamp(config, "0011_shopping_item_purchased")
+    command.stamp(config, "0007_recipes")
+    command.upgrade(config, "0011_shopping_item_purchased")
     command.upgrade(config, "head")
 
     engine = create_engine(f"sqlite+pysqlite:///{database}")
@@ -198,7 +200,8 @@ def test_database_schema_contains_ordered_recipe_shopping_ingredients(tmp_path, 
     database = tmp_path / "recipe-shopping-ingredients.sqlite"
     monkeypatch.setenv("DATABASE_URL", f"sqlite+pysqlite:///{database}")
     config = Config("alembic.ini")
-    command.stamp(config, "0011_shopping_item_purchased")
+    command.stamp(config, "0007_recipes")
+    command.upgrade(config, "0011_shopping_item_purchased")
     command.upgrade(config, "head")
 
     engine = create_engine(f"sqlite+pysqlite:///{database}")
@@ -240,6 +243,61 @@ def test_adds_product_to_shopping_list_with_quantity_and_unit(meal_database):
     )
     assert item["quantity"] == 3
     assert item["unit"] == "unit"
+
+
+def test_migration_adds_optional_product_image_path(tmp_path, monkeypatch):
+    """Verifica que una base existente admite productos con y sin imagen."""
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import inspect, text
+
+    database = tmp_path / "productos.sqlite"
+    url = f"sqlite+pysqlite:///{database}"
+    monkeypatch.setenv("DATABASE_URL", url)
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conexion:
+            conexion.execute(text("CREATE TABLE shopping_products (id INTEGER PRIMARY KEY, name VARCHAR(100) NOT NULL)"))
+            conexion.execute(text("INSERT INTO shopping_products (id, name) VALUES (1, 'Manzana')"))
+        config = Config("alembic.ini")
+        command.stamp(config, "0012_recipe_shopping_sections")
+        command.upgrade(config, "head")
+        columna = next(c for c in inspect(engine).get_columns("shopping_products") if c["name"] == "image_path")
+        assert columna["nullable"]
+        with engine.begin() as conexion:
+            assert conexion.execute(text("SELECT image_path FROM shopping_products WHERE id = 1")).scalar_one() is None
+            conexion.execute(text("UPDATE shopping_products SET image_path = 'productos/manzana.webp' WHERE id = 1"))
+            assert conexion.execute(text("SELECT image_path FROM shopping_products WHERE id = 1")).scalar_one() == "productos/manzana.webp"
+    finally:
+        engine.dispose()
+
+
+def test_create_product_with_image_persists_image(meal_database):
+    """Comprueba que la imagen de un producto creado permanece disponible en el catálogo."""
+    import base64
+    import io
+    from PIL import Image
+
+    cookies = authenticate(meal_database)
+    imagen = io.BytesIO()
+    Image.new("RGB", (10, 10), "red").save(imagen, format="PNG")
+    datos = base64.b64encode(imagen.getvalue()).decode("ascii")
+    preparada = post_with_session(
+        "/api/v1/food-labels/images/prepare",
+        {"data_url": f"data:image/png;base64,{datos}", "crop": {"x": 0, "y": 0, "width": 10, "height": 10}},
+        cookies,
+    )
+    assert preparada.status_code == 200
+    categoria = post_with_session("/api/v1/shopping-categories", {"name": "Frutas"}, cookies)
+    ruta = f"/api/v1/shopping-categories/{categoria.json()['id']}/products"
+    creado = post_with_session(ruta, {"name": "Manzana", "image_token": preparada.json()["image_token"]}, cookies)
+    assert creado.status_code == 201
+
+    productos = api_get(ruta, cookies=cookies).json()["products"]
+    producto = next(item for item in productos if item["id"] == creado.json()["id"])
+    imagen_guardada = api_get(f"/api/v1{producto['image_url']}", cookies=cookies)
+    assert imagen_guardada.status_code == 200
+    assert imagen_guardada.headers["content-type"] == "image/webp"
 
 
 def test_shopping_list_items_have_stable_ids(meal_database):

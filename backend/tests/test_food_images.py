@@ -89,3 +89,15 @@ def test_new_storage_files_are_private_and_symlink_directories_rejected(tmp_path
     with pytest.raises(OSError):
         food_images.publish_temporary(tmp_path, session, token)
     assert path.exists()
+
+
+def test_publish_product_image_in_product_directory(tmp_path):
+    """Comprueba que se publica la imagen temporal en el directorio de productos."""
+    sesion = uuid4()
+    token = food_images.save_temporary(tmp_path, sesion, b"imagen preparada")
+
+    ruta = food_images.publish_temporary(tmp_path, sesion, token, category="productos")
+
+    assert ruta.startswith("productos/")
+    assert (tmp_path / ruta).read_bytes() == b"imagen preparada"
+    assert food_images.temporary_path(tmp_path, sesion, token) is None

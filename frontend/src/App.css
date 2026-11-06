@@ -315,7 +315,10 @@ button.today-button-fixed { position: fixed; right: max(1rem, env(safe-area-inse
 .meal-details { display: flex; min-width: 0; flex-direction: column; align-items: center; gap: .25rem; }
 .meal-card-status.lunch { color: #604900; background: #fff0b8; }
 .meal-card-status.dinner { color: #4d3184; background: #eee3ff; }
-.toast { position: fixed; right: 1rem; bottom: 1rem; z-index: 5; box-shadow: 0 4px 20px #12334a22; }
+.toast { position: fixed; top: 1rem; right: 1rem; z-index: 50; display: flex; align-items: center; justify-content: space-between; gap: 1rem; width: min(28rem, calc(100vw - 2rem)); box-shadow: 0 4px 20px #12334a22; opacity: 1; transition: opacity .3s ease, transform .3s ease; }
+.toast.toast-leaving { opacity: 0; transform: translateY(.5rem); }
+.toast button { flex: 0 0 auto; padding: .15rem .45rem; background: transparent; color: inherit; font-size: 1.35rem; }
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
 @media (max-width: 760px) {
   .app-sidebar { display: block; padding: .75rem 1.2rem; }
   .sidebar-header { display: flex; align-items: center; justify-content: space-between; }

@@ -1,6 +1,7 @@
 // Presenta categorías y productos del catálogo compartido de compra.
 import { useEffect, useState, type FormEvent } from "react";
 import type { ShoppingListItem, ShoppingProduct } from "./mealPlanningApi";
+import ToastMessage from "./ToastMessage";
 
 export type ShoppingCategory = { id: string; name: string };
 
@@ -36,6 +37,7 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
   const [comprados, setComprados] = useState<Record<string, ShoppingListItem>>({});
   const [seccionesRecetas, setSeccionesRecetas] = useState<RecipeSection[]>([]);
   const [errorListaCompra, setErrorListaCompra] = useState("");
+  const [errorReceta, setErrorReceta] = useState("");
 
   // Carga los elementos compartidos al entrar en la vista.
   useEffect(() => {
@@ -114,7 +116,7 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
 
   /** Marca como comprado un ingrediente de receta concreto. */
   async function marcarIngredienteReceta(ingredientId: string) {
-    await onMarkRecipeIngredient?.(ingredientId);
+    try { await onMarkRecipeIngredient?.(ingredientId); } catch (error) { setErrorReceta(error instanceof Error ? error.message : "No se pudo actualizar el ingrediente."); return; }
     setSeccionesRecetas((actuales) => actuales.map((seccion) => ({
       ...seccion,
       ingredients: seccion.ingredients.map((ingrediente) =>
@@ -124,7 +126,7 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
 
   /** Devuelve a pendiente un ingrediente comprado de receta. */
   async function desmarcarIngredienteReceta(ingredientId: string) {
-    await onUnmarkRecipeIngredient?.(ingredientId);
+    try { await onUnmarkRecipeIngredient?.(ingredientId); } catch (error) { setErrorReceta(error instanceof Error ? error.message : "No se pudo actualizar el ingrediente."); return; }
     setSeccionesRecetas((actuales) => actuales.map((seccion) => ({
       ...seccion,
       ingredients: seccion.ingredients.map((ingrediente) =>
@@ -134,7 +136,7 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
 
   /** Elimina una línea concreta de ingredientes de receta. */
   async function eliminarIngredienteReceta(ingredientId: string) {
-    await onDeleteRecipeIngredient?.(ingredientId);
+    try { await onDeleteRecipeIngredient?.(ingredientId); } catch (error) { setErrorReceta(error instanceof Error ? error.message : "No se pudo eliminar el ingrediente."); return; }
     setSeccionesRecetas((actuales) => actuales.map((seccion) => ({
       ...seccion,
       ingredients: seccion.ingredients.filter((ingrediente) => ingrediente.id !== ingredientId),
@@ -143,11 +145,12 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
 
   /** Elimina una sección completa de receta. */
   async function eliminarSeccionReceta(sectionId: string) {
-    await onDeleteRecipeSection?.(sectionId);
+    try { await onDeleteRecipeSection?.(sectionId); } catch (error) { setErrorReceta(error instanceof Error ? error.message : "No se pudo eliminar la sección."); return; }
     setSeccionesRecetas((actuales) => actuales.filter((seccion) => seccion.id !== sectionId));
   }
 
   return <section className="panel">
+    {errorReceta && <ToastMessage kind="error" onClose={() => setErrorReceta("")}>{errorReceta}</ToastMessage>}
     <h2>Lista de la compra</h2>
     {seccionesRecetas.map((seccion) => <section key={seccion.id} aria-label={seccion.name}>
       <h3>{seccion.name}</h3>

@@ -2,7 +2,7 @@
 
 **Estado:** completada; criterios de aceptación verificados.
 
-Corresponde a la [historia #3 del backlog de la lista de la compra](../product/backlog-lista-de-la-compra.md).
+Corresponde a la [historia #3 del backlog de la lista de la compra](../../product/backlog-lista-de-la-compra.md).
 
 Depende de [HU-LC-002 — Marcar productos pendientes como comprados](HU-LC-002-marcar-productos-comprados.md).
 

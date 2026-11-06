@@ -2,7 +2,7 @@
 
 **Estado:** completada y verificada.
 
-Corresponde a la [historia #4 del backlog de la lista de la compra](../product/backlog-lista-de-la-compra.md).
+Corresponde a la [historia #4 del backlog de la lista de la compra](../../product/backlog-lista-de-la-compra.md).
 
 Depende de [HU-LC-001 — Lista de la compra](HU-LC-001-lista-de-la-compra.md).
 

@@ -2,7 +2,7 @@
 
 **Estado:** completada; criterios de aceptación verificados.
 
-Corresponde a la [historia #2 del backlog de la lista de la compra](../product/backlog-lista-de-la-compra.md).
+Corresponde a la [historia #2 del backlog de la lista de la compra](../../product/backlog-lista-de-la-compra.md).
 
 Depende de [HU-LC-001 — Añadir productos a la lista de la compra](HU-LC-001-lista-de-la-compra.md).
 

@@ -23,6 +23,17 @@ describe("ShoppingList", () => {
     expect(within(seccion).getAllByRole("listitem").map(item => item.firstChild?.textContent)).toEqual(["agua", "sal"]);
   });
 
+  // Verifica que las acciones compactas conservan nombre y descripción accesibles.
+  it("muestra acciones con iconos y descripción en la lista", async () => {
+    render(<ShoppingList categories={[]} onCreateCategory={vi.fn()} onGetProducts={vi.fn()} onCreateProduct={vi.fn()}
+      onGetShoppingList={vi.fn().mockResolvedValue({ items: [{ id: "1", product_id: "p", product_name: "Manzana", quantity: 2, unit: "unit", image_url: "/manzana" }] })}
+      onMarkPurchased={vi.fn()} onDeleteItem={vi.fn()} />);
+    const accion = await screen.findByRole("button", { name: "Marcar Manzana como comprado" });
+    expect(accion.getAttribute("data-tooltip")).toBe("Marcar Manzana como comprado");
+    expect(accion.querySelector("svg")).not.toBeNull();
+    expect(screen.getByRole("img", { name: "Manzana" }).classList.contains("compra-miniatura")).toBe(true);
+  });
+
   it("marca como comprado un ingrediente de receta", async () => {
     const onMarkRecipeIngredient = vi.fn().mockResolvedValue(undefined);
     const user = userEvent.setup();
@@ -63,8 +74,8 @@ describe("ShoppingList", () => {
       ] })} />);
     await user.click(await screen.findByRole("button", { name: "Eliminar agua" }));
     expect(onDeleteRecipeIngredient).toHaveBeenCalledWith("agua-1");
-    expect(screen.queryByText("agua", { selector: "li" })).toBeNull();
-    expect(screen.getByText("sal", { selector: "li" })).not.toBeNull();
+    expect(screen.queryByText("agua")).toBeNull();
+    expect(screen.getByText("sal")).not.toBeNull();
   });
 
   it("elimina una sección de receta completa", async () => {

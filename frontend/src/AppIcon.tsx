@@ -1,7 +1,9 @@
 // Presenta los iconos utilizados por las vistas de la aplicación.
-type IconName = "calendar" | "repeat" | "users" | "chevron-left" | "chevron-right" | "plus" | "logout" | "utensils" | "menu" | "edit" | "trash" | "eye" | "shopping-cart";
+type IconName = "calendar" | "repeat" | "users" | "chevron-left" | "chevron-right" | "plus" | "logout" | "utensils" | "menu" | "edit" | "trash" | "eye" | "shopping-cart" | "check" | "undo";
 
 const paths: Record<IconName, string> = {
+  check: "M5 12l4 4L19 6",
+  undo: "M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-2",
   "shopping-cart": "M3 3h2l2 11h10l3-8H6M9 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm8 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z",
   utensils: "M4 3v6a3 3 0 0 0 6 0V3M7 3v18M16 21V3c-3 2-3 7-3 9h3",
   menu: "M4 6h16M4 12h16M4 18h16",

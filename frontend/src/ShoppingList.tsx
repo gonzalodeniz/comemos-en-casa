@@ -3,6 +3,9 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import Cropper from "react-easy-crop";
 import type { ShoppingListItem, ShoppingProduct } from "./mealPlanningApi";
 import ToastMessage from "./ToastMessage";
+import AppIcon from "./AppIcon";
+import SelectorCompra from "./SelectorCompra";
+import DialogoCantidadCompra from "./DialogoCantidadCompra";
 
 export type ShoppingCategory = { id: string; name: string; image_url?: string | null };
 
@@ -19,6 +22,8 @@ function urlImagenApi(url: string): string {
 
 type Props = {
   categories: ShoppingCategory[];
+  mostrarAdministracion?: boolean;
+  onAbrirCatalogo?: () => void;
   onCreateCategory: (name: string, imageToken?: string) => void | Promise<void>;
   onGetProducts: (categoryId: string) => Promise<ShoppingProduct[]>;
   onCreateProduct: (categoryId: string, name: string, imageToken?: string) => Promise<ShoppingProduct>;
@@ -38,7 +43,8 @@ type Props = {
 };
 
 /** Presenta las categorías y permite consultar y crear sus productos. */
-export default function ShoppingList({ categories, onCreateCategory, onGetProducts, onCreateProduct, onPrepareImage, onImportImage, onUpdateProductImage, onUpdateCategoryImage, onAddToShoppingList, onGetShoppingList, onMarkPurchased, onUnmarkPurchased, onDeleteItem, onMarkRecipeIngredient, onUnmarkRecipeIngredient, onDeleteRecipeIngredient, onDeleteRecipeSection }: Props) {
+export default function ShoppingList({ categories, mostrarAdministracion = true, onAbrirCatalogo, onCreateCategory, onGetProducts, onCreateProduct, onPrepareImage, onImportImage, onUpdateProductImage, onUpdateCategoryImage, onAddToShoppingList, onGetShoppingList, onMarkPurchased, onUnmarkPurchased, onDeleteItem, onMarkRecipeIngredient, onUnmarkRecipeIngredient, onDeleteRecipeIngredient, onDeleteRecipeSection }: Props) {
+  const [productoSeleccionado, setProductoSeleccionado] = useState<ShoppingProduct | null>(null);
   const [name, setName] = useState("");
   const [products, setProducts] = useState<Record<string, ShoppingProduct[]>>({});
   const [productNames, setProductNames] = useState<Record<string, string>>({});
@@ -126,6 +132,7 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
 
   // Carga el catálogo de productos cuando cambia la lista de categorías.
   useEffect(() => {
+    if (!mostrarAdministracion) return;
     categories.forEach((category) => {
       void onGetProducts(category.id).then((items) => {
         setProducts((current) => ({ ...current, [category.id]: items }));
@@ -134,7 +141,7 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
         setProductErrors((current) => ({ ...current, [category.id]: "No se pudieron cargar los productos." }));
       });
     });
-  }, [categories]);
+  }, [categories, mostrarAdministracion]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -272,7 +279,7 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
     const updated = await onMarkPurchased(item.id);
     const key = `${item.product_id}:${item.unit}`;
     setListaCompra((current) => { const next = { ...current }; delete next[key]; return next; });
-    setComprados((current) => ({ ...current, [key]: updated }));
+    setComprados((current) => ({ ...current, [key]: { ...item, ...updated } }));
   }
 
   /** Desmarca un producto comprado y lo devuelve a la sección de pendientes. */
@@ -281,7 +288,7 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
     const updated = await onUnmarkPurchased(item.id);
     const key = `${item.product_id}:${item.unit}`;
     setComprados((current) => { const next = { ...current }; delete next[key]; return next; });
-    setListaCompra((current) => ({ ...current, [key]: updated }));
+    setListaCompra((current) => ({ ...current, [key]: { ...item, ...updated } }));
   }
 
   /** Elimina una entrada de la sección correspondiente tras confirmarla en la API. */
@@ -331,17 +338,25 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
   return <section className="panel">
     {errorReceta && <ToastMessage kind="error" onClose={() => setErrorReceta("")}>{errorReceta}</ToastMessage>}
     <h2>Lista de la compra</h2>
-    {seccionesRecetas.map((seccion) => <section key={seccion.id} aria-label={seccion.name}>
-      <h3>{seccion.name}</h3>
-      <button type="button" onClick={() => void eliminarSeccionReceta(seccion.id)}>Eliminar sección {seccion.name}</button>
-      <ul>{seccion.ingredients.map((ingrediente) => <li key={ingrediente.id}>{ingrediente.text}
-        {ingrediente.purchased
-          ? <button type="button" onClick={() => void desmarcarIngredienteReceta(ingrediente.id)}>Desmarcar {ingrediente.text} como comprado</button>
-          : <button type="button" onClick={() => void marcarIngredienteReceta(ingrediente.id)}>Marcar {ingrediente.text} como comprado</button>}
-        <button type="button" onClick={() => void eliminarIngredienteReceta(ingrediente.id)}>Eliminar {ingrediente.text}</button>
+    <SelectorCompra categorias={categories} consultar={onGetProducts} seleccionar={setProductoSeleccionado} />
+    {productoSeleccionado && onAddToShoppingList && <DialogoCantidadCompra producto={productoSeleccionado} agregar={onAddToShoppingList}
+      alAgregar={(entrada) => setListaCompra((actual) => ({ ...actual, [`${entrada.product_id}:${entrada.unit}`]: { ...entrada, product_name: productoSeleccionado.name, image_url: productoSeleccionado.image_url } }))}
+      cerrar={() => setProductoSeleccionado(null)} /> }
+    {seccionesRecetas.map((seccion) => <section className="compra-receta" key={seccion.id} aria-label={seccion.name}>
+      <div className="compra-receta-cabecera"><h3>{seccion.name}</h3>
+        <button className="compra-accion" type="button" aria-label={`Eliminar sección ${seccion.name}`} data-tooltip={`Eliminar sección ${seccion.name}`} onClick={() => void eliminarSeccionReceta(seccion.id)}><AppIcon name="trash" /></button>
+      </div>
+      <ul className="compra-filas">{seccion.ingredients.map((ingrediente) => <li className="compra-fila" key={ingrediente.id}><span className="compra-fila-texto">{ingrediente.text}</span>
+        <span className="compra-acciones">
+          {ingrediente.purchased
+            ? <button className="compra-accion" type="button" aria-label={`Desmarcar ${ingrediente.text} como comprado`} data-tooltip={`Desmarcar ${ingrediente.text} como comprado`} onClick={() => void desmarcarIngredienteReceta(ingrediente.id)}><AppIcon name="undo" /></button>
+            : <button className="compra-accion" type="button" aria-label={`Marcar ${ingrediente.text} como comprado`} data-tooltip={`Marcar ${ingrediente.text} como comprado`} onClick={() => void marcarIngredienteReceta(ingrediente.id)}><AppIcon name="check" /></button>}
+          <button className="compra-accion" type="button" aria-label={`Eliminar ${ingrediente.text}`} data-tooltip={`Eliminar ${ingrediente.text}`} onClick={() => void eliminarIngredienteReceta(ingrediente.id)}><AppIcon name="trash" /></button>
+        </span>
       </li>)}</ul>
     </section>)}
-    <form onSubmit={submit}>
+    {onAbrirCatalogo && <button type="button" className="secondary" onClick={onAbrirCatalogo}>Gestionar catálogo</button>}
+    {mostrarAdministracion && <><form onSubmit={submit}>
       {productErrors["nueva-categoria"] && <p role="alert">{productErrors["nueva-categoria"]}</p>}
       <label>Nombre de la categoría<input aria-label="Nombre de la categoría" value={name} onChange={(event) => setName(event.target.value)} required /></label>
       <label tabIndex={0} onPaste={(event) => leerImagenProducto("nueva-categoria", Array.from(event.clipboardData.files).find((file) => file.type.startsWith("image/")))} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); leerImagenProducto("nueva-categoria", event.dataTransfer.files[0]); }}>Imagen de la categoría<input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => leerImagenProducto("nueva-categoria", event.target.files?.[0])} /></label>
@@ -382,20 +397,35 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
         <button type="submit">Crear producto</button>
       </form>
     </li>)}</ul>
+    </>}
     <section aria-label="Lista de la compra"><h3>Lista de la compra</h3>
       {errorListaCompra && <p role="alert">{errorListaCompra}</p>}
-      <h4>Pendientes</h4><ul>{Object.values(listaCompra).map((item) => <li key={`${item.product_id}:${item.unit}`}>
-        {item.image_url && <img src={urlImagenApi(item.image_url)} alt={item.product_name ?? Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id} />}
-        {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id}: {item.quantity} {item.unit === "unit" ? "unidad" : item.unit}
-        {item.id && <button type="button" onClick={() => void markPurchased(item)}>Marcar {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id} como comprado</button>}
-        {item.id && onDeleteItem && <button type="button" onClick={() => void deleteItem(item, false)}>Eliminar {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id} de Pendientes</button>}
-      </li>)}</ul>
-      <h4>Comprados</h4><ul>{Object.values(comprados).map((item) => <li key={`${item.product_id}:${item.unit}`}>
-        {item.image_url && <img src={urlImagenApi(item.image_url)} alt={item.product_name ?? Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id} />}
-        {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id}: {item.quantity} {item.unit === "unit" ? "unidad" : item.unit}
-        {item.id && onUnmarkPurchased && <button type="button" onClick={() => void unmarkPurchased(item)}>Desmarcar {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id} como pendiente</button>}
-        {item.id && onDeleteItem && <button type="button" onClick={() => void deleteItem(item, true)}>Eliminar {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id} de Comprados</button>}
-      </li>)}</ul>
+      <h4>Pendientes</h4><ul className="compra-filas">{Object.values(listaCompra).map((item) => {
+        const nombre = item.product_name ?? Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? "Producto";
+        const marcar = `Marcar ${nombre} como comprado`;
+        const eliminar = `Eliminar ${nombre} de Pendientes`;
+        return <li className="compra-fila" key={`${item.product_id}:${item.unit}`}>
+          {item.image_url && <img className="compra-miniatura" src={urlImagenApi(item.image_url)} alt={nombre} />}
+          <span className="compra-fila-texto">{nombre}: {item.quantity} {item.unit === "unit" ? "unidad" : item.unit}</span>
+          <span className="compra-acciones">
+            {item.id && <button className="compra-accion" type="button" aria-label={marcar} data-tooltip={marcar} onClick={() => void markPurchased(item)}><AppIcon name="check" /></button>}
+            {item.id && onDeleteItem && <button className="compra-accion" type="button" aria-label={eliminar} data-tooltip={eliminar} onClick={() => void deleteItem(item, false)}><AppIcon name="trash" /></button>}
+          </span>
+        </li>;
+      })}</ul>
+      <h4>Comprados</h4><ul className="compra-filas">{Object.values(comprados).map((item) => {
+        const nombre = item.product_name ?? Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? "Producto";
+        const desmarcar = `Desmarcar ${nombre} como pendiente`;
+        const eliminar = `Eliminar ${nombre} de Comprados`;
+        return <li className="compra-fila" key={`${item.product_id}:${item.unit}`}>
+          {item.image_url && <img className="compra-miniatura" src={urlImagenApi(item.image_url)} alt={nombre} />}
+          <span className="compra-fila-texto">{nombre}: {item.quantity} {item.unit === "unit" ? "unidad" : item.unit}</span>
+          <span className="compra-acciones">
+            {item.id && onUnmarkPurchased && <button className="compra-accion" type="button" aria-label={desmarcar} data-tooltip={desmarcar} onClick={() => void unmarkPurchased(item)}><AppIcon name="undo" /></button>}
+            {item.id && onDeleteItem && <button className="compra-accion" type="button" aria-label={eliminar} data-tooltip={eliminar} onClick={() => void deleteItem(item, true)}><AppIcon name="trash" /></button>}
+          </span>
+        </li>;
+      })}</ul>
     </section>
   </section>;
 }

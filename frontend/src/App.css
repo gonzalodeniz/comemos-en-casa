@@ -537,3 +537,26 @@ span.meal-thumbnail[role="button"]:focus-visible { outline:3px solid #00854a; ou
 @media (max-width: 1100px) { .catalogo-productos-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 760px) { .catalogo-productos-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .catalogo-cabecera { margin-bottom: 2rem; } }
 @media (max-width: 480px) { .catalogo-cabecera { flex-direction: column; } .catalogo-productos-grid { gap: .75rem; } .catalogo-productos-tarjeta { min-height: 180px; padding: 1.1rem .8rem; } .catalogo-productos-tarjeta strong { font-size: 1.1rem; } }
+
+/* Mantiene compacto el selector progresivo de compra. */
+.selector-compra { position: sticky; top: 0; z-index: 3; padding: .75rem; border: 1px solid var(--color-border); border-radius: .85rem; background: white; box-shadow: var(--shadow-panel); }
+.selector-compra-cabecera { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.selector-compra-cabecera h3 { margin: 0; }
+.selector-compra-contenido { max-height: 30vh; overflow: auto; padding-top: .6rem; }
+.selector-compra-cuadricula { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: .5rem; }
+.selector-compra-tarjeta { display: grid; justify-items: center; gap: .3rem; color: var(--color-text); background: var(--color-secondary-bg); overflow-wrap: anywhere; }
+.selector-compra-tarjeta:hover:not(:disabled) { background: #deeeea; }
+.selector-compra-tarjeta img { width: 48px; height: 48px; object-fit: cover; border-radius: 50%; }
+
+/* Acompaña el texto de compra con miniaturas y acciones separadas. */
+.compra-filas { list-style: none; padding: 0; margin: 0 0 1rem; }
+.compra-fila { display: flex; align-items: center; gap: .75rem; padding: .65rem 0; border-bottom: 1px solid var(--color-border-subtle); min-width: 0; }
+.compra-miniatura { width: 40px; height: 40px; flex: 0 0 40px; object-fit: cover; border-radius: .5rem; }
+.compra-fila-texto { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.compra-acciones { display: flex; flex: 0 0 auto; align-items: center; gap: .75rem; }
+.compra-receta-cabecera { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.compra-receta-cabecera h3 { margin: 0; }
+button.compra-accion { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; min-height: 44px; padding: .55rem; color: var(--color-secondary-text); background: var(--color-secondary-bg); }
+button.compra-accion:hover, button.compra-accion:focus-visible { background: #deeeea; }
+button.compra-accion::after { content: attr(data-tooltip); position: absolute; z-index: 5; bottom: calc(100% + .4rem); right: 0; width: max-content; max-width: min(18rem, 75vw); padding: .4rem .6rem; border-radius: .4rem; background: #103642; color: white; font-size: .75rem; line-height: 1.3; white-space: normal; pointer-events: none; opacity: 0; visibility: hidden; }
+button.compra-accion:hover::after, button.compra-accion:focus-visible::after { opacity: 1; visibility: visible; }

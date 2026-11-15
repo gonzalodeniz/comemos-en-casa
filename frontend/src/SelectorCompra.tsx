@@ -1,5 +1,6 @@
 // Permite elegir progresivamente una categoría y un producto de compra.
 import { useEffect, useRef, useState } from "react";
+import AppIcon from "./AppIcon";
 import type { ShoppingCategory } from "./ShoppingList";
 import type { ShoppingProduct } from "./mealPlanningApi";
 
@@ -38,7 +39,7 @@ export default function SelectorCompra({ categorias, consultar, seleccionar, err
 
   return <section className="selector-compra" aria-label="Añadir productos">
     <div className="selector-compra-cabecera"><h3>Añadir productos</h3>
-      <button type="button" className="secondary" aria-expanded={!recogido} onClick={() => setRecogido(!recogido)}>{recogido ? "Mostrar" : "Recoger"}</button>
+      <button type="button" className="compra-accion" aria-expanded={!recogido} aria-label={recogido ? "Mostrar" : "Recoger"} data-tooltip={recogido ? "Mostrar" : "Recoger"} onClick={() => setRecogido(!recogido)}><AppIcon name={recogido ? "chevron-down" : "chevron-up"} /></button>
     </div>
     {!recogido && <div className="selector-compra-contenido">
       {categoria ? <>

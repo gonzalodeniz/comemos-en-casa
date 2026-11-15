@@ -595,3 +595,5 @@ button.modal-aceptar:hover, button.modal-aceptar:focus-visible { background: #c3
 
 .compra-receta-titulo { display: flex; align-items: center; gap: .65rem; min-width: 0; }
 .compra-receta-titulo .compra-miniatura { width: 50px; height: 50px; flex-basis: 50px; }
+
+.receta-ingrediente { display: flex; align-items: center; gap: .65rem; }

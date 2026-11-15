@@ -10,9 +10,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from app.auth import ActiveSession, get_active_session, require_csrf
 from app.database import get_database_session
+from app.ingredient_images import imagen_ingrediente
 import app.meal_planning_api as meal_planning_api
 from app.food_images import publication_lock, temporary_path
-from app.models import Recipe, RecipeFoodLabel, FoodLabel, RecipeShoppingSection, RecipeShoppingIngredient
+from app.models import Recipe, RecipeFoodLabel, FoodLabel, RecipeShoppingSection, RecipeShoppingIngredient, ShoppingProduct
 
 router=APIRouter(prefix="/api/v1", tags=["recipes"])
 
@@ -23,7 +24,9 @@ def norm(v): return "".join(c for c in unicodedata.normalize("NFD",v.casefold())
 def image_url(r): return f"/recipes/{r.id}/image?v={hashlib.sha256(r.image_path.encode()).hexdigest()}" if r.image_path else None
 def serialize(r,db):
     fs=db.scalars(select(FoodLabel).join(RecipeFoodLabel).where(RecipeFoodLabel.recipe_id==r.id).order_by(FoodLabel.name_canonical)).all()
-    return {"id":str(r.id),"title":r.title,"image_url":image_url(r),"ingredients":r.ingredients,"preparation":r.preparation,"foods":[{"id":str(f.id),"name":f.name} for f in fs]}
+    productos = db.scalars(select(ShoppingProduct)).all()
+    imagenes = [imagen_ingrediente(linea, productos) for linea in (r.ingredients or "").splitlines()]
+    return {"ingredient_images": imagenes, "id":str(r.id),"title":r.title,"image_url":image_url(r),"ingredients":r.ingredients,"preparation":r.preparation,"foods":[{"id":str(f.id),"name":f.name} for f in fs]}
 def title_conflict(error):
     text=str(error.orig).lower()
     return "uq_recipes_title_canonical" in text or "recipes.title_canonical" in text

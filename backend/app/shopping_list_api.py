@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import ActiveSession, get_active_session, require_csrf
 from app.database import get_database_session
+from app.ingredient_images import imagen_ingrediente
 from app.models import Recipe, RecipeShoppingIngredient, RecipeShoppingSection, ShoppingCategory, ShoppingListItem, ShoppingProduct
 
 router = APIRouter(prefix="/api/v1/shopping-list", tags=["shopping-list"])
@@ -92,6 +93,7 @@ async def list_shopping_list_items(
     """Devuelve los productos y las secciones de recetas de la lista."""
     items = db.scalars(select(ShoppingListItem)).all()
     secciones = db.scalars(select(RecipeShoppingSection)).all()
+    productos_catalogo = db.scalars(select(ShoppingProduct)).all()
     ingredientes = db.scalars(
         select(RecipeShoppingIngredient).order_by(RecipeShoppingIngredient.position)
     ).all()
@@ -119,7 +121,7 @@ async def list_shopping_list_items(
                 **({"image_url": imagen_receta_compra(seccion, db)} if imagen_receta_compra(seccion, db) else {}),
                 "ingredients": [
                     {"id": str(ingrediente.id), "text": ingrediente.text,
-                     "purchased": ingrediente.purchased}
+                     "purchased": ingrediente.purchased, **({"image_url": imagen_ingrediente(ingrediente.text, productos_catalogo)} if imagen_ingrediente(ingrediente.text, productos_catalogo) else {})}
                     for ingrediente in ingredientes if ingrediente.section_id == seccion.id
                 ],
             }

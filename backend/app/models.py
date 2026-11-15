@@ -210,6 +210,7 @@ class RecipeShoppingSection(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
+    recipe_id: Mapped[UUID | None] = mapped_column(ForeignKey("recipes.id", ondelete="SET NULL"), nullable=True)
 
 
 class RecipeShoppingIngredient(Base):

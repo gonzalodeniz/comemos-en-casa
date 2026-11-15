@@ -204,3 +204,12 @@ it("actualiza el contador de recetas de la pestaña", async () => {
   await usuario.click(screen.getByRole("button", { name: "Eliminar sección Sopa" }));
   expect(await screen.findByRole("tab", { name: "Recetas" })).toBeTruthy();
 });
+
+// Comprueba la miniatura junto al nombre de la receta en su pestaña.
+it("muestra la imagen de la receta en la lista", async () => {
+  render(<ShoppingList categories={[]} onCreateCategory={vi.fn()} onGetProducts={vi.fn()} onCreateProduct={vi.fn()}
+    onGetShoppingList={vi.fn().mockResolvedValue({ items: [], recipe_sections: [{ id: "s", name: "Sopa", image_url: "/recipes/r/image?v=1", ingredients: [] }] })} />);
+  await userEvent.setup().click(await screen.findByRole("tab", { name: "Recetas (1)" }));
+  const seccion = screen.getByRole("region", { name: "Sopa" });
+  expect(seccion.querySelector("img")?.getAttribute("src")).toContain("/api/v1/recipes/r/image?v=1");
+});

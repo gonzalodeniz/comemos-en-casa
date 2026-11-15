@@ -592,3 +592,6 @@ button.modal-aceptar:hover, button.modal-aceptar:focus-visible { background: #c3
 
 .compra-pestanas { display: flex; gap: .5rem; margin: 1rem 0; }
 .compra-pestanas button[aria-selected="false"] { background: var(--color-secondary-bg); color: var(--color-secondary-text); }
+
+.compra-receta-titulo { display: flex; align-items: center; gap: .65rem; min-width: 0; }
+.compra-receta-titulo .compra-miniatura { width: 50px; height: 50px; flex-basis: 50px; }

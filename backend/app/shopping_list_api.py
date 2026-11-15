@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import ActiveSession, get_active_session, require_csrf
 from app.database import get_database_session
-from app.models import RecipeShoppingIngredient, RecipeShoppingSection, ShoppingCategory, ShoppingListItem, ShoppingProduct
+from app.models import Recipe, RecipeShoppingIngredient, RecipeShoppingSection, ShoppingCategory, ShoppingListItem, ShoppingProduct
 
 router = APIRouter(prefix="/api/v1/shopping-list", tags=["shopping-list"])
 
@@ -116,6 +116,7 @@ async def list_shopping_list_items(
             {
                 "id": str(seccion.id),
                 "name": seccion.name,
+                **({"image_url": imagen_receta_compra(seccion, db)} if imagen_receta_compra(seccion, db) else {}),
                 "ingredients": [
                     {"id": str(ingrediente.id), "text": ingrediente.text,
                      "purchased": ingrediente.purchased}
@@ -158,6 +159,19 @@ async def actualizar_cantidad(
         item.quantity_text = None
     db.commit()
     return {"id": str(item.id), "product_id": str(item.product_id), "quantity": int(item.quantity), "unit": item.unit, "quantity_text": item.quantity_text}
+
+
+def imagen_receta_compra(seccion: RecipeShoppingSection, db: Session) -> str | None:
+    """Resuelve la imagen de la receta asociada o de una coincidencia antigua única."""
+    receta = db.get(Recipe, seccion.recipe_id) if seccion.recipe_id else None
+    if seccion.recipe_id is None:
+        coincidencias = db.scalars(select(Recipe).where(Recipe.title == seccion.name).limit(2)).all()
+        receta = coincidencias[0] if len(coincidencias) == 1 else None
+    if receta is None or not receta.image_path:
+        return None
+    import hashlib
+    version = hashlib.sha256(receta.image_path.encode()).hexdigest()
+    return f"/recipes/{receta.id}/image?v={version}"
 
 
 def shopping_product_image_url(product: ShoppingProduct) -> str | None:

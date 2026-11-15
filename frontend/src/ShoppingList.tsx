@@ -14,7 +14,7 @@ export type ShoppingCategory = { id: string; name: string; image_url?: string | 
 type ShoppingUnit = "unit" | "kg" | "g";
 
 // Describe una copia de receta incluida en la compra.
-type RecipeSection = { id: string; name: string; ingredients: { id: string; text: string; purchased: boolean }[] };
+type RecipeSection = { id: string; name: string; image_url?: string | null; ingredients: { id: string; text: string; purchased: boolean }[] };
 
 /** Resuelve una imagen autenticada de la API bajo la ruta configurada. */
 function urlImagenApi(url: string): string {
@@ -478,7 +478,7 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
     </div>
     <div role="tabpanel" id="panel-compra-recetas" aria-labelledby="tab-compra-recetas" hidden={pestana !== "recetas"}>
     {seccionesRecetas.map((seccion) => <section className="compra-receta" key={seccion.id} aria-label={seccion.name}>
-      <div className="compra-receta-cabecera"><h3>{seccion.name}</h3>
+      <div className="compra-receta-cabecera"><div className="compra-receta-titulo">{seccion.image_url && <img className="compra-miniatura" src={urlImagenApi(seccion.image_url)} alt="" />}<h3>{seccion.name}</h3></div>
         <button className="compra-accion" type="button" aria-label={`Eliminar sección ${seccion.name}`} data-tooltip={`Eliminar sección ${seccion.name}`} onClick={() => void eliminarSeccionReceta(seccion.id)}><AppIcon name="trash" /></button>
       </div>
       {([false, true] as const).map((comprado) => <Fragment key={String(comprado)}><h4>{comprado ? "Comprados" : "Pendientes"}</h4><ul className="compra-filas">{seccion.ingredients.filter((ingrediente) => ingrediente.purchased === comprado).map((ingrediente) => <li className={`compra-fila${comprado ? " compra-fila-comprada" : ""}`} key={ingrediente.id}>

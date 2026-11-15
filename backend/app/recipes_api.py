@@ -107,7 +107,7 @@ def add_recipe_to_shopping_section(rid: UUID, request: Request, s: ActiveSession
     recipe = db.get(Recipe, rid)
     if recipe is None:
         raise HTTPException(404, "Recipe not found")
-    section = RecipeShoppingSection(name=recipe.title)
+    section = RecipeShoppingSection(name=recipe.title, recipe_id=recipe.id)
     db.add(section)
     db.flush()
     lines = (recipe.ingredients or "").splitlines()

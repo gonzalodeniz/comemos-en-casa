@@ -55,7 +55,8 @@ def test_food_catalog_migration_follows_meal_planning_and_auth_migrations():
     root = Path(__file__).resolve().parents[1]
     script = ScriptDirectory(dir=str(root / "migrations"))
 
-    assert script.get_heads() == ["0014_category_image"]
+    assert script.get_heads() == ["0015_shopping_quantity_text"]
+    assert script.get_revision("0015_shopping_quantity_text").down_revision == "0014_category_image"
     assert script.get_revision("0002_user_auth").down_revision == "0001_baseline"
     assert script.get_revision("0003_login_attempt_events").down_revision == "0002_user_auth"
     assert script.get_revision("0004_password_reset_rate_scopes").down_revision == "0003_login_attempt_events"

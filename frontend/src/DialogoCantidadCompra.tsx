@@ -4,7 +4,7 @@ import type { ShoppingListItem, ShoppingProduct } from "./mealPlanningApi";
 
 // Define las unidades y acciones admitidas por la operación existente.
 type Unidad = "unit" | "kg" | "g";
-type Props = { producto: ShoppingProduct; agregar: (id: string, cantidad: number, unidad: Unidad) => Promise<ShoppingListItem>; alAgregar: (entrada: ShoppingListItem) => void; cerrar: () => void };
+type Props = { producto: ShoppingProduct; agregar: (id: string, cantidad: number, unidad: Unidad, texto?: string) => Promise<ShoppingListItem>; alAgregar: (entrada: ShoppingListItem) => void; cerrar: () => void };
 
 /** Presenta un diálogo modal y conserva los valores si falla el envío. */
 export default function DialogoCantidadCompra({ producto, agregar, alAgregar, cerrar }: Props) {
@@ -13,6 +13,8 @@ export default function DialogoCantidadCompra({ producto, agregar, alAgregar, ce
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState("");
   const [cantidad, setCantidad] = useState("1");
+  const [textoLibre, setTextoLibre] = useState(false);
+  const [texto, setTexto] = useState("");
   const [unidad, setUnidad] = useState<Unidad>("unit");
 
   useEffect(() => {
@@ -31,7 +33,8 @@ export default function DialogoCantidadCompra({ producto, agregar, alAgregar, ce
     setOcupado(true);
     setError("");
     try {
-      const entrada = await agregar(producto.id, Number(cantidad), unidad);
+      if (textoLibre && !texto.trim()) { setError("Introduce una descripción."); return; }
+      const entrada = textoLibre ? await agregar(producto.id, 0, unidad, texto.trim()) : await agregar(producto.id, Number(cantidad), unidad);
       alAgregar(entrada);
       cerrar();
     } catch {
@@ -45,8 +48,9 @@ export default function DialogoCantidadCompra({ producto, agregar, alAgregar, ce
   return <dialog ref={ventana} aria-labelledby="titulo-dialogo-compra" onCancel={(evento) => { evento.preventDefault(); if (!enviando.current) cerrar(); }}>
     <form onSubmit={(evento) => void enviar(evento)}>
       <h3 id="titulo-dialogo-compra">{producto.name}</h3>
-      <label>Cantidad<input type="number" required min="0.01" step="any" value={cantidad} onChange={(evento) => setCantidad(evento.target.value)} /></label>
-      <label>Unidad<select value={unidad} onChange={(evento) => setUnidad(evento.target.value as Unidad)}><option value="unit">unidad</option><option value="kg">kg</option><option value="g">g</option></select></label>
+      <label>Tipo de cantidad<select value={textoLibre ? "texto" : "numero"} onChange={(evento) => setTextoLibre(evento.target.value === "texto")}><option value="numero">Cantidad y unidad</option><option value="texto">Texto libre</option></select></label>
+      {textoLibre ? <label>Texto libre<input required maxLength={255} value={texto} onChange={(evento) => setTexto(evento.target.value)} /></label> : <><label>Cantidad<input type="number" required min="0.01" step="any" value={cantidad} onChange={(evento) => setCantidad(evento.target.value)} /></label>
+      <label>Unidad<select value={unidad} onChange={(evento) => setUnidad(evento.target.value as Unidad)}><option value="unit">unidad</option><option value="kg">kg</option><option value="g">g</option></select></label></>}
       {error && <p role="alert">{error}</p>}
       <button type="button" className="secondary" disabled={ocupado} onClick={cerrar}>Cancelar</button>
       <button type="submit" disabled={ocupado}>Añadir</button>

@@ -47,3 +47,17 @@ it("conserva la cantidad cuando falla y permite reintentar", async () => {
   await usuario.click(screen.getByRole("button", { name: "Añadir" }));
   await waitFor(() => expect(cerrar).toHaveBeenCalledOnce());
 });
+
+// Comprueba que se puede añadir una descripción libre sin cantidad numérica.
+it("añade un producto con texto libre", async () => {
+  const usuario = userEvent.setup();
+  const entrada = { id: "i", product_id: "m", quantity: 0, unit: "unit", quantity_text: "un puñado" };
+  const agregar = vi.fn().mockResolvedValue(entrada);
+  const alAgregar = vi.fn();
+  render(<DialogoCantidadCompra producto={{ id: "m", name: "Manzana" }} agregar={agregar} alAgregar={alAgregar} cerrar={vi.fn()} />);
+  await usuario.selectOptions(screen.getByLabelText("Tipo de cantidad"), "texto");
+  await usuario.type(screen.getByLabelText("Texto libre"), "un puñado");
+  await usuario.click(screen.getByRole("button", { name: "Añadir" }));
+  expect(agregar).toHaveBeenCalledWith("m", 0, "unit", "un puñado");
+  expect(alAgregar).toHaveBeenCalledWith(entrada);
+});

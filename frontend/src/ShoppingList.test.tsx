@@ -150,3 +150,19 @@ describe("ShoppingList", () => {
     expect(onAddToShoppingList).toHaveBeenCalledWith("product-1", 1.5, "kg");
   });
 });
+
+// Comprueba la edición de un producto pendiente y la presentación del texto guardado.
+it("edita un producto pendiente con texto libre", async () => {
+  HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
+  HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
+  const usuario = userEvent.setup();
+  const entrada = { id: "i", product_id: "p", product_name: "Pera", quantity: 2, unit: "unit" };
+  const guardar = vi.fn().mockResolvedValue({ ...entrada, quantity_text: "un puñado" });
+  render(<ShoppingList categories={[]} onCreateCategory={vi.fn()} onGetProducts={vi.fn()} onCreateProduct={vi.fn()} onUpdateShoppingItem={guardar} onGetShoppingList={vi.fn().mockResolvedValue({ items: [entrada] })} />);
+  await usuario.click(await screen.findByRole("button", { name: "Editar Pera" }));
+  await usuario.selectOptions(screen.getByLabelText("Tipo de cantidad"), "texto");
+  await usuario.type(screen.getByLabelText("Texto libre"), "un puñado");
+  await usuario.click(screen.getByRole("button", { name: "Guardar" }));
+  expect(guardar).toHaveBeenCalledWith("i", { quantity_text: "un puñado" });
+  expect((await screen.findByRole("button", { name: "Editar Pera" })).textContent).toBe("Pera: un puñado");
+});

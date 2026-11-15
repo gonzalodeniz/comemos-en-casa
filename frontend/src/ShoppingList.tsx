@@ -1,11 +1,12 @@
 // Presenta categorías y productos del catálogo compartido de compra.
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Cropper from "react-easy-crop";
-import type { ShoppingListItem, ShoppingProduct } from "./mealPlanningApi";
+import type { ShoppingListItem, ShoppingProduct, CambioCantidad } from "./mealPlanningApi";
 import ToastMessage from "./ToastMessage";
 import AppIcon from "./AppIcon";
 import SelectorCompra from "./SelectorCompra";
 import DialogoCantidadCompra from "./DialogoCantidadCompra";
+import DialogoEditarCompra from "./DialogoEditarCompra";
 
 export type ShoppingCategory = { id: string; name: string; image_url?: string | null };
 
@@ -20,6 +21,11 @@ function urlImagenApi(url: string): string {
   return `${import.meta.env.VITE_API_BASE_URL || "/comemos"}/api/v1${url}`;
 }
 
+/** Identifica independientemente las entradas de texto libre. */
+function claveEntrada(item: ShoppingListItem): string {
+  return item.quantity_text != null && item.id ? item.id : `${item.product_id}:${item.unit}`;
+}
+
 type Props = {
   categories: ShoppingCategory[];
   mostrarAdministracion?: boolean;
@@ -31,7 +37,8 @@ type Props = {
   onImportImage?: (url: string) => Promise<string>;
   onUpdateProductImage?: (categoryId: string, productId: string, change: { image_token: string } | { remove_image: true }) => Promise<ShoppingProduct>;
   onUpdateCategoryImage?: (categoryId: string, change: { image_token: string } | { remove_image: true }) => Promise<ShoppingCategory>;
-  onAddToShoppingList?: (productId: string, quantity: number, unit: ShoppingUnit) => Promise<ShoppingListItem>;
+  onAddToShoppingList?: (productId: string, quantity: number, unit: ShoppingUnit, texto?: string) => Promise<ShoppingListItem>;
+  onUpdateShoppingItem?: (id: string, cambio: CambioCantidad) => Promise<ShoppingListItem>;
   onGetShoppingList?: () => Promise<{ items: ShoppingListItem[]; purchased_items?: ShoppingListItem[]; recipe_sections?: RecipeSection[] }>;
   onMarkRecipeIngredient?: (ingredientId: string) => Promise<unknown>;
   onUnmarkRecipeIngredient?: (ingredientId: string) => Promise<unknown>;
@@ -43,7 +50,8 @@ type Props = {
 };
 
 /** Presenta las categorías y permite consultar y crear sus productos. */
-export default function ShoppingList({ categories, mostrarAdministracion = true, onAbrirCatalogo, onCreateCategory, onGetProducts, onCreateProduct, onPrepareImage, onImportImage, onUpdateProductImage, onUpdateCategoryImage, onAddToShoppingList, onGetShoppingList, onMarkPurchased, onUnmarkPurchased, onDeleteItem, onMarkRecipeIngredient, onUnmarkRecipeIngredient, onDeleteRecipeIngredient, onDeleteRecipeSection }: Props) {
+export default function ShoppingList({ categories, mostrarAdministracion = true, onAbrirCatalogo, onCreateCategory, onGetProducts, onCreateProduct, onPrepareImage, onImportImage, onUpdateProductImage, onUpdateCategoryImage, onAddToShoppingList, onUpdateShoppingItem, onGetShoppingList, onMarkPurchased, onUnmarkPurchased, onDeleteItem, onMarkRecipeIngredient, onUnmarkRecipeIngredient, onDeleteRecipeIngredient, onDeleteRecipeSection }: Props) {
+  const [entradaEditada, setEntradaEditada] = useState<ShoppingListItem | null>(null);
   const [productoSeleccionado, setProductoSeleccionado] = useState<ShoppingProduct | null>(null);
   const [name, setName] = useState("");
   const [products, setProducts] = useState<Record<string, ShoppingProduct[]>>({});
@@ -126,8 +134,8 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
   useEffect(() => {
     if (!onGetShoppingList) return;
     void onGetShoppingList().then(({ items, purchased_items = [], recipe_sections = [] }) => {
-      setListaCompra(Object.fromEntries(items.map((item) => [`${item.product_id}:${item.unit}`, item])));
-      setComprados(Object.fromEntries(purchased_items.map((item) => [`${item.product_id}:${item.unit}`, item])));
+      setListaCompra(Object.fromEntries(items.map((item) => [claveEntrada(item), item])));
+      setComprados(Object.fromEntries(purchased_items.map((item) => [claveEntrada(item), item])));
       setSeccionesRecetas(recipe_sections);
     }).catch(() => setErrorListaCompra("No se pudo cargar la lista de la compra."));
   }, [onGetShoppingList]);
@@ -272,14 +280,14 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     const item = await onAddToShoppingList?.(product.id, Number(formData.get("quantity")), formData.get("unit") as ShoppingUnit);
-    if (item) setListaCompra((actual) => ({ ...actual, [`${item.product_id}:${item.unit}`]: item }));
+    if (item) setListaCompra((actual) => ({ ...actual, [claveEntrada(item)]: item }));
   }
 
   /** Marca una entrada pendiente como comprada y la conserva en la sección inferior. */
   async function markPurchased(item: ShoppingListItem) {
     if (!item.id || !onMarkPurchased) return;
     const updated = await onMarkPurchased(item.id);
-    const key = `${item.product_id}:${item.unit}`;
+    const key = claveEntrada(item);
     setListaCompra((current) => { const next = { ...current }; delete next[key]; return next; });
     setComprados((current) => ({ ...current, [key]: { ...item, ...updated } }));
   }
@@ -288,7 +296,7 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
   async function unmarkPurchased(item: ShoppingListItem) {
     if (!item.id || !onUnmarkPurchased) return;
     const updated = await onUnmarkPurchased(item.id);
-    const key = `${item.product_id}:${item.unit}`;
+    const key = claveEntrada(item);
     setComprados((current) => { const next = { ...current }; delete next[key]; return next; });
     setListaCompra((current) => ({ ...current, [key]: { ...item, ...updated } }));
   }
@@ -297,7 +305,7 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
   async function deleteItem(item: ShoppingListItem, purchased: boolean) {
     if (!item.id || !onDeleteItem) return;
     await onDeleteItem(item.id);
-    const key = `${item.product_id}:${item.unit}`;
+    const key = claveEntrada(item);
     if (purchased) setComprados((current) => { const next = { ...current }; delete next[key]; return next; });
     else setListaCompra((current) => { const next = { ...current }; delete next[key]; return next; });
   }
@@ -386,9 +394,12 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
     <div className="compra-cabecera"><h2>Lista de la compra</h2>
       {onAbrirCatalogo && <button type="button" className="compra-accion" aria-label="Gestionar catálogo" data-tooltip="Gestionar catálogo" onClick={onAbrirCatalogo}><AppIcon name="store" /></button>}
     </div>
+    {entradaEditada && onUpdateShoppingItem && <DialogoEditarCompra entrada={entradaEditada} guardar={onUpdateShoppingItem} cerrar={() => setEntradaEditada(null)} alGuardar={(actualizada) => {
+      setListaCompra((actual) => { const siguiente = { ...actual }; delete siguiente[claveEntrada(entradaEditada)]; siguiente[claveEntrada(actualizada)] = { ...entradaEditada, ...actualizada }; return siguiente; });
+    }} />}
     <SelectorCompra categorias={categories} consultar={onGetProducts} seleccionar={setProductoSeleccionado} />
     {productoSeleccionado && onAddToShoppingList && <DialogoCantidadCompra producto={productoSeleccionado} agregar={onAddToShoppingList}
-      alAgregar={(entrada) => setListaCompra((actual) => ({ ...actual, [`${entrada.product_id}:${entrada.unit}`]: { ...entrada, product_name: productoSeleccionado.name, image_url: productoSeleccionado.image_url } }))}
+      alAgregar={(entrada) => setListaCompra((actual) => ({ ...actual, [claveEntrada(entrada)]: { ...entrada, product_name: productoSeleccionado.name, image_url: productoSeleccionado.image_url } }))}
       cerrar={() => setProductoSeleccionado(null)} /> }
     {seccionesRecetas.map((seccion) => <section className="compra-receta" key={seccion.id} aria-label={seccion.name}>
       <div className="compra-receta-cabecera"><h3>{seccion.name}</h3>
@@ -451,10 +462,10 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
         const nombre = item.product_name ?? Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? "Producto";
         const marcar = `Marcar ${nombre} como comprado`;
         const eliminar = `Eliminar ${nombre} de Pendientes`;
-        return <li className="compra-fila" key={`${item.product_id}:${item.unit}`}>
+        return <li className="compra-fila" key={claveEntrada(item)}>
           <input className="compra-casilla" type="checkbox" checked={false} disabled={!item.id || borrandoComprados} aria-label={marcar} onChange={() => void markPurchased(item)} />
           {item.image_url && <img className="compra-miniatura" src={urlImagenApi(item.image_url)} alt={nombre} />}
-          <span className="compra-fila-texto"><strong>{nombre}</strong>: {item.quantity} {item.unit === "unit" ? "unidad" : item.unit}</span>
+          <button type="button" className="compra-fila-texto compra-editar" disabled={!item.id || !onUpdateShoppingItem || borrandoComprados} onClick={() => setEntradaEditada(item)} aria-label={`Editar ${nombre}`}><strong>{nombre}</strong>: {item.quantity_text ?? `${item.quantity} ${item.unit === "unit" ? "unidad" : item.unit}`}</button>
           <span className="compra-acciones">
             {item.id && onDeleteItem && <button className="compra-accion" type="button" aria-label={eliminar} data-tooltip={eliminar} onClick={() => void deleteItem(item, false)}><AppIcon name="trash" /></button>}
           </span>
@@ -464,10 +475,10 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
         const nombre = item.product_name ?? Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? "Producto";
         const desmarcar = `Desmarcar ${nombre} como pendiente`;
         const eliminar = `Eliminar ${nombre} de Comprados`;
-        return <li className="compra-fila compra-fila-comprada" key={`${item.product_id}:${item.unit}`}>
+        return <li className="compra-fila compra-fila-comprada" key={claveEntrada(item)}>
           <input className="compra-casilla" type="checkbox" checked={true} disabled={!item.id || !onUnmarkPurchased || borrandoComprados} aria-label={desmarcar} onChange={() => void unmarkPurchased(item)} />
           {item.image_url && <img className="compra-miniatura" src={urlImagenApi(item.image_url)} alt={nombre} />}
-          <span className="compra-fila-texto"><strong>{nombre}</strong>: {item.quantity} {item.unit === "unit" ? "unidad" : item.unit}</span>
+          <span className="compra-fila-texto"><strong>{nombre}</strong>: {item.quantity_text ?? `${item.quantity} ${item.unit === "unit" ? "unidad" : item.unit}`}</span>
           <span className="compra-acciones">
             {item.id && onDeleteItem && <button className="compra-accion" type="button" aria-label={eliminar} data-tooltip={eliminar} disabled={borrandoComprados} onClick={() => void deleteItem(item, true)}><AppIcon name="trash" /></button>}
           </span>

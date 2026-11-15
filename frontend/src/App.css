@@ -560,3 +560,9 @@ button.compra-accion { position: relative; display: inline-flex; align-items: ce
 button.compra-accion:hover, button.compra-accion:focus-visible { background: #deeeea; }
 button.compra-accion::after { content: attr(data-tooltip); position: absolute; z-index: 5; bottom: calc(100% + .4rem); right: 0; width: max-content; max-width: min(18rem, 75vw); padding: .4rem .6rem; border-radius: .4rem; background: #103642; color: white; font-size: .75rem; line-height: 1.3; white-space: normal; pointer-events: none; opacity: 0; visibility: hidden; }
 button.compra-accion:hover::after, button.compra-accion:focus-visible::after { opacity: 1; visibility: visible; }
+
+/* Distingue las entradas compradas y alinea las casillas con su contenido. */
+input.compra-casilla { flex: 0 0 22px; width: 22px; height: 22px; min-height: 0; margin: 0; accent-color: var(--color-primary); cursor: pointer; }
+.compra-fila-comprada { padding: .65rem .6rem; border-radius: .65rem; background: #e0f3eb; }
+.compra-fila-comprada .compra-fila-texto { text-decoration: line-through; }
+.compra-comprados-cabecera { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }

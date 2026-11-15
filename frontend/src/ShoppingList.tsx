@@ -50,6 +50,8 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
   const [productNames, setProductNames] = useState<Record<string, string>>({});
   const [productErrors, setProductErrors] = useState<Record<string, string>>({});
   const [listaCompra, setListaCompra] = useState<Record<string, ShoppingListItem>>({});
+  const [borrandoComprados, setBorrandoComprados] = useState(false);
+  const bloqueoBorrado = useRef(false);
   const [comprados, setComprados] = useState<Record<string, ShoppingListItem>>({});
   const [seccionesRecetas, setSeccionesRecetas] = useState<RecipeSection[]>([]);
   const [errorListaCompra, setErrorListaCompra] = useState("");
@@ -300,6 +302,28 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
     else setListaCompra((current) => { const next = { ...current }; delete next[key]; return next; });
   }
 
+  /** Elimina únicamente las entradas compradas confirmadas por la API. */
+  async function borrarTodosComprados() {
+    if (!onDeleteItem || bloqueoBorrado.current || !Object.keys(comprados).length) return;
+    if (!window.confirm("¿Eliminar todos los productos comprados?")) return;
+    bloqueoBorrado.current = true;
+    setBorrandoComprados(true);
+    setErrorListaCompra("");
+    const entradas = Object.entries(comprados);
+    const resultados = await Promise.allSettled(entradas.map(([, item]) => item.id ? onDeleteItem(item.id) : Promise.reject(new Error("Entrada sin identificador"))));
+    setComprados((actual) => {
+      const siguiente = { ...actual };
+      resultados.forEach((resultado, indice) => {
+        const [clave, item] = entradas[indice];
+        if (resultado.status === "fulfilled" && siguiente[clave]?.id === item.id) delete siguiente[clave];
+      });
+      return siguiente;
+    });
+    if (resultados.some((resultado) => resultado.status === "rejected")) setErrorListaCompra("No se pudieron eliminar todos los productos comprados. Inténtalo de nuevo.");
+    bloqueoBorrado.current = false;
+    setBorrandoComprados(false);
+  }
+
   /** Marca como comprado un ingrediente de receta concreto. */
   async function marcarIngredienteReceta(ingredientId: string) {
     try { await onMarkRecipeIngredient?.(ingredientId); } catch (error) { setErrorReceta(error instanceof Error ? error.message : "No se pudo actualizar el ingrediente."); return; }
@@ -405,24 +429,24 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
         const marcar = `Marcar ${nombre} como comprado`;
         const eliminar = `Eliminar ${nombre} de Pendientes`;
         return <li className="compra-fila" key={`${item.product_id}:${item.unit}`}>
+          <input className="compra-casilla" type="checkbox" checked={false} disabled={!item.id || borrandoComprados} aria-label={marcar} onChange={() => void markPurchased(item)} />
           {item.image_url && <img className="compra-miniatura" src={urlImagenApi(item.image_url)} alt={nombre} />}
           <span className="compra-fila-texto">{nombre}: {item.quantity} {item.unit === "unit" ? "unidad" : item.unit}</span>
           <span className="compra-acciones">
-            {item.id && <button className="compra-accion" type="button" aria-label={marcar} data-tooltip={marcar} onClick={() => void markPurchased(item)}><AppIcon name="check" /></button>}
             {item.id && onDeleteItem && <button className="compra-accion" type="button" aria-label={eliminar} data-tooltip={eliminar} onClick={() => void deleteItem(item, false)}><AppIcon name="trash" /></button>}
           </span>
         </li>;
       })}</ul>
-      <h4>Comprados</h4><ul className="compra-filas">{Object.values(comprados).map((item) => {
+      <h4 className="compra-comprados-cabecera" aria-label="Comprados"><span>Comprados</span><button className="compra-accion" type="button" aria-label="Eliminar todos los productos comprados" data-tooltip="Eliminar todos los productos comprados" disabled={!onDeleteItem || borrandoComprados || !Object.keys(comprados).length} onClick={() => void borrarTodosComprados()}><AppIcon name="trash" /></button></h4><ul className="compra-filas">{Object.values(comprados).map((item) => {
         const nombre = item.product_name ?? Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? "Producto";
         const desmarcar = `Desmarcar ${nombre} como pendiente`;
         const eliminar = `Eliminar ${nombre} de Comprados`;
-        return <li className="compra-fila" key={`${item.product_id}:${item.unit}`}>
+        return <li className="compra-fila compra-fila-comprada" key={`${item.product_id}:${item.unit}`}>
+          <input className="compra-casilla" type="checkbox" checked={true} disabled={!item.id || !onUnmarkPurchased || borrandoComprados} aria-label={desmarcar} onChange={() => void unmarkPurchased(item)} />
           {item.image_url && <img className="compra-miniatura" src={urlImagenApi(item.image_url)} alt={nombre} />}
           <span className="compra-fila-texto">{nombre}: {item.quantity} {item.unit === "unit" ? "unidad" : item.unit}</span>
           <span className="compra-acciones">
-            {item.id && onUnmarkPurchased && <button className="compra-accion" type="button" aria-label={desmarcar} data-tooltip={desmarcar} onClick={() => void unmarkPurchased(item)}><AppIcon name="undo" /></button>}
-            {item.id && onDeleteItem && <button className="compra-accion" type="button" aria-label={eliminar} data-tooltip={eliminar} onClick={() => void deleteItem(item, true)}><AppIcon name="trash" /></button>}
+            {item.id && onDeleteItem && <button className="compra-accion" type="button" aria-label={eliminar} data-tooltip={eliminar} disabled={borrandoComprados} onClick={() => void deleteItem(item, true)}><AppIcon name="trash" /></button>}
           </span>
         </li>;
       })}</ul>

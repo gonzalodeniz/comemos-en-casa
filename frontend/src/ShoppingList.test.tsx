@@ -28,10 +28,31 @@ describe("ShoppingList", () => {
     render(<ShoppingList categories={[]} onCreateCategory={vi.fn()} onGetProducts={vi.fn()} onCreateProduct={vi.fn()}
       onGetShoppingList={vi.fn().mockResolvedValue({ items: [{ id: "1", product_id: "p", product_name: "Manzana", quantity: 2, unit: "unit", image_url: "/manzana" }] })}
       onMarkPurchased={vi.fn()} onDeleteItem={vi.fn()} />);
-    const accion = await screen.findByRole("button", { name: "Marcar Manzana como comprado" });
-    expect(accion.getAttribute("data-tooltip")).toBe("Marcar Manzana como comprado");
-    expect(accion.querySelector("svg")).not.toBeNull();
+    const accion = await screen.findByRole("checkbox", { name: "Marcar Manzana como comprado" });
+    expect((accion as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByRole("button", { name: "Eliminar Manzana de Pendientes" }).querySelector("svg")).not.toBeNull();
     expect(screen.getByRole("img", { name: "Manzana" }).classList.contains("compra-miniatura")).toBe(true);
+  });
+
+  // Comprueba el borrado selectivo y la recuperación ante un fallo parcial.
+  it("elimina comprados confirmados y conserva los que fallan", async () => {
+    const usuario = userEvent.setup();
+    const confirmar = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const borrar = vi.fn().mockImplementation((id: string) => id === "fallo" ? Promise.reject(new Error("error")) : Promise.resolve(null));
+    render(<ShoppingList categories={[]} onCreateCategory={vi.fn()} onGetProducts={vi.fn()} onCreateProduct={vi.fn()} onDeleteItem={borrar}
+      onGetShoppingList={vi.fn().mockResolvedValue({ items: [{ id: "pendiente", product_id: "p", product_name: "Pera", quantity: 1, unit: "unit" }], purchased_items: [
+        { id: "ok", product_id: "a", product_name: "Manzana", quantity: 2, unit: "unit" },
+        { id: "fallo", product_id: "b", product_name: "Pan", quantity: 1, unit: "unit" },
+      ] })} />);
+    expect((await screen.findByRole("checkbox", { name: "Desmarcar Manzana como pendiente" }) as HTMLInputElement).checked).toBe(true);
+    await usuario.click(screen.getByRole("button", { name: "Eliminar todos los productos comprados" }));
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(borrar).toHaveBeenCalledTimes(2);
+    expect(borrar).not.toHaveBeenCalledWith("pendiente");
+    expect(screen.queryByText("Manzana: 2 unidad")).toBeNull();
+    expect(screen.getByText("Pan: 1 unidad")).toBeTruthy();
+    expect(screen.getByText("Pera: 1 unidad")).toBeTruthy();
+    confirmar.mockRestore();
   });
 
   it("marca como comprado un ingrediente de receta", async () => {

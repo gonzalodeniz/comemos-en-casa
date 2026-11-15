@@ -976,7 +976,7 @@ describe("shopping list integration", () => {
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
 
-    await user.click(await screen.findByRole("button", { name: "Marcar Manzanas como comprado" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Marcar Manzanas como comprado" }));
 
     const [, init] = fetchMock.mock.calls.find(([url, options]) => String(url).endsWith("/item-1/purchase") && options?.method === "POST")!;
     expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-1");
@@ -1009,7 +1009,7 @@ describe("shopping list integration", () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
-    await user.click(await screen.findByRole("button", { name: "Marcar Manzanas como comprado" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Marcar Manzanas como comprado" }));
     await user.click(screen.getByRole("button", { name: "Plan semanal" }));
     await user.click(screen.getByRole("button", { name: "Lista de la compra" }));
 
@@ -1033,7 +1033,7 @@ describe("shopping list integration", () => {
       onUnmarkPurchased={async () => comprado}
     />);
 
-    expect(await screen.findByRole("button", { name: "Desmarcar Manzanas como pendiente" })).toBeTruthy();
+    expect(await screen.findByRole("checkbox", { name: "Desmarcar Manzanas como pendiente" })).toBeTruthy();
   });
 
   // Comprueba que desmarcar mueve el producto desde Comprados a Pendientes.
@@ -1050,7 +1050,7 @@ describe("shopping list integration", () => {
     />);
     const lista = await screen.findByRole("region", { name: "Lista de la compra" });
 
-    await user.click(await within(lista).findByRole("button", { name: "Desmarcar Manzanas como pendiente" }));
+    await user.click(await within(lista).findByRole("checkbox", { name: "Desmarcar Manzanas como pendiente" }));
 
     const seccionPendientes = within(lista).getByRole("heading", { name: "Pendientes" }).nextElementSibling;
     const seccionComprados = within(lista).getByRole("heading", { name: "Comprados" }).nextElementSibling;
@@ -1080,7 +1080,7 @@ describe("shopping list integration", () => {
     await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
     const lista = await screen.findByRole("region", { name: "Lista de la compra" });
 
-    await user.click(await within(lista).findByRole("button", { name: "Desmarcar Manzanas como pendiente" }));
+    await user.click(await within(lista).findByRole("checkbox", { name: "Desmarcar Manzanas como pendiente" }));
 
     const llamada = fetchMock.mock.calls.find(([url, options]) => String(url).endsWith("/item-1/unpurchase") && options?.method === "POST");
     expect(llamada).toBeTruthy();
@@ -1144,7 +1144,7 @@ describe("shopping list integration", () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
-    await user.click(await screen.findByRole("button", { name: "Marcar Manzanas como comprado" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Marcar Manzanas como comprado" }));
 
     const lista = screen.getByRole("region", { name: "Lista de la compra" });
     expect(lista.textContent).toContain("Manzanas: 5 unidad");
@@ -1172,7 +1172,7 @@ describe("shopping list integration", () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
-    await user.click(await screen.findByRole("button", { name: "Marcar Manzanas como comprado" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Marcar Manzanas como comprado" }));
 
     const lista = screen.getByRole("region", { name: "Lista de la compra" });
     await waitFor(() => expect(lista.querySelectorAll("li")).toHaveLength(2));

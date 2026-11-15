@@ -543,8 +543,10 @@ span.meal-thumbnail[role="button"]:focus-visible { outline:3px solid #00854a; ou
 .selector-compra-cabecera { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
 .selector-compra-cabecera h3 { margin: 0; }
 .selector-compra-contenido { max-height: 30vh; overflow: auto; padding-top: .6rem; }
-.selector-compra-cuadricula { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: .5rem; }
-.selector-compra-tarjeta { display: grid; justify-items: center; gap: .3rem; color: var(--color-text); background: var(--color-secondary-bg); overflow-wrap: anywhere; }
+.selector-compra-acciones { display: inline-flex; align-items: center; gap: .4rem; }
+.selector-compra-cuadricula { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 145px), 1fr)); gap: .5rem; }
+.selector-compra-tarjeta { display: grid; justify-items: center; gap: .3rem; color: var(--color-text); background: var(--color-secondary-bg); overflow-wrap: normal; word-break: normal; white-space: normal; }
+.selector-compra-tarjeta span { max-width: 100%; overflow-wrap: normal; word-break: normal; text-align: center; }
 .selector-compra-tarjeta:hover:not(:disabled) { background: #deeeea; }
 .selector-compra-tarjeta img { width: 48px; height: 48px; object-fit: cover; border-radius: 50%; }
 

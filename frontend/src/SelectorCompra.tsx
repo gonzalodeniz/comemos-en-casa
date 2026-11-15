@@ -38,12 +38,12 @@ export default function SelectorCompra({ categorias, consultar, seleccionar, err
   }, [categoria, revision]);
 
   return <section className="selector-compra" aria-label="Añadir productos">
-    <div className="selector-compra-cabecera"><h3>Añadir productos</h3>
-      <button type="button" className="compra-accion" aria-expanded={!recogido} aria-label={recogido ? "Mostrar" : "Recoger"} data-tooltip={recogido ? "Mostrar" : "Recoger"} onClick={() => setRecogido(!recogido)}><AppIcon name={recogido ? "chevron-down" : "chevron-up"} /></button>
+    <div className="selector-compra-cabecera"><h3>Añadir productos</h3><span className="selector-compra-acciones">
+      {categoria && <button type="button" className="compra-accion" aria-label="Volver a categorías" data-tooltip="Volver a categorías" onClick={() => setCategoria(null)}><AppIcon name="arrow-left" /></button>}
+      <button type="button" className="compra-accion" aria-expanded={!recogido} aria-label={recogido ? "Mostrar" : "Recoger"} data-tooltip={recogido ? "Mostrar" : "Recoger"} onClick={() => setRecogido(!recogido)}><AppIcon name={recogido ? "chevron-down" : "chevron-up"} /></button></span>
     </div>
     {!recogido && <div className="selector-compra-contenido">
       {categoria ? <>
-        <button type="button" className="secondary" onClick={() => setCategoria(null)}>Volver a categorías</button>
         <h4>{categoria.name}</h4>
         {estado === "cargando" && <p role="status">Cargando productos…</p>}
         {estado === "error" && <div role="alert">No se pudieron cargar los productos. <button type="button" onClick={() => setRevision((actual) => actual + 1)}>Reintentar</button></div>}

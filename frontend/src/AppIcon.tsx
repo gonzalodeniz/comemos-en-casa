@@ -1,5 +1,5 @@
 // Presenta los iconos utilizados por las vistas de la aplicación.
-type IconName = "calendar" | "repeat" | "users" | "chevron-left" | "chevron-right" | "chevron-up" | "chevron-down" | "plus" | "logout" | "utensils" | "menu" | "edit" | "trash" | "eye" | "shopping-cart" | "check" | "undo" | "clear-list" | "store";
+type IconName = "calendar" | "repeat" | "users" | "chevron-left" | "chevron-right" | "chevron-up" | "chevron-down" | "plus" | "logout" | "utensils" | "menu" | "edit" | "trash" | "eye" | "shopping-cart" | "check" | "undo" | "clear-list" | "store" | "arrow-left";
 
 const paths: Record<IconName, string> = {
   check: "M5 12l4 4L19 6",
@@ -14,6 +14,7 @@ const paths: Record<IconName, string> = {
   "chevron-right": "m9 18 6-6-6-6",
   "chevron-up": "m6 15 6-6 6 6",
   "chevron-down": "m6 9 6 6 6-6",
+  "arrow-left": "M19 12H5m7 7-7-7 7-7",
   plus: "M12 5v14M5 12h14",
   logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 14 5-5-5-5m5 5H9",
   edit: "M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z",

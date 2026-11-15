@@ -324,6 +324,28 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
     setBorrandoComprados(false);
   }
 
+  /** Elimina únicamente las entradas pendientes confirmadas por la API. */
+  async function borrarTodosPendientes() {
+    if (!onDeleteItem || bloqueoBorrado.current || !Object.keys(listaCompra).length) return;
+    if (!window.confirm("¿Eliminar todos los productos pendientes?")) return;
+    bloqueoBorrado.current = true;
+    setBorrandoComprados(true);
+    setErrorListaCompra("");
+    const entradas = Object.entries(listaCompra);
+    const resultados = await Promise.allSettled(entradas.map(([, item]) => item.id ? onDeleteItem(item.id) : Promise.reject(new Error("Entrada sin identificador"))));
+    setListaCompra((actual) => {
+      const siguiente = { ...actual };
+      resultados.forEach((resultado, indice) => {
+        const [clave, item] = entradas[indice];
+        if (resultado.status === "fulfilled" && siguiente[clave]?.id === item.id) delete siguiente[clave];
+      });
+      return siguiente;
+    });
+    if (resultados.some((resultado) => resultado.status === "rejected")) setErrorListaCompra("No se pudieron eliminar todos los productos pendientes. Inténtalo de nuevo.");
+    bloqueoBorrado.current = false;
+    setBorrandoComprados(false);
+  }
+
   /** Marca como comprado un ingrediente de receta concreto. */
   async function marcarIngredienteReceta(ingredientId: string) {
     try { await onMarkRecipeIngredient?.(ingredientId); } catch (error) { setErrorReceta(error instanceof Error ? error.message : "No se pudo actualizar el ingrediente."); return; }
@@ -424,7 +446,7 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
     </>}
     <section aria-label="Lista de la compra"><h3>Lista de la compra</h3>
       {errorListaCompra && <p role="alert">{errorListaCompra}</p>}
-      <h4>Pendientes</h4><ul className="compra-filas">{Object.values(listaCompra).map((item) => {
+      <h4 className="compra-comprados-cabecera"><span>Pendientes</span><button className="compra-accion" type="button" aria-label="Eliminar todos los productos pendientes" data-tooltip="Eliminar todos los productos pendientes" disabled={!onDeleteItem || borrandoComprados || !Object.keys(listaCompra).length} onClick={() => void borrarTodosPendientes()}><AppIcon name="trash" /></button></h4><ul className="compra-filas">{Object.values(listaCompra).map((item) => {
         const nombre = item.product_name ?? Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? "Producto";
         const marcar = `Marcar ${nombre} como comprado`;
         const eliminar = `Eliminar ${nombre} de Pendientes`;

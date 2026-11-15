@@ -17,9 +17,9 @@ HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); 
 async function agregarManzanas(user: ReturnType<typeof userEvent.setup>, cantidad: string, unidad = "unit") {
   await user.click(await screen.findByRole("button", { name: "Manzanas" }));
   const dialogo = screen.getByRole("dialog");
-  const campo = within(dialogo).getByLabelText("Cantidad");
+  const campo = within(dialogo).getByLabelText("Unidades", { selector: "input" });
   await user.clear(campo); await user.type(campo, cantidad);
-  await user.selectOptions(within(dialogo).getByLabelText("Unidad"), unidad);
+  await user.click(within(dialogo).getByRole("button", { name: unidad === "kg" ? "Kilogramos" : unidad === "g" ? "Gramos" : "Unidades" }));
   await user.click(within(dialogo).getByRole("button", { name: "Añadir" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 }

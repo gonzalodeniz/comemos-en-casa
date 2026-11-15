@@ -39,9 +39,9 @@ describe("Rediseño de la lista de la compra", () => {
     await usuario.click(screen.getByRole("button", { name: "Fruta" }));
     await usuario.click(await screen.findByRole("button", { name: "Manzana" }));
     const dialogo = screen.getByRole("dialog");
-    await usuario.clear(within(dialogo).getByLabelText("Cantidad"));
-    await usuario.type(within(dialogo).getByLabelText("Cantidad"), "1.5");
-    await usuario.selectOptions(within(dialogo).getByLabelText("Unidad"), "kg");
+    await usuario.clear(within(dialogo).getByLabelText("Unidades", { selector: "input" }));
+    await usuario.type(within(dialogo).getByLabelText("Unidades", { selector: "input" }), "1.5");
+    await usuario.click(within(dialogo).getByRole("button", { name: "Kilogramos" }));
     await usuario.click(within(dialogo).getByRole("button", { name: "Añadir" }));
     expect(agregar).toHaveBeenCalledWith("manzana", 1.5, "kg");
     expect(await screen.findByRole("button", { name: "Manzana" })).toBeTruthy();

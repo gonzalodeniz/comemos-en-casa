@@ -1,5 +1,6 @@
 // Solicita la cantidad de un producto antes de incorporarlo a la compra.
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import AppIcon from "./AppIcon";
 import type { ShoppingListItem, ShoppingProduct } from "./mealPlanningApi";
 
 // Define las unidades y acciones admitidas por la operación existente.
@@ -13,9 +14,9 @@ export default function DialogoCantidadCompra({ producto, agregar, alAgregar, ce
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState("");
   const [cantidad, setCantidad] = useState("1");
-  const [textoLibre, setTextoLibre] = useState(false);
+  const [modo, setModo] = useState<"texto" | "unit" | "g" | "kg">("unit");
+  const textoLibre = modo === "texto";
   const [texto, setTexto] = useState("");
-  const [unidad, setUnidad] = useState<Unidad>("unit");
 
   useEffect(() => {
     const origen = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -34,7 +35,8 @@ export default function DialogoCantidadCompra({ producto, agregar, alAgregar, ce
     setError("");
     try {
       if (textoLibre && !texto.trim()) { setError("Introduce una descripción."); return; }
-      const entrada = textoLibre ? await agregar(producto.id, 0, unidad, texto.trim()) : await agregar(producto.id, Number(cantidad), unidad);
+      const medida: Unidad = modo === "texto" ? "unit" : modo === "unit" ? "unit" : modo;
+      const entrada = textoLibre ? await agregar(producto.id, 0, "unit", texto.trim()) : await agregar(producto.id, Number(cantidad), medida);
       alAgregar(entrada);
       cerrar();
     } catch {
@@ -48,12 +50,10 @@ export default function DialogoCantidadCompra({ producto, agregar, alAgregar, ce
   return <dialog ref={ventana} aria-labelledby="titulo-dialogo-compra" onCancel={(evento) => { evento.preventDefault(); if (!enviando.current) cerrar(); }}>
     <form onSubmit={(evento) => void enviar(evento)}>
       <h3 id="titulo-dialogo-compra">{producto.name}</h3>
-      <label>Tipo de cantidad<select value={textoLibre ? "texto" : "numero"} onChange={(evento) => setTextoLibre(evento.target.value === "texto")}><option value="numero">Cantidad y unidad</option><option value="texto">Texto libre</option></select></label>
-      {textoLibre ? <label>Texto libre<input required maxLength={255} value={texto} onChange={(evento) => setTexto(evento.target.value)} /></label> : <><label>Cantidad<input type="number" required min="0.01" step="any" value={cantidad} onChange={(evento) => setCantidad(evento.target.value)} /></label>
-      <label>Unidad<select value={unidad} onChange={(evento) => setUnidad(evento.target.value as Unidad)}><option value="unit">unidad</option><option value="kg">kg</option><option value="g">g</option></select></label></>}
+      <div className="compra-modos" role="group" aria-label="Tipo de cantidad">{([['texto','T','Texto libre'],['unit','U','Unidades'],['g','gr','Gramos'],['kg','kg','Kilogramos']] as const).map(([valor, etiqueta, ayuda]) => <button key={valor} type="button" className={modo === valor ? "seleccionado" : ""} aria-pressed={modo === valor} aria-label={ayuda} data-tooltip={ayuda} onClick={() => setModo(valor)}>{etiqueta}</button>)}</div>
+      {textoLibre ? <label>Texto libre<input required maxLength={255} value={texto} onChange={(evento) => setTexto(evento.target.value)} /></label> : <label>{modo === "unit" ? "Unidades" : modo === "g" ? "Gramos" : "Kilogramos"}<input type="number" required min="0.01" step="any" value={cantidad} onChange={(evento) => setCantidad(evento.target.value)} /></label>}
       {error && <p role="alert">{error}</p>}
-      <button type="button" className="secondary" disabled={ocupado} onClick={cerrar}>Cancelar</button>
-      <button type="submit" disabled={ocupado}>Añadir</button>
+      <div className="compra-modal-acciones"><button type="button" className="compra-accion modal-cancelar" aria-label="Cancelar" data-tooltip="Cancelar" disabled={ocupado} onClick={cerrar}><AppIcon name="close" /></button><button type="submit" className="compra-accion modal-aceptar" aria-label="Añadir" data-tooltip="Añadir" disabled={ocupado}><AppIcon name="check" /></button></div>
     </form>
   </dialog>;
 }

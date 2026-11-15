@@ -20,11 +20,11 @@ it("envía cantidad y unidad y entrega la respuesta del servidor", async () => {
   const alAgregar = vi.fn();
   const cerrar = vi.fn();
   render(<DialogoCantidadCompra producto={{ id: "m", name: "Manzana" }} agregar={agregar} alAgregar={alAgregar} cerrar={cerrar} />);
-  const cantidad = screen.getByLabelText("Cantidad");
+  const cantidad = screen.getByLabelText("Unidades", { selector: "input" });
   expect(document.activeElement).toBe(cantidad);
   await usuario.clear(cantidad);
   await usuario.type(cantidad, "1.5");
-  await usuario.selectOptions(screen.getByLabelText("Unidad"), "kg");
+  await usuario.click(screen.getByRole("button", { name: "Kilogramos" }));
   await usuario.click(screen.getByRole("button", { name: "Añadir" }));
   expect(agregar).toHaveBeenCalledWith("m", 1.5, "kg");
   await waitFor(() => expect(alAgregar).toHaveBeenCalledWith(entrada));
@@ -37,7 +37,7 @@ it("conserva la cantidad cuando falla y permite reintentar", async () => {
   const agregar = vi.fn().mockRejectedValueOnce(new Error("fallo")).mockResolvedValueOnce({ product_id: "m", quantity: 3, unit: "unit" });
   const cerrar = vi.fn();
   render(<DialogoCantidadCompra producto={{ id: "m", name: "Manzana" }} agregar={agregar} alAgregar={vi.fn()} cerrar={cerrar} />);
-  const cantidad = screen.getByLabelText("Cantidad") as HTMLInputElement;
+  const cantidad = screen.getByLabelText("Unidades", { selector: "input" }) as HTMLInputElement;
   await usuario.clear(cantidad);
   await usuario.type(cantidad, "3");
   await usuario.click(screen.getByRole("button", { name: "Añadir" }));
@@ -55,8 +55,8 @@ it("añade un producto con texto libre", async () => {
   const agregar = vi.fn().mockResolvedValue(entrada);
   const alAgregar = vi.fn();
   render(<DialogoCantidadCompra producto={{ id: "m", name: "Manzana" }} agregar={agregar} alAgregar={alAgregar} cerrar={vi.fn()} />);
-  await usuario.selectOptions(screen.getByLabelText("Tipo de cantidad"), "texto");
-  await usuario.type(screen.getByLabelText("Texto libre"), "un puñado");
+  await usuario.click(screen.getByRole("button", { name: "Texto libre" }));
+  await usuario.type(screen.getByLabelText("Texto libre", { selector: "input" }), "un puñado");
   await usuario.click(screen.getByRole("button", { name: "Añadir" }));
   expect(agregar).toHaveBeenCalledWith("m", 0, "unit", "un puñado");
   expect(alAgregar).toHaveBeenCalledWith(entrada);

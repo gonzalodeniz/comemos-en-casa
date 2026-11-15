@@ -160,8 +160,8 @@ it("edita un producto pendiente con texto libre", async () => {
   const guardar = vi.fn().mockResolvedValue({ ...entrada, quantity_text: "un puñado" });
   render(<ShoppingList categories={[]} onCreateCategory={vi.fn()} onGetProducts={vi.fn()} onCreateProduct={vi.fn()} onUpdateShoppingItem={guardar} onGetShoppingList={vi.fn().mockResolvedValue({ items: [entrada] })} />);
   await usuario.click(await screen.findByRole("button", { name: "Editar Pera" }));
-  await usuario.selectOptions(screen.getByLabelText("Tipo de cantidad"), "texto");
-  await usuario.type(screen.getByLabelText("Texto libre"), "un puñado");
+  await usuario.click(screen.getByRole("button", { name: "Texto libre" }));
+  await usuario.type(screen.getByLabelText("Texto libre", { selector: "input" }), "un puñado");
   await usuario.click(screen.getByRole("button", { name: "Guardar" }));
   expect(guardar).toHaveBeenCalledWith("i", { quantity_text: "un puñado" });
   expect((await screen.findByRole("button", { name: "Editar Pera" })).textContent).toBe("Pera: un puñado");

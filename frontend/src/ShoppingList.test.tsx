@@ -19,7 +19,7 @@ describe("ShoppingList", () => {
           { id: "b", text: "sal", purchased: false },
         ] },
       ] })} />);
-    await userEvent.setup().click(screen.getByRole("tab", { name: "Recetas" }));
+    await userEvent.setup().click(screen.getByRole("tab", { name: /^Recetas/ }));
     const seccion = await screen.findByRole("region", { name: "Sopa" });
     expect(within(seccion).getByRole("heading", { name: "Pendientes" })).toBeTruthy();
     expect(within(seccion).getByText("agua")).toBeTruthy();
@@ -67,7 +67,7 @@ describe("ShoppingList", () => {
       onGetShoppingList={vi.fn().mockResolvedValue({ items: [], recipe_sections: [
         { id: "seccion", name: "Sopa", ingredients: [{ id: "agua-1", text: "agua", purchased: false }] },
       ] })} />);
-    await userEvent.setup().click(screen.getByRole("tab", { name: "Recetas" }));
+    await userEvent.setup().click(screen.getByRole("tab", { name: /^Recetas/ }));
     await user.click(await screen.findByRole("checkbox", { name: "Marcar agua como comprado" }));
     expect(onMarkRecipeIngredient).toHaveBeenCalledWith("agua-1");
     const seccion = screen.getByRole("region", { name: "Sopa" });
@@ -84,7 +84,7 @@ describe("ShoppingList", () => {
       onGetShoppingList={vi.fn().mockResolvedValue({ items: [], recipe_sections: [
         { id: "seccion", name: "Sopa", ingredients: [{ id: "agua-1", text: "agua", purchased: true }] },
       ] })} />);
-    await userEvent.setup().click(screen.getByRole("tab", { name: "Recetas" }));
+    await userEvent.setup().click(screen.getByRole("tab", { name: /^Recetas/ }));
     await user.click(await screen.findByRole("checkbox", { name: "Desmarcar agua como comprado" }));
     expect(onUnmarkRecipeIngredient).toHaveBeenCalledWith("agua-1");
     const seccion = screen.getByRole("region", { name: "Sopa" });
@@ -104,7 +104,7 @@ describe("ShoppingList", () => {
           { id: "sal-1", text: "sal", purchased: false },
         ] },
       ] })} />);
-    await userEvent.setup().click(screen.getByRole("tab", { name: "Recetas" }));
+    await userEvent.setup().click(screen.getByRole("tab", { name: /^Recetas/ }));
     await user.click(await screen.findByRole("button", { name: "Eliminar agua" }));
     expect(onDeleteRecipeIngredient).toHaveBeenCalledWith("agua-1");
     expect(screen.queryByText("agua")).toBeNull();
@@ -121,7 +121,7 @@ describe("ShoppingList", () => {
         { id: "seccion", name: "Sopa", ingredients: [{ id: "agua-1", text: "agua", purchased: false }] },
         { id: "otra", name: "Ensalada", ingredients: [{ id: "tomate-1", text: "tomate", purchased: false }] },
       ] })} />);
-    await userEvent.setup().click(screen.getByRole("tab", { name: "Recetas" }));
+    await userEvent.setup().click(screen.getByRole("tab", { name: /^Recetas/ }));
     await user.click(await screen.findByRole("button", { name: "Eliminar sección Sopa" }));
     expect(onDeleteRecipeSection).toHaveBeenCalledWith("seccion");
     expect(screen.queryByRole("region", { name: "Sopa" })).toBeNull();
@@ -188,8 +188,19 @@ it("abre Productos por defecto y separa las recetas", async () => {
   expect(screen.getByRole("tab", { name: "Productos" }).getAttribute("aria-selected")).toBe("true");
   expect(screen.getByRole("region", { name: "Añadir productos" })).toBeTruthy();
   expect(screen.queryByRole("region", { name: "Sopa" })).toBeNull();
-  await usuario.click(screen.getByRole("tab", { name: "Recetas" }));
+  await usuario.click(screen.getByRole("tab", { name: /^Recetas/ }));
   expect(await screen.findByRole("region", { name: "Sopa" })).toBeTruthy();
   expect(screen.queryByRole("region", { name: "Añadir productos" })).toBeNull();
   expect(screen.queryByRole("region", { name: "Lista de la compra" })).toBeNull();
+});
+
+// Comprueba que el contador refleja las recetas presentes y desaparece al vaciar la lista.
+it("actualiza el contador de recetas de la pestaña", async () => {
+  const usuario = userEvent.setup();
+  render(<ShoppingList categories={[]} onCreateCategory={vi.fn()} onGetProducts={vi.fn()} onCreateProduct={vi.fn()} onDeleteRecipeSection={vi.fn().mockResolvedValue(undefined)}
+    onGetShoppingList={vi.fn().mockResolvedValue({ items: [], recipe_sections: [{ id: "s", name: "Sopa", ingredients: [] }] })} />);
+  expect((await screen.findByRole("tab", { name: "Recetas (1)" }))).toBeTruthy();
+  await usuario.click(screen.getByRole("tab", { name: "Recetas (1)" }));
+  await usuario.click(screen.getByRole("button", { name: "Eliminar sección Sopa" }));
+  expect(await screen.findByRole("tab", { name: "Recetas" })).toBeTruthy();
 });

@@ -383,7 +383,9 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
 
   return <section className="panel">
     {errorReceta && <ToastMessage kind="error" onClose={() => setErrorReceta("")}>{errorReceta}</ToastMessage>}
-    <h2>Lista de la compra</h2>
+    <div className="compra-cabecera"><h2>Lista de la compra</h2>
+      {onAbrirCatalogo && <button type="button" className="compra-accion" aria-label="Gestionar catálogo" data-tooltip="Gestionar catálogo" onClick={onAbrirCatalogo}><AppIcon name="store" /></button>}
+    </div>
     <SelectorCompra categorias={categories} consultar={onGetProducts} seleccionar={setProductoSeleccionado} />
     {productoSeleccionado && onAddToShoppingList && <DialogoCantidadCompra producto={productoSeleccionado} agregar={onAddToShoppingList}
       alAgregar={(entrada) => setListaCompra((actual) => ({ ...actual, [`${entrada.product_id}:${entrada.unit}`]: { ...entrada, product_name: productoSeleccionado.name, image_url: productoSeleccionado.image_url } }))}
@@ -401,7 +403,6 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
         </span>
       </li>)}</ul>
     </section>)}
-    {onAbrirCatalogo && <button type="button" className="secondary" onClick={onAbrirCatalogo}>Gestionar catálogo</button>}
     {mostrarAdministracion && <><form onSubmit={submit}>
       {productErrors["nueva-categoria"] && <p role="alert">{productErrors["nueva-categoria"]}</p>}
       <label>Nombre de la categoría<input aria-label="Nombre de la categoría" value={name} onChange={(event) => setName(event.target.value)} required /></label>

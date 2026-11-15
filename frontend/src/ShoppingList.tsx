@@ -446,7 +446,7 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
     </>}
     <section aria-label="Lista de la compra"><h3>Lista de la compra</h3>
       {errorListaCompra && <p role="alert">{errorListaCompra}</p>}
-      <h4 className="compra-comprados-cabecera"><span>Pendientes</span><button className="compra-accion" type="button" aria-label="Eliminar todos los productos pendientes" data-tooltip="Eliminar todos los productos pendientes" disabled={!onDeleteItem || borrandoComprados || !Object.keys(listaCompra).length} onClick={() => void borrarTodosPendientes()}><AppIcon name="trash" /></button></h4><ul className="compra-filas">{Object.values(listaCompra).map((item) => {
+      <h4 className="compra-comprados-cabecera"><span>Pendientes</span><button className="compra-accion" type="button" aria-label="Eliminar todos los productos pendientes" data-tooltip="Eliminar todos los productos pendientes" disabled={!onDeleteItem || borrandoComprados || !Object.keys(listaCompra).length} onClick={() => void borrarTodosPendientes()}><AppIcon name="clear-list" /></button></h4><ul className="compra-filas">{Object.values(listaCompra).map((item) => {
         const nombre = item.product_name ?? Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? "Producto";
         const marcar = `Marcar ${nombre} como comprado`;
         const eliminar = `Eliminar ${nombre} de Pendientes`;
@@ -459,7 +459,7 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
           </span>
         </li>;
       })}</ul>
-      <h4 className="compra-comprados-cabecera" aria-label="Comprados"><span>Comprados</span><button className="compra-accion" type="button" aria-label="Eliminar todos los productos comprados" data-tooltip="Eliminar todos los productos comprados" disabled={!onDeleteItem || borrandoComprados || !Object.keys(comprados).length} onClick={() => void borrarTodosComprados()}><AppIcon name="trash" /></button></h4><ul className="compra-filas">{Object.values(comprados).map((item) => {
+      <h4 className="compra-comprados-cabecera" aria-label="Comprados"><span>Comprados</span><button className="compra-accion" type="button" aria-label="Eliminar todos los productos comprados" data-tooltip="Eliminar todos los productos comprados" disabled={!onDeleteItem || borrandoComprados || !Object.keys(comprados).length} onClick={() => void borrarTodosComprados()}><AppIcon name="clear-list" /></button></h4><ul className="compra-filas">{Object.values(comprados).map((item) => {
         const nombre = item.product_name ?? Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? "Producto";
         const desmarcar = `Desmarcar ${nombre} como pendiente`;
         const eliminar = `Eliminar ${nombre} de Comprados`;

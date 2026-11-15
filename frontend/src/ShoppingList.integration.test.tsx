@@ -1057,8 +1057,8 @@ describe("shopping list integration", () => {
     if (!(seccionPendientes instanceof HTMLElement) || !(seccionComprados instanceof HTMLElement)) {
       throw new Error("No se encontraron las listas de pendientes y comprados.");
     }
-    expect(within(seccionPendientes).getByText("Manzanas: 3 unidad")).toBeTruthy();
-    expect(within(seccionComprados).queryByText("Manzanas: 3 unidad")).toBeNull();
+    expect(within(seccionPendientes).getByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidad")).toBeTruthy();
+    expect(within(seccionComprados).queryByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidad")).toBeNull();
   });
 
   // Comprueba que la aplicación envía el desmarcado a la API y actualiza ambas secciones.
@@ -1090,8 +1090,8 @@ describe("shopping list integration", () => {
     if (!(seccionPendientes instanceof HTMLElement) || !(seccionComprados instanceof HTMLElement)) {
       throw new Error("No se encontraron las listas de pendientes y comprados.");
     }
-    expect(within(seccionPendientes).getByText("Manzanas: 3 unidad")).toBeTruthy();
-    expect(within(seccionComprados).queryByText("Manzanas: 3 unidad")).toBeNull();
+    expect(within(seccionPendientes).getByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidad")).toBeTruthy();
+    expect(within(seccionComprados).queryByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidad")).toBeNull();
   });
 
   // Comprueba que volver a añadir un producto comprado crea una entrada pendiente distinta.
@@ -1227,9 +1227,9 @@ describe("shopping list integration", () => {
     const purchased = within(region).getByRole("heading", { name: "Comprados" }).nextElementSibling as HTMLElement;
 
     await user.click(await within(pending).findByRole("button", { name: /Eliminar/ }));
-    await waitFor(() => expect(within(pending).queryByText("Manzanas: 2 unidad")).toBeNull());
-    expect(within(purchased).getByText("Manzanas: 3 unidad")).toBeTruthy();
+    await waitFor(() => expect(within(pending).queryByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 2 unidad")).toBeNull());
+    expect(within(purchased).getByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidad")).toBeTruthy();
     await user.click(await within(purchased).findByRole("button", { name: /Eliminar/ }));
-    await waitFor(() => expect(within(purchased).queryByText("Manzanas: 3 unidad")).toBeNull());
+    await waitFor(() => expect(within(purchased).queryByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidad")).toBeNull());
   });
 });

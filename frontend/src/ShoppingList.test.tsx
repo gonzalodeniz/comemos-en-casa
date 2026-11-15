@@ -49,9 +49,9 @@ describe("ShoppingList", () => {
     expect(await screen.findByRole("alert")).toBeTruthy();
     expect(borrar).toHaveBeenCalledTimes(2);
     expect(borrar).not.toHaveBeenCalledWith("pendiente");
-    expect(screen.queryByText("Manzana: 2 unidad")).toBeNull();
-    expect(screen.getByText("Pan: 1 unidad")).toBeTruthy();
-    expect(screen.getByText("Pera: 1 unidad")).toBeTruthy();
+    expect(screen.queryByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzana: 2 unidad")).toBeNull();
+    expect(screen.getByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Pan: 1 unidad")).toBeTruthy();
+    expect(screen.getByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Pera: 1 unidad")).toBeTruthy();
     confirmar.mockRestore();
   });
 

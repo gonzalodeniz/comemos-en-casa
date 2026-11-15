@@ -589,3 +589,6 @@ button.modal-cancelar { color: #9f3030; background: #fce3e3; }
 button.modal-cancelar:hover, button.modal-cancelar:focus-visible { background: #f7caca; }
 button.modal-aceptar { color: #176b3a; background: #dcf3e3; }
 button.modal-aceptar:hover, button.modal-aceptar:focus-visible { background: #c3e9cf; }
+
+.compra-pestanas { display: flex; gap: .5rem; margin: 1rem 0; }
+.compra-pestanas button[aria-selected="false"] { background: var(--color-secondary-bg); color: var(--color-secondary-text); }

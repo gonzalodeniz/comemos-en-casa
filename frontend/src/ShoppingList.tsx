@@ -51,6 +51,7 @@ type Props = {
 
 /** Presenta las categorías y permite consultar y crear sus productos. */
 export default function ShoppingList({ categories, mostrarAdministracion = true, onAbrirCatalogo, onCreateCategory, onGetProducts, onCreateProduct, onPrepareImage, onImportImage, onUpdateProductImage, onUpdateCategoryImage, onAddToShoppingList, onUpdateShoppingItem, onGetShoppingList, onMarkPurchased, onUnmarkPurchased, onDeleteItem, onMarkRecipeIngredient, onUnmarkRecipeIngredient, onDeleteRecipeIngredient, onDeleteRecipeSection }: Props) {
+  const [pestana, setPestana] = useState<"productos" | "recetas">("productos");
   const [entradaEditada, setEntradaEditada] = useState<ShoppingListItem | null>(null);
   const [productoSeleccionado, setProductoSeleccionado] = useState<ShoppingProduct | null>(null);
   const [name, setName] = useState("");
@@ -394,6 +395,8 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
     <div className="compra-cabecera"><h2>Lista de la compra</h2>
       {onAbrirCatalogo && <button type="button" className="compra-accion" aria-label="Gestionar catálogo" data-tooltip="Gestionar catálogo" onClick={onAbrirCatalogo}><AppIcon name="store" /></button>}
     </div>
+    <div className="compra-pestanas" role="tablist" aria-label="Vista de la compra">{(["productos", "recetas"] as const).map((vista) => <button key={vista} type="button" role="tab" id={`tab-compra-${vista}`} aria-controls={`panel-compra-${vista}`} aria-selected={pestana === vista} tabIndex={pestana === vista ? 0 : -1} onClick={() => setPestana(vista)} onKeyDown={(evento) => { if (evento.key === "ArrowRight" || evento.key === "ArrowLeft") { evento.preventDefault(); const siguiente = vista === "productos" ? "recetas" : "productos"; setPestana(siguiente); document.getElementById(`tab-compra-${siguiente}`)?.focus(); } }}>{vista === "productos" ? "Productos" : "Recetas"}</button>)}</div>
+    <div role="tabpanel" id="panel-compra-productos" aria-labelledby="tab-compra-productos" hidden={pestana !== "productos"}>
     {entradaEditada && onUpdateShoppingItem && <DialogoEditarCompra entrada={entradaEditada} guardar={onUpdateShoppingItem} cerrar={() => setEntradaEditada(null)} alGuardar={(actualizada) => {
       setListaCompra((actual) => { const siguiente = { ...actual }; delete siguiente[claveEntrada(entradaEditada)]; siguiente[claveEntrada(actualizada)] = { ...entradaEditada, ...actualizada }; return siguiente; });
     }} />}
@@ -401,18 +404,6 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
     {productoSeleccionado && onAddToShoppingList && <DialogoCantidadCompra producto={productoSeleccionado} agregar={onAddToShoppingList}
       alAgregar={(entrada) => setListaCompra((actual) => ({ ...actual, [claveEntrada(entrada)]: { ...entrada, product_name: productoSeleccionado.name, image_url: productoSeleccionado.image_url } }))}
       cerrar={() => setProductoSeleccionado(null)} /> }
-    {seccionesRecetas.map((seccion) => <section className="compra-receta" key={seccion.id} aria-label={seccion.name}>
-      <div className="compra-receta-cabecera"><h3>{seccion.name}</h3>
-        <button className="compra-accion" type="button" aria-label={`Eliminar sección ${seccion.name}`} data-tooltip={`Eliminar sección ${seccion.name}`} onClick={() => void eliminarSeccionReceta(seccion.id)}><AppIcon name="trash" /></button>
-      </div>
-      {([false, true] as const).map((comprado) => <Fragment key={String(comprado)}><h4>{comprado ? "Comprados" : "Pendientes"}</h4><ul className="compra-filas">{seccion.ingredients.filter((ingrediente) => ingrediente.purchased === comprado).map((ingrediente) => <li className={`compra-fila${comprado ? " compra-fila-comprada" : ""}`} key={ingrediente.id}>
-        <input className="compra-casilla" type="checkbox" checked={ingrediente.purchased} aria-label={`${ingrediente.purchased ? "Desmarcar" : "Marcar"} ${ingrediente.text} como comprado`} onChange={() => void (ingrediente.purchased ? desmarcarIngredienteReceta(ingrediente.id) : marcarIngredienteReceta(ingrediente.id))} />
-        <span className="compra-fila-texto">{ingrediente.text}</span>
-        <span className="compra-acciones">
-          <button className="compra-accion" type="button" aria-label={`Eliminar ${ingrediente.text}`} data-tooltip={`Eliminar ${ingrediente.text}`} onClick={() => void eliminarIngredienteReceta(ingrediente.id)}><AppIcon name="trash" /></button>
-        </span>
-      </li>)}</ul></Fragment>)}
-    </section>)}
     {mostrarAdministracion && <><form onSubmit={submit}>
       {productErrors["nueva-categoria"] && <p role="alert">{productErrors["nueva-categoria"]}</p>}
       <label>Nombre de la categoría<input aria-label="Nombre de la categoría" value={name} onChange={(event) => setName(event.target.value)} required /></label>
@@ -484,5 +475,20 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
         </li>;
       })}</ul>
     </section>
+    </div>
+    <div role="tabpanel" id="panel-compra-recetas" aria-labelledby="tab-compra-recetas" hidden={pestana !== "recetas"}>
+    {seccionesRecetas.map((seccion) => <section className="compra-receta" key={seccion.id} aria-label={seccion.name}>
+      <div className="compra-receta-cabecera"><h3>{seccion.name}</h3>
+        <button className="compra-accion" type="button" aria-label={`Eliminar sección ${seccion.name}`} data-tooltip={`Eliminar sección ${seccion.name}`} onClick={() => void eliminarSeccionReceta(seccion.id)}><AppIcon name="trash" /></button>
+      </div>
+      {([false, true] as const).map((comprado) => <Fragment key={String(comprado)}><h4>{comprado ? "Comprados" : "Pendientes"}</h4><ul className="compra-filas">{seccion.ingredients.filter((ingrediente) => ingrediente.purchased === comprado).map((ingrediente) => <li className={`compra-fila${comprado ? " compra-fila-comprada" : ""}`} key={ingrediente.id}>
+        <input className="compra-casilla" type="checkbox" checked={ingrediente.purchased} aria-label={`${ingrediente.purchased ? "Desmarcar" : "Marcar"} ${ingrediente.text} como comprado`} onChange={() => void (ingrediente.purchased ? desmarcarIngredienteReceta(ingrediente.id) : marcarIngredienteReceta(ingrediente.id))} />
+        <span className="compra-fila-texto">{ingrediente.text}</span>
+        <span className="compra-acciones">
+          <button className="compra-accion" type="button" aria-label={`Eliminar ${ingrediente.text}`} data-tooltip={`Eliminar ${ingrediente.text}`} onClick={() => void eliminarIngredienteReceta(ingrediente.id)}><AppIcon name="trash" /></button>
+        </span>
+      </li>)}</ul></Fragment>)}
+    </section>)}
+    </div>
   </section>;
 }

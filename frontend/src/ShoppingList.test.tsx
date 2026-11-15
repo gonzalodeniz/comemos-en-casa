@@ -20,7 +20,9 @@ describe("ShoppingList", () => {
         ] },
       ] })} />);
     const seccion = await screen.findByRole("region", { name: "Sopa" });
-    expect(within(seccion).getAllByRole("listitem").map(item => item.firstChild?.textContent)).toEqual(["agua", "sal"]);
+    expect(within(seccion).getByRole("heading", { name: "Pendientes" })).toBeTruthy();
+    expect(within(seccion).getByText("agua")).toBeTruthy();
+    expect(within(seccion).getByText("sal")).toBeTruthy();
   });
 
   // Verifica que las acciones compactas conservan nombre y descripción accesibles.
@@ -64,8 +66,11 @@ describe("ShoppingList", () => {
       onGetShoppingList={vi.fn().mockResolvedValue({ items: [], recipe_sections: [
         { id: "seccion", name: "Sopa", ingredients: [{ id: "agua-1", text: "agua", purchased: false }] },
       ] })} />);
-    await user.click(await screen.findByRole("button", { name: "Marcar agua como comprado" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Marcar agua como comprado" }));
     expect(onMarkRecipeIngredient).toHaveBeenCalledWith("agua-1");
+    const seccion = screen.getByRole("region", { name: "Sopa" });
+    expect(within(seccion).getByRole("heading", { name: "Comprados" })).toBeTruthy();
+    expect(within(seccion).getByText("agua")).toBeTruthy();
   });
 
   it("devuelve a pendiente un ingrediente de receta", async () => {
@@ -77,8 +82,11 @@ describe("ShoppingList", () => {
       onGetShoppingList={vi.fn().mockResolvedValue({ items: [], recipe_sections: [
         { id: "seccion", name: "Sopa", ingredients: [{ id: "agua-1", text: "agua", purchased: true }] },
       ] })} />);
-    await user.click(await screen.findByRole("button", { name: "Desmarcar agua como comprado" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Desmarcar agua como comprado" }));
     expect(onUnmarkRecipeIngredient).toHaveBeenCalledWith("agua-1");
+    const seccion = screen.getByRole("region", { name: "Sopa" });
+    expect(within(seccion).getByRole("heading", { name: "Pendientes" })).toBeTruthy();
+    expect(within(seccion).getByText("agua")).toBeTruthy();
   });
 
   it("elimina un ingrediente de receta de su sección", async () => {

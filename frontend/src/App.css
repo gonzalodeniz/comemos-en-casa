@@ -528,6 +528,8 @@ span.meal-thumbnail[role="button"]:focus-visible { outline:3px solid #00854a; ou
 .catalogo-productos-imagen { display: grid; place-items: center; background: #e1f1e8; color: #79a894; }
 .catalogo-productos-imagen .app-icon { width: 38%; height: 38%; }
 .catalogo-productos .catalogo-tarjeta-contenido { display: flex; width: 100%; flex: 1; flex-direction: column; align-items: center; justify-content: flex-start; gap: 1rem; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; }
+/* Extiende la zona interactiva del producto hasta los bordes de la tarjeta. */
+.catalogo-productos .catalogo-producto-activar::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
 .catalogo-productos-tarjeta strong { align-self: stretch; color: #123647; font-size: 1.35rem; line-height: 1.2; }
 .catalogo-productos .catalogo-accion { position: absolute; top: .8rem; right: .8rem; display: grid; width: 36px; height: 36px; place-items: center; padding: 0; border-radius: .5rem; background: transparent; color: #123647; font-size: 1.6rem; line-height: 1; }
 .catalogo-productos .catalogo-accion:hover, .catalogo-productos .catalogo-tarjeta-contenido:hover { background: #eef6f3; }

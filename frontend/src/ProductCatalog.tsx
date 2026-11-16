@@ -113,8 +113,7 @@ export default function ProductCatalog({ categories, cargandoCategorias, errorCa
       <div className="catalogo-cabecera"><div><h2>{categoria.name}</h2><p>Productos de esta categoría</p></div>
       <button className="catalogo-crear" type="button" disabled={guardando || cargando} onClick={() => abrirEditor({ tipo: "producto", id: "", nombre: "", imagen: false })}><AppIcon name="plus" />Nuevo producto</button></div>
       {cargando ? <p role="status">Cargando productos…</p> : productos.length === 0 ? <p>No hay productos en esta categoría.</p> : <div className="catalogo-productos-grid">{productos.map((producto) => <article className="catalogo-productos-tarjeta" key={producto.id}>
-        {producto.image_url ? <img src={urlImagen(producto.image_url)} alt="" /> : <span className="catalogo-productos-imagen" aria-hidden="true"><AppIcon name="utensils" /></span>}
-        <strong>{producto.name}</strong><button className="catalogo-accion" type="button" aria-label={"Gestionar imagen de " + producto.name} title="Gestionar imagen" disabled={guardando} onClick={() => abrirEditor({ tipo: "producto", id: producto.id, nombre: producto.name, imagen: !!producto.image_url })}><span aria-hidden="true">⋮</span></button>
+        <button className="catalogo-tarjeta-contenido catalogo-producto-activar" type="button" aria-label={"Gestionar imagen de " + producto.name} disabled={guardando} onClick={() => abrirEditor({ tipo: "producto", id: producto.id, nombre: producto.name, imagen: !!producto.image_url })}>{producto.image_url ? <img src={urlImagen(producto.image_url)} alt="" /> : <span className="catalogo-productos-imagen" aria-hidden="true"><AppIcon name="utensils" /></span>}<strong>{producto.name}</strong></button>
       </article>)}</div>}
     </> : <>
       <div className="catalogo-cabecera"><div><h2>Catálogo de categorías</h2><p>Organiza tus categorías de productos</p></div>

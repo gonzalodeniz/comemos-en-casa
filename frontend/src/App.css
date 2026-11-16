@@ -536,6 +536,10 @@ span.meal-thumbnail[role="button"]:focus-visible { outline:3px solid #00854a; ou
 .catalogo-editor { max-width: 42rem; margin-top: 2rem; padding: 1.5rem; border: 1px solid #d8e5eb; border-radius: 1rem; background: #fff; }
 .catalogo-editor h3 { margin-top: 0; }
 .catalogo-editor > button { margin: 1rem .75rem 0 0; }
+/* Limita el tamaño del modal y permite desplazar su contenido en pantallas pequeñas. */
+.catalogo-modal { width: min(42rem, calc(100% - 2rem)); max-height: calc(100vh - 2rem); overflow: auto; border: 1px solid #d8e5eb; border-radius: 1rem; padding: 1.5rem; }
+.catalogo-modal::backdrop { background: rgb(16 54 66 / 45%); }
+.catalogo-modal .catalogo-editor { margin: 0; padding: 0; border: 0; }
 @media (max-width: 1100px) { .catalogo-productos-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 760px) { .catalogo-productos-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .catalogo-cabecera { margin-bottom: 2rem; } }
 @media (max-width: 480px) { .catalogo-cabecera { flex-direction: column; } .catalogo-productos-grid { gap: .75rem; } .catalogo-productos-tarjeta { min-height: 180px; padding: 1.1rem .8rem; } .catalogo-productos-tarjeta strong { font-size: 1.1rem; } }

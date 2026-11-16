@@ -2,11 +2,16 @@
 // Comprueba la consulta y la sesión del catálogo mediante interacciones.
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ApiError } from "./api";
 import ProductCatalog from "./ProductCatalog";
 
 afterEach(cleanup);
+beforeEach(() => {
+  // Simula el diálogo nativo que jsdom no implementa.
+  HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
+  HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
+});
 
 it("muestra la imagen y el nombre de los productos de la categoría", async () => {
   const usuario = userEvent.setup();
@@ -23,6 +28,7 @@ it("renombra un producto sin modificar su imagen", async () => {
   render(<ProductCatalog onUpdateCategoryImage={vi.fn()} onUpdateProductImage={actualizar} onImportImage={vi.fn()} onPrepareImage={vi.fn()} categories={[{ id: "1", name: "Frutas" }]} onGetProducts={async () => [{ id: "p", name: "Pera", image_url: "/imagen" }]} onCreateCategory={vi.fn()} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} />);
   await usuario.click(screen.getByRole("button", { name: "Frutas" }));
   await usuario.click(await screen.findByRole("button", { name: "Gestionar imagen de Pera" }));
+  expect(screen.getByRole("dialog", { name: "Producto Pera" })).toBeTruthy();
   const nombre = screen.getByLabelText("Nombre del producto");
   await usuario.clear(nombre);
   await usuario.type(nombre, "Pera conferencia");

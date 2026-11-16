@@ -1,5 +1,5 @@
 // Presenta y gestiona el catálogo compartido mediante las operaciones existentes.
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { ApiError } from "./api";
 import ImagenCatalogo, { type RecorteCatalogo } from "./ImagenCatalogo";
 import AppIcon from "./AppIcon";
@@ -27,6 +27,18 @@ type Props = {
 
 // Identifica el formulario activo sin presentar acciones no admitidas.
 type Editor = { tipo: "categoria" | "producto"; id: string; nombre: string; imagen: boolean } | null;
+
+/** Presenta el editor de producto como diálogo modal y devuelve el foco al cerrarlo. */
+function ModalProducto({ titulo, cerrar, ocupado, children }: { titulo: string; cerrar: () => void; ocupado: boolean; children: ReactNode }) {
+  const dialogo = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const origen = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const ventana = dialogo.current;
+    ventana?.showModal();
+    return () => { if (ventana?.open) ventana.close(); origen?.focus(); };
+  }, []);
+  return <dialog ref={dialogo} className="catalogo-modal" aria-labelledby="titulo-modal-producto" onCancel={(evento) => { evento.preventDefault(); if (!ocupado) cerrar(); }}><h3 id="titulo-modal-producto">{titulo}</h3>{children}</dialog>;
+}
 
 /** Construye la ruta autenticada de una imagen del catálogo. */
 function urlImagen(url: string): string {
@@ -125,13 +137,14 @@ export default function ProductCatalog({ categories, cargandoCategorias, errorCa
         <button className="catalogo-accion" type="button" aria-label={"Gestionar imagen de " + elemento.name} title="Gestionar imagen" disabled={guardando} onClick={() => abrirEditor({ tipo: "categoria", id: elemento.id, nombre: elemento.name, imagen: !!elemento.image_url })}><span aria-hidden="true">⋮</span></button>
       </article>)}</div>}
     </>}
-    {error && <p role="alert">{error}</p>}
-    {editor && <form className="catalogo-editor" onSubmit={(evento) => void guardar(evento)} aria-label={editor.id ? "Imagen de " + editor.nombre : editor.tipo === "categoria" ? "Nueva categoría" : "Nuevo producto"}>
-      <h3>{editor.id ? "Imagen de " + editor.nombre : editor.tipo === "categoria" ? "Nueva categoría" : "Nuevo producto"}</h3>
+    {error && !(editor?.tipo === "producto" && editor.id) && <p role="alert">{error}</p>}
+    {editor && (() => { const formulario = <form className="catalogo-editor" onSubmit={(evento) => void guardar(evento)} aria-label={editor.id && editor.tipo === "producto" ? "Producto " + editor.nombre : editor.id ? "Imagen de " + editor.nombre : editor.tipo === "categoria" ? "Nueva categoría" : "Nuevo producto"}>
+      {!(editor.id && editor.tipo === "producto") && <h3>{editor.id ? "Imagen de " + editor.nombre : editor.tipo === "categoria" ? "Nueva categoría" : "Nuevo producto"}</h3>}
+      {editor.id && editor.tipo === "producto" && error && <p role="alert">{error}</p>}
       {(!editor.id || editor.tipo === "producto") && <label>{editor.tipo === "categoria" ? "Nombre de la categoría" : "Nombre del producto"}<input value={nombre} onChange={(evento) => setNombre(evento.target.value)} maxLength={100} required /></label>}
       <ImagenCatalogo key={versionEditor} importar={importar} cambiar={(datos, area, ocupado) => { setImagen(datos); setRecorte(area); setLeyendo(ocupado); if (datos || ocupado) setQuitar(false); }} />
       {editor.imagen && <label><input type="checkbox" checked={quitar} onChange={(evento) => { setQuitar(evento.target.checked); if (evento.target.checked) { setImagen(""); setRecorte(null); setLeyendo(false); setVersionEditor((actual) => actual + 1); } }} />Quitar imagen actual</label>}
       <button type="submit" disabled={guardando || leyendo}>{guardando ? "Guardando…" : "Guardar"}</button><button type="button" disabled={guardando} onClick={() => abrirEditor(null)}>Cancelar</button>
-    </form>}
+    </form>; return editor.id && editor.tipo === "producto" ? <ModalProducto titulo={"Producto " + editor.nombre} cerrar={() => abrirEditor(null)} ocupado={guardando}>{formulario}</ModalProducto> : formulario; })()}
   </section>;
 }

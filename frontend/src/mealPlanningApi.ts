@@ -79,7 +79,7 @@ export function createShoppingProduct(categoryId: string, name: string, csrfToke
 }
 
 /** Actualiza la imagen de un producto existente. */
-export function updateShoppingProductImage(categoryId: string, productId: string, csrfToken: string, change: { image_token: string } | { remove_image: true }): Promise<ShoppingProduct> {
+export function updateShoppingProductImage(categoryId: string, productId: string, csrfToken: string, change: { name?: string; image_token?: string; remove_image?: true }): Promise<ShoppingProduct> {
   return apiRequest(`/shopping-categories/${categoryId}/products/${productId}`, { method: "PATCH", csrfToken, body: change });
 }
 

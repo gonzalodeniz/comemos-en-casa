@@ -177,12 +177,14 @@ class ShoppingProduct(Base):
     """Representa un producto compartido asociado a una categoría de compra."""
 
     __tablename__ = "shopping_products"
+    __table_args__ = (UniqueConstraint("name_canonical", name="uq_shopping_products_name_canonical"),)
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     category_id: Mapped[UUID] = mapped_column(
         ForeignKey("shopping_categories.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
+    name_canonical: Mapped[str] = mapped_column(Text, nullable=False, default=lambda context: unicodedata.normalize("NFC", context.get_current_parameters()["name"].strip()).casefold())
     image_path: Mapped[str | None] = mapped_column(String(255))
 
 

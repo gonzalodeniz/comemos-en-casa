@@ -49,7 +49,7 @@ def test_database_is_ready_and_latest_migration_is_applied():
         check=False,
     )
     assert migration.returncode == 0, migration.stderr
-    assert "0018_shopping_item_observation (head)" in migration.stdout
+    assert "0019_product_name_unique (head)" in migration.stdout
 
 
 @pytest.mark.skipif(

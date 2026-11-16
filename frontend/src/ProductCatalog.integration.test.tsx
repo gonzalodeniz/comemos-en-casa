@@ -16,6 +16,21 @@ it("muestra la imagen y el nombre de los productos de la categoría", async () =
   expect(document.querySelector('img[src$="/api/v1/imagen"]')).toBeTruthy();
 });
 
+// Comprueba que el nombre se edita sin exigir un cambio de imagen.
+it("renombra un producto sin modificar su imagen", async () => {
+  const usuario = userEvent.setup();
+  const actualizar = vi.fn().mockResolvedValue({ id: "p", name: "Pera conferencia", image_url: "/imagen" });
+  render(<ProductCatalog onUpdateCategoryImage={vi.fn()} onUpdateProductImage={actualizar} onImportImage={vi.fn()} onPrepareImage={vi.fn()} categories={[{ id: "1", name: "Frutas" }]} onGetProducts={async () => [{ id: "p", name: "Pera", image_url: "/imagen" }]} onCreateCategory={vi.fn()} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} />);
+  await usuario.click(screen.getByRole("button", { name: "Frutas" }));
+  await usuario.click(await screen.findByRole("button", { name: "Gestionar imagen de Pera" }));
+  const nombre = screen.getByLabelText("Nombre del producto");
+  await usuario.clear(nombre);
+  await usuario.type(nombre, "Pera conferencia");
+  await usuario.click(screen.getByRole("button", { name: "Guardar" }));
+  expect(actualizar).toHaveBeenCalledWith("1", "p", { name: "Pera conferencia" });
+  expect(await screen.findByText("Pera conferencia")).toBeTruthy();
+});
+
 it("notifica la expiración de la sesión al fallar la consulta de productos", async () => {
   const usuario = userEvent.setup();
   const expiracion = vi.fn();
@@ -67,7 +82,7 @@ it("crea productos y actualiza su imagen", async () => {
   await usuario.click(await screen.findByRole("button", { name: "Gestionar imagen de Pera" }));
   await usuario.click(screen.getByLabelText("Quitar imagen actual"));
   await usuario.click(screen.getByRole("button", { name: "Guardar" }));
-  expect(actualizar).toHaveBeenCalledWith("1", "p", { remove_image: true });
+  expect(actualizar).toHaveBeenCalledWith("1", "p", { name: "Pera", remove_image: true });
 });
 
 it("ofrece reintentar cuando falla la carga de categorías", async () => {

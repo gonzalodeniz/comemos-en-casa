@@ -1,7 +1,9 @@
 // Presenta los iconos utilizados por las vistas de la aplicación.
-type IconName = "calendar" | "repeat" | "users" | "chevron-left" | "chevron-right" | "plus" | "logout" | "utensils" | "menu" | "edit" | "trash" | "eye" | "shopping-cart";
+type IconName = "calendar" | "repeat" | "users" | "chevron-left" | "chevron-right" | "chevron-up" | "chevron-down" | "plus" | "logout" | "utensils" | "menu" | "edit" | "trash" | "eye" | "shopping-cart" | "check" | "undo" | "clear-list" | "store" | "arrow-left" | "close";
 
 const paths: Record<IconName, string> = {
+  check: "M5 12l4 4L19 6",
+  undo: "M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-2",
   "shopping-cart": "M3 3h2l2 11h10l3-8H6M9 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm8 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z",
   utensils: "M4 3v6a3 3 0 0 0 6 0V3M7 3v18M16 21V3c-3 2-3 7-3 9h3",
   menu: "M4 6h16M4 12h16M4 18h16",
@@ -10,10 +12,16 @@ const paths: Record<IconName, string> = {
   users: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m20 0v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z",
   "chevron-left": "m15 18-6-6 6-6",
   "chevron-right": "m9 18 6-6-6-6",
+  "chevron-up": "m6 15 6-6 6 6",
+  "chevron-down": "m6 9 6 6 6-6",
+  "arrow-left": "M19 12H5m7 7-7-7 7-7",
+  close: "M6 6l12 12M18 6 6 18",
   plus: "M12 5v14M5 12h14",
   logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 14 5-5-5-5m5 5H9",
   edit: "M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z",
   trash: "M3 6h18m-2 0-.9 14H5.9L5 6m4 0V4h6v2m-5 4v6m4-6v6",
+  store: "M3 10h18l-2-6H5l-2 6Zm1 0v10h16V10M9 20v-6h6v6M3 10a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 3 1.7A2 2 0 0 0 21 10",
+  "clear-list": "M4 5h10M4 10h10M4 15h6M4 20h6m7-7 6 6m0-6-6 6",
   eye: "M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Zm10-2a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z",
 };
 

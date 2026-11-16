@@ -154,7 +154,7 @@ def test_database_schema_contains_shopping_list_items_with_quantity_and_unit(
     try:
         inspector = inspect(engine)
         assert "shopping_list_items" in inspector.get_table_names()
-        assert {"id", "quantity", "unit", "purchased"}.issubset(
+        assert {"id", "quantity", "unit", "purchased", "observation"}.issubset(
             {column["name"] for column in inspector.get_columns("shopping_list_items")}
         )
         quantity_column = next(
@@ -447,7 +447,7 @@ def test_migration_adds_optional_category_image_path(tmp_path, monkeypatch):
             conexion.execute(text("CREATE TABLE shopping_categories (id INTEGER PRIMARY KEY, name VARCHAR(100) NOT NULL)"))
         config = Config("alembic.ini")
         command.stamp(config, "0013_product_image")
-        command.upgrade(config, "head")
+        command.upgrade(config, "0014_category_image")
         columna = next(c for c in inspect(engine).get_columns("shopping_categories") if c["name"] == "image_path")
         assert columna["nullable"]
     finally:
@@ -1230,3 +1230,79 @@ def test_deleted_item_stays_absent_for_shared_list_readers(meal_database):
         }
     ]
     assert response.json()["purchased_items"] == []
+
+
+def test_editar_texto_libre_no_suma_al_anadir_o_comprar(meal_database):
+    """Conserva el texto libre como entrada independiente en cada transición."""
+    from meal_planning_test_support import api_patch, api_post
+
+    cookies = authenticate(meal_database)
+    categoria = post_with_session("/api/v1/shopping-categories", {"name": "Fruta"}, cookies).json()
+    producto = post_with_session(f"/api/v1/shopping-categories/{categoria['id']}/products", {"name": "Pera"}, cookies).json()
+    datos = {"product_id": producto["id"], "quantity": 2, "unit": "unit"}
+    entrada = post_with_session("/api/v1/shopping-list", datos, cookies).json()
+    editada = api_patch(f"/api/v1/shopping-list/{entrada['id']}", payload={"quantity_text": "un puñado"}, cookies=cookies, csrf_token=cookies["csrf_token"])
+    assert editada.status_code == 200
+    assert editada.json()["quantity_text"] == "un puñado"
+    otra = post_with_session("/api/v1/shopping-list", datos, cookies).json()
+    assert otra["id"] != entrada["id"]
+    assert len(api_get("/api/v1/shopping-list", cookies=cookies).json()["items"]) == 2
+    for identificador in (otra["id"], entrada["id"]):
+        assert api_post(f"/api/v1/shopping-list/{identificador}/purchase", payload={}, cookies=cookies, csrf_token=cookies["csrf_token"]).status_code == 200
+    assert len(api_get("/api/v1/shopping-list", cookies=cookies).json()["purchased_items"]) == 2
+    assert api_post(f"/api/v1/shopping-list/{entrada['id']}/unpurchase", payload={}, cookies=cookies, csrf_token=cookies["csrf_token"]).json()["quantity_text"] == "un puñado"
+    numerica = api_patch(f"/api/v1/shopping-list/{entrada['id']}", payload={"quantity": 1.5, "unit": "kg"}, cookies=cookies, csrf_token=cookies["csrf_token"])
+    assert numerica.status_code == 200
+    assert numerica.json()["quantity"] == 1500
+    assert numerica.json()["quantity_text"] is None
+
+
+def test_anadir_texto_libre_crea_entradas_independientes(meal_database):
+    """Añade dos textos libres y una cantidad sin agregarlos entre sí."""
+    cookies = authenticate(meal_database)
+    categoria = post_with_session("/api/v1/shopping-categories", {"name": "Fruta"}, cookies).json()
+    producto = post_with_session(f"/api/v1/shopping-categories/{categoria['id']}/products", {"name": "Manzana"}, cookies).json()
+    datos = {"product_id": producto["id"], "quantity_text": "un puñado"}
+    primera = post_with_session("/api/v1/shopping-list", datos, cookies)
+    segunda = post_with_session("/api/v1/shopping-list", datos, cookies)
+    numerica = post_with_session("/api/v1/shopping-list", {"product_id": producto["id"], "quantity": 2, "unit": "unit"}, cookies)
+    assert primera.status_code == segunda.status_code == numerica.status_code == 201
+    assert primera.json()["id"] != segunda.json()["id"]
+    assert primera.json()["quantity_text"] == "un puñado"
+    assert len(api_get("/api/v1/shopping-list", cookies=cookies).json()["items"]) == 3
+
+
+def test_observacion_se_guarda_se_muestra_y_no_se_mezcla(meal_database):
+    """Conserva la observación en la lista y separa entradas con notas distintas."""
+    from meal_planning_test_support import api_patch, api_post
+
+    cookies = authenticate(meal_database)
+    categoria = post_with_session("/api/v1/shopping-categories", {"name": "Despensa"}, cookies).json()
+    producto = post_with_session(f"/api/v1/shopping-categories/{categoria['id']}/products", {"name": "Café"}, cookies).json()
+    base = {"product_id": producto["id"], "quantity": 1, "unit": "unit"}
+    con_observacion = post_with_session("/api/v1/shopping-list", {**base, "observation": "Marca favorita"}, cookies)
+    repetida = post_with_session("/api/v1/shopping-list", {**base, "quantity": 2, "observation": "Marca favorita"}, cookies)
+    sin_observacion = post_with_session("/api/v1/shopping-list", base, cookies)
+
+    assert con_observacion.status_code == repetida.status_code == sin_observacion.status_code == 201
+    assert con_observacion.json()["observation"] == "Marca favorita"
+    assert repetida.json()["id"] == con_observacion.json()["id"]
+    assert repetida.json()["quantity"] == 3
+    assert con_observacion.json()["id"] != sin_observacion.json()["id"]
+    elementos = api_get("/api/v1/shopping-list", cookies=cookies).json()["items"]
+    assert next(item for item in elementos if item["id"] == con_observacion.json()["id"])["observation"] == "Marca favorita"
+
+    editada = api_patch(
+        f"/api/v1/shopping-list/{con_observacion.json()['id']}",
+        payload={"quantity": 2, "unit": "unit", "observation": "Sin cafeína"},
+        cookies=cookies,
+        csrf_token=cookies["csrf_token"],
+    )
+    assert editada.status_code == 200
+    assert editada.json()["observation"] == "Sin cafeína"
+    comprada = api_post(
+        f"/api/v1/shopping-list/{con_observacion.json()['id']}/purchase",
+        payload={}, cookies=cookies, csrf_token=cookies["csrf_token"],
+    )
+    assert comprada.status_code == 200
+    assert comprada.json()["observation"] == "Sin cafeína"

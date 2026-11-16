@@ -1,8 +1,12 @@
 // Presenta categorías y productos del catálogo compartido de compra.
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Fragment, useEffect, useRef, useState, type FormEvent } from "react";
 import Cropper from "react-easy-crop";
-import type { ShoppingListItem, ShoppingProduct } from "./mealPlanningApi";
+import type { ShoppingListItem, ShoppingProduct, CambioCantidad } from "./mealPlanningApi";
 import ToastMessage from "./ToastMessage";
+import AppIcon from "./AppIcon";
+import SelectorCompra from "./SelectorCompra";
+import DialogoCantidadCompra from "./DialogoCantidadCompra";
+import DialogoEditarCompra from "./DialogoEditarCompra";
 
 export type ShoppingCategory = { id: string; name: string; image_url?: string | null };
 
@@ -10,15 +14,28 @@ export type ShoppingCategory = { id: string; name: string; image_url?: string | 
 type ShoppingUnit = "unit" | "kg" | "g";
 
 // Describe una copia de receta incluida en la compra.
-type RecipeSection = { id: string; name: string; ingredients: { id: string; text: string; purchased: boolean }[] };
+type RecipeSection = { id: string; name: string; image_url?: string | null; ingredients: { id: string; text: string; purchased: boolean; image_url?: string | null }[] };
 
 /** Resuelve una imagen autenticada de la API bajo la ruta configurada. */
 function urlImagenApi(url: string): string {
   return `${import.meta.env.VITE_API_BASE_URL || "/comemos"}/api/v1${url}`;
 }
 
+/** Identifica independientemente las entradas de texto libre. */
+function claveEntrada(item: ShoppingListItem): string {
+  return (item.quantity_text != null || item.observation != null) && item.id ? item.id : `${item.product_id}:${item.unit}`;
+}
+
+/** Presenta la cantidad con la unidad en singular o plural según corresponda. */
+function textoCantidadCompra(item: ShoppingListItem): string {
+  const cantidad = item.quantity_text ?? `${item.quantity} ${item.unit === "unit" ? (item.quantity > 1 ? "unidades" : "unidad") : item.unit}`;
+  return item.observation ? `${cantidad} · ${item.observation}` : cantidad;
+}
+
 type Props = {
   categories: ShoppingCategory[];
+  mostrarAdministracion?: boolean;
+  onAbrirCatalogo?: () => void;
   onCreateCategory: (name: string, imageToken?: string) => void | Promise<void>;
   onGetProducts: (categoryId: string) => Promise<ShoppingProduct[]>;
   onCreateProduct: (categoryId: string, name: string, imageToken?: string) => Promise<ShoppingProduct>;
@@ -26,7 +43,8 @@ type Props = {
   onImportImage?: (url: string) => Promise<string>;
   onUpdateProductImage?: (categoryId: string, productId: string, change: { image_token: string } | { remove_image: true }) => Promise<ShoppingProduct>;
   onUpdateCategoryImage?: (categoryId: string, change: { image_token: string } | { remove_image: true }) => Promise<ShoppingCategory>;
-  onAddToShoppingList?: (productId: string, quantity: number, unit: ShoppingUnit) => Promise<ShoppingListItem>;
+  onAddToShoppingList?: (productId: string, quantity: number, unit: ShoppingUnit, texto?: string, observacion?: string) => Promise<ShoppingListItem>;
+  onUpdateShoppingItem?: (id: string, cambio: CambioCantidad) => Promise<ShoppingListItem>;
   onGetShoppingList?: () => Promise<{ items: ShoppingListItem[]; purchased_items?: ShoppingListItem[]; recipe_sections?: RecipeSection[] }>;
   onMarkRecipeIngredient?: (ingredientId: string) => Promise<unknown>;
   onUnmarkRecipeIngredient?: (ingredientId: string) => Promise<unknown>;
@@ -38,12 +56,17 @@ type Props = {
 };
 
 /** Presenta las categorías y permite consultar y crear sus productos. */
-export default function ShoppingList({ categories, onCreateCategory, onGetProducts, onCreateProduct, onPrepareImage, onImportImage, onUpdateProductImage, onUpdateCategoryImage, onAddToShoppingList, onGetShoppingList, onMarkPurchased, onUnmarkPurchased, onDeleteItem, onMarkRecipeIngredient, onUnmarkRecipeIngredient, onDeleteRecipeIngredient, onDeleteRecipeSection }: Props) {
+export default function ShoppingList({ categories, mostrarAdministracion = true, onAbrirCatalogo, onCreateCategory, onGetProducts, onCreateProduct, onPrepareImage, onImportImage, onUpdateProductImage, onUpdateCategoryImage, onAddToShoppingList, onUpdateShoppingItem, onGetShoppingList, onMarkPurchased, onUnmarkPurchased, onDeleteItem, onMarkRecipeIngredient, onUnmarkRecipeIngredient, onDeleteRecipeIngredient, onDeleteRecipeSection }: Props) {
+  const [pestana, setPestana] = useState<"productos" | "recetas">("productos");
+  const [entradaEditada, setEntradaEditada] = useState<ShoppingListItem | null>(null);
+  const [productoSeleccionado, setProductoSeleccionado] = useState<ShoppingProduct | null>(null);
   const [name, setName] = useState("");
   const [products, setProducts] = useState<Record<string, ShoppingProduct[]>>({});
   const [productNames, setProductNames] = useState<Record<string, string>>({});
   const [productErrors, setProductErrors] = useState<Record<string, string>>({});
   const [listaCompra, setListaCompra] = useState<Record<string, ShoppingListItem>>({});
+  const [borrandoComprados, setBorrandoComprados] = useState(false);
+  const bloqueoBorrado = useRef(false);
   const [comprados, setComprados] = useState<Record<string, ShoppingListItem>>({});
   const [seccionesRecetas, setSeccionesRecetas] = useState<RecipeSection[]>([]);
   const [errorListaCompra, setErrorListaCompra] = useState("");
@@ -118,14 +141,15 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
   useEffect(() => {
     if (!onGetShoppingList) return;
     void onGetShoppingList().then(({ items, purchased_items = [], recipe_sections = [] }) => {
-      setListaCompra(Object.fromEntries(items.map((item) => [`${item.product_id}:${item.unit}`, item])));
-      setComprados(Object.fromEntries(purchased_items.map((item) => [`${item.product_id}:${item.unit}`, item])));
+      setListaCompra(Object.fromEntries(items.map((item) => [claveEntrada(item), item])));
+      setComprados(Object.fromEntries(purchased_items.map((item) => [claveEntrada(item), item])));
       setSeccionesRecetas(recipe_sections);
     }).catch(() => setErrorListaCompra("No se pudo cargar la lista de la compra."));
   }, [onGetShoppingList]);
 
   // Carga el catálogo de productos cuando cambia la lista de categorías.
   useEffect(() => {
+    if (!mostrarAdministracion) return;
     categories.forEach((category) => {
       void onGetProducts(category.id).then((items) => {
         setProducts((current) => ({ ...current, [category.id]: items }));
@@ -134,7 +158,7 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
         setProductErrors((current) => ({ ...current, [category.id]: "No se pudieron cargar los productos." }));
       });
     });
-  }, [categories]);
+  }, [categories, mostrarAdministracion]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -263,34 +287,78 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     const item = await onAddToShoppingList?.(product.id, Number(formData.get("quantity")), formData.get("unit") as ShoppingUnit);
-    if (item) setListaCompra((actual) => ({ ...actual, [`${item.product_id}:${item.unit}`]: item }));
+    if (item) setListaCompra((actual) => ({ ...actual, [claveEntrada(item)]: item }));
   }
 
   /** Marca una entrada pendiente como comprada y la conserva en la sección inferior. */
   async function markPurchased(item: ShoppingListItem) {
     if (!item.id || !onMarkPurchased) return;
     const updated = await onMarkPurchased(item.id);
-    const key = `${item.product_id}:${item.unit}`;
+    const key = claveEntrada(item);
     setListaCompra((current) => { const next = { ...current }; delete next[key]; return next; });
-    setComprados((current) => ({ ...current, [key]: updated }));
+    setComprados((current) => ({ ...current, [key]: { ...item, ...updated } }));
   }
 
   /** Desmarca un producto comprado y lo devuelve a la sección de pendientes. */
   async function unmarkPurchased(item: ShoppingListItem) {
     if (!item.id || !onUnmarkPurchased) return;
     const updated = await onUnmarkPurchased(item.id);
-    const key = `${item.product_id}:${item.unit}`;
+    const key = claveEntrada(item);
     setComprados((current) => { const next = { ...current }; delete next[key]; return next; });
-    setListaCompra((current) => ({ ...current, [key]: updated }));
+    setListaCompra((current) => ({ ...current, [key]: { ...item, ...updated } }));
   }
 
   /** Elimina una entrada de la sección correspondiente tras confirmarla en la API. */
   async function deleteItem(item: ShoppingListItem, purchased: boolean) {
     if (!item.id || !onDeleteItem) return;
     await onDeleteItem(item.id);
-    const key = `${item.product_id}:${item.unit}`;
+    const key = claveEntrada(item);
     if (purchased) setComprados((current) => { const next = { ...current }; delete next[key]; return next; });
     else setListaCompra((current) => { const next = { ...current }; delete next[key]; return next; });
+  }
+
+  /** Elimina únicamente las entradas compradas confirmadas por la API. */
+  async function borrarTodosComprados() {
+    if (!onDeleteItem || bloqueoBorrado.current || !Object.keys(comprados).length) return;
+    if (!window.confirm("¿Eliminar todos los productos comprados?")) return;
+    bloqueoBorrado.current = true;
+    setBorrandoComprados(true);
+    setErrorListaCompra("");
+    const entradas = Object.entries(comprados);
+    const resultados = await Promise.allSettled(entradas.map(([, item]) => item.id ? onDeleteItem(item.id) : Promise.reject(new Error("Entrada sin identificador"))));
+    setComprados((actual) => {
+      const siguiente = { ...actual };
+      resultados.forEach((resultado, indice) => {
+        const [clave, item] = entradas[indice];
+        if (resultado.status === "fulfilled" && siguiente[clave]?.id === item.id) delete siguiente[clave];
+      });
+      return siguiente;
+    });
+    if (resultados.some((resultado) => resultado.status === "rejected")) setErrorListaCompra("No se pudieron eliminar todos los productos comprados. Inténtalo de nuevo.");
+    bloqueoBorrado.current = false;
+    setBorrandoComprados(false);
+  }
+
+  /** Elimina únicamente las entradas pendientes confirmadas por la API. */
+  async function borrarTodosPendientes() {
+    if (!onDeleteItem || bloqueoBorrado.current || !Object.keys(listaCompra).length) return;
+    if (!window.confirm("¿Eliminar todos los productos pendientes?")) return;
+    bloqueoBorrado.current = true;
+    setBorrandoComprados(true);
+    setErrorListaCompra("");
+    const entradas = Object.entries(listaCompra);
+    const resultados = await Promise.allSettled(entradas.map(([, item]) => item.id ? onDeleteItem(item.id) : Promise.reject(new Error("Entrada sin identificador"))));
+    setListaCompra((actual) => {
+      const siguiente = { ...actual };
+      resultados.forEach((resultado, indice) => {
+        const [clave, item] = entradas[indice];
+        if (resultado.status === "fulfilled" && siguiente[clave]?.id === item.id) delete siguiente[clave];
+      });
+      return siguiente;
+    });
+    if (resultados.some((resultado) => resultado.status === "rejected")) setErrorListaCompra("No se pudieron eliminar todos los productos pendientes. Inténtalo de nuevo.");
+    bloqueoBorrado.current = false;
+    setBorrandoComprados(false);
   }
 
   /** Marca como comprado un ingrediente de receta concreto. */
@@ -330,18 +398,19 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
 
   return <section className="panel">
     {errorReceta && <ToastMessage kind="error" onClose={() => setErrorReceta("")}>{errorReceta}</ToastMessage>}
-    <h2>Lista de la compra</h2>
-    {seccionesRecetas.map((seccion) => <section key={seccion.id} aria-label={seccion.name}>
-      <h3>{seccion.name}</h3>
-      <button type="button" onClick={() => void eliminarSeccionReceta(seccion.id)}>Eliminar sección {seccion.name}</button>
-      <ul>{seccion.ingredients.map((ingrediente) => <li key={ingrediente.id}>{ingrediente.text}
-        {ingrediente.purchased
-          ? <button type="button" onClick={() => void desmarcarIngredienteReceta(ingrediente.id)}>Desmarcar {ingrediente.text} como comprado</button>
-          : <button type="button" onClick={() => void marcarIngredienteReceta(ingrediente.id)}>Marcar {ingrediente.text} como comprado</button>}
-        <button type="button" onClick={() => void eliminarIngredienteReceta(ingrediente.id)}>Eliminar {ingrediente.text}</button>
-      </li>)}</ul>
-    </section>)}
-    <form onSubmit={submit}>
+    <div className="compra-cabecera"><h2>Lista de la compra</h2>
+      {onAbrirCatalogo && <button type="button" className="compra-accion" aria-label="Gestionar catálogo" data-tooltip="Gestionar catálogo" onClick={onAbrirCatalogo}><AppIcon name="store" /></button>}
+    </div>
+    <div className="compra-pestanas" role="tablist" aria-label="Vista de la compra">{(["productos", "recetas"] as const).map((vista) => <button key={vista} type="button" role="tab" id={`tab-compra-${vista}`} aria-controls={`panel-compra-${vista}`} aria-selected={pestana === vista} tabIndex={pestana === vista ? 0 : -1} onClick={() => setPestana(vista)} onKeyDown={(evento) => { if (evento.key === "ArrowRight" || evento.key === "ArrowLeft") { evento.preventDefault(); const siguiente = vista === "productos" ? "recetas" : "productos"; setPestana(siguiente); document.getElementById(`tab-compra-${siguiente}`)?.focus(); } }}>{vista === "productos" ? "Productos" : `Recetas${seccionesRecetas.length ? ` (${seccionesRecetas.length})` : ""}`}</button>)}</div>
+    <div role="tabpanel" id="panel-compra-productos" aria-labelledby="tab-compra-productos" hidden={pestana !== "productos"}>
+    {entradaEditada && onUpdateShoppingItem && <DialogoEditarCompra entrada={entradaEditada} guardar={onUpdateShoppingItem} cerrar={() => setEntradaEditada(null)} alGuardar={(actualizada) => {
+      setListaCompra((actual) => { const siguiente = { ...actual }; delete siguiente[claveEntrada(entradaEditada)]; siguiente[claveEntrada(actualizada)] = { ...entradaEditada, ...actualizada }; return siguiente; });
+    }} />}
+    <SelectorCompra categorias={categories} consultar={onGetProducts} seleccionar={setProductoSeleccionado} />
+    {productoSeleccionado && onAddToShoppingList && <DialogoCantidadCompra producto={productoSeleccionado} agregar={onAddToShoppingList}
+      alAgregar={(entrada) => setListaCompra((actual) => ({ ...actual, [claveEntrada(entrada)]: { ...entrada, product_name: productoSeleccionado.name, image_url: productoSeleccionado.image_url } }))}
+      cerrar={() => setProductoSeleccionado(null)} /> }
+    {mostrarAdministracion && <><form onSubmit={submit}>
       {productErrors["nueva-categoria"] && <p role="alert">{productErrors["nueva-categoria"]}</p>}
       <label>Nombre de la categoría<input aria-label="Nombre de la categoría" value={name} onChange={(event) => setName(event.target.value)} required /></label>
       <label tabIndex={0} onPaste={(event) => leerImagenProducto("nueva-categoria", Array.from(event.clipboardData.files).find((file) => file.type.startsWith("image/")))} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); leerImagenProducto("nueva-categoria", event.dataTransfer.files[0]); }}>Imagen de la categoría<input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => leerImagenProducto("nueva-categoria", event.target.files?.[0])} /></label>
@@ -382,20 +451,51 @@ export default function ShoppingList({ categories, onCreateCategory, onGetProduc
         <button type="submit">Crear producto</button>
       </form>
     </li>)}</ul>
+    </>}
     <section aria-label="Lista de la compra"><h3>Lista de la compra</h3>
       {errorListaCompra && <p role="alert">{errorListaCompra}</p>}
-      <h4>Pendientes</h4><ul>{Object.values(listaCompra).map((item) => <li key={`${item.product_id}:${item.unit}`}>
-        {item.image_url && <img src={urlImagenApi(item.image_url)} alt={item.product_name ?? Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id} />}
-        {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id}: {item.quantity} {item.unit === "unit" ? "unidad" : item.unit}
-        {item.id && <button type="button" onClick={() => void markPurchased(item)}>Marcar {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id} como comprado</button>}
-        {item.id && onDeleteItem && <button type="button" onClick={() => void deleteItem(item, false)}>Eliminar {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id} de Pendientes</button>}
-      </li>)}</ul>
-      <h4>Comprados</h4><ul>{Object.values(comprados).map((item) => <li key={`${item.product_id}:${item.unit}`}>
-        {item.image_url && <img src={urlImagenApi(item.image_url)} alt={item.product_name ?? Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id} />}
-        {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id}: {item.quantity} {item.unit === "unit" ? "unidad" : item.unit}
-        {item.id && onUnmarkPurchased && <button type="button" onClick={() => void unmarkPurchased(item)}>Desmarcar {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id} como pendiente</button>}
-        {item.id && onDeleteItem && <button type="button" onClick={() => void deleteItem(item, true)}>Eliminar {Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? item.product_id} de Comprados</button>}
-      </li>)}</ul>
+      <h4 className="compra-comprados-cabecera"><span>Pendientes</span><button className="compra-accion" type="button" aria-label="Eliminar todos los productos pendientes" data-tooltip="Eliminar todos los productos pendientes" disabled={!onDeleteItem || borrandoComprados || !Object.keys(listaCompra).length} onClick={() => void borrarTodosPendientes()}><AppIcon name="clear-list" /></button></h4><ul className="compra-filas">{Object.values(listaCompra).map((item) => {
+        const nombre = item.product_name ?? Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? "Producto";
+        const marcar = `Marcar ${nombre} como comprado`;
+        const eliminar = `Eliminar ${nombre} de Pendientes`;
+        return <li className="compra-fila" key={claveEntrada(item)}>
+          <input className="compra-casilla" type="checkbox" checked={false} disabled={!item.id || borrandoComprados} aria-label={marcar} onChange={() => void markPurchased(item)} />
+          {item.image_url && <img className="compra-miniatura" src={urlImagenApi(item.image_url)} alt={nombre} />}
+          <button type="button" className="compra-fila-texto compra-editar" disabled={!item.id || !onUpdateShoppingItem || borrandoComprados} onClick={() => setEntradaEditada(item)} aria-label={`Editar ${nombre}`}><strong>{nombre}</strong>: {textoCantidadCompra(item)}</button>
+          <span className="compra-acciones">
+            {item.id && onDeleteItem && <button className="compra-accion" type="button" aria-label={eliminar} data-tooltip={eliminar} onClick={() => void deleteItem(item, false)}><AppIcon name="trash" /></button>}
+          </span>
+        </li>;
+      })}</ul>
+      <h4 className="compra-comprados-cabecera" aria-label="Comprados"><span>Comprados</span><button className="compra-accion" type="button" aria-label="Eliminar todos los productos comprados" data-tooltip="Eliminar todos los productos comprados" disabled={!onDeleteItem || borrandoComprados || !Object.keys(comprados).length} onClick={() => void borrarTodosComprados()}><AppIcon name="clear-list" /></button></h4><ul className="compra-filas">{Object.values(comprados).map((item) => {
+        const nombre = item.product_name ?? Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? "Producto";
+        const desmarcar = `Desmarcar ${nombre} como pendiente`;
+        const eliminar = `Eliminar ${nombre} de Comprados`;
+        return <li className="compra-fila compra-fila-comprada" key={claveEntrada(item)}>
+          <input className="compra-casilla" type="checkbox" checked={true} disabled={!item.id || !onUnmarkPurchased || borrandoComprados} aria-label={desmarcar} onChange={() => void unmarkPurchased(item)} />
+          {item.image_url && <img className="compra-miniatura" src={urlImagenApi(item.image_url)} alt={nombre} />}
+          <span className="compra-fila-texto"><strong>{nombre}</strong>: {textoCantidadCompra(item)}</span>
+          <span className="compra-acciones">
+            {item.id && onDeleteItem && <button className="compra-accion" type="button" aria-label={eliminar} data-tooltip={eliminar} disabled={borrandoComprados} onClick={() => void deleteItem(item, true)}><AppIcon name="trash" /></button>}
+          </span>
+        </li>;
+      })}</ul>
     </section>
+    </div>
+    <div role="tabpanel" id="panel-compra-recetas" aria-labelledby="tab-compra-recetas" hidden={pestana !== "recetas"}>
+    {seccionesRecetas.map((seccion) => <section className="compra-receta" key={seccion.id} aria-label={seccion.name}>
+      <div className="compra-receta-cabecera"><div className="compra-receta-titulo">{seccion.image_url && <img className="compra-miniatura" src={urlImagenApi(seccion.image_url)} alt="" />}<h3>{seccion.name}</h3></div>
+        <button className="compra-accion" type="button" aria-label={`Eliminar sección ${seccion.name}`} data-tooltip={`Eliminar sección ${seccion.name}`} onClick={() => void eliminarSeccionReceta(seccion.id)}><AppIcon name="trash" /></button>
+      </div>
+      {([false, true] as const).map((comprado) => <Fragment key={String(comprado)}><h4>{comprado ? "Comprados" : "Pendientes"}</h4><ul className="compra-filas">{seccion.ingredients.filter((ingrediente) => ingrediente.purchased === comprado).map((ingrediente) => <li className={`compra-fila${comprado ? " compra-fila-comprada" : ""}`} key={ingrediente.id}>
+        <input className="compra-casilla" type="checkbox" checked={ingrediente.purchased} aria-label={`${ingrediente.purchased ? "Desmarcar" : "Marcar"} ${ingrediente.text} como comprado`} onChange={() => void (ingrediente.purchased ? desmarcarIngredienteReceta(ingrediente.id) : marcarIngredienteReceta(ingrediente.id))} />
+        {ingrediente.image_url && <img className="compra-miniatura" src={urlImagenApi(ingrediente.image_url)} alt="" />}
+        <span className="compra-fila-texto">{ingrediente.text}</span>
+        <span className="compra-acciones">
+          <button className="compra-accion" type="button" aria-label={`Eliminar ${ingrediente.text}`} data-tooltip={`Eliminar ${ingrediente.text}`} onClick={() => void eliminarIngredienteReceta(ingrediente.id)}><AppIcon name="trash" /></button>
+        </span>
+      </li>)}</ul></Fragment>)}
+    </section>)}
+    </div>
   </section>;
 }

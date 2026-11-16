@@ -19,8 +19,44 @@ describe("ShoppingList", () => {
           { id: "b", text: "sal", purchased: false },
         ] },
       ] })} />);
+    await userEvent.setup().click(screen.getByRole("tab", { name: /^Recetas/ }));
     const seccion = await screen.findByRole("region", { name: "Sopa" });
-    expect(within(seccion).getAllByRole("listitem").map(item => item.firstChild?.textContent)).toEqual(["agua", "sal"]);
+    expect(within(seccion).getByRole("heading", { name: "Pendientes" })).toBeTruthy();
+    expect(within(seccion).getByText("agua")).toBeTruthy();
+    expect(within(seccion).getByText("sal")).toBeTruthy();
+  });
+
+  // Verifica que las acciones compactas conservan nombre y descripción accesibles.
+  it("muestra acciones con iconos y descripción en la lista", async () => {
+    render(<ShoppingList categories={[]} onCreateCategory={vi.fn()} onGetProducts={vi.fn()} onCreateProduct={vi.fn()}
+      onGetShoppingList={vi.fn().mockResolvedValue({ items: [{ id: "1", product_id: "p", product_name: "Manzana", quantity: 2, unit: "unit", image_url: "/manzana", observation: "Marca especial" }] })}
+      onMarkPurchased={vi.fn()} onDeleteItem={vi.fn()} />);
+    const accion = await screen.findByRole("checkbox", { name: "Marcar Manzana como comprado" });
+    expect((accion as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByRole("button", { name: "Editar Manzana" }).textContent).toBe("Manzana: 2 unidades · Marca especial");
+    expect(screen.getByRole("button", { name: "Eliminar Manzana de Pendientes" }).querySelector("svg")).not.toBeNull();
+    expect(screen.getByRole("img", { name: "Manzana" }).classList.contains("compra-miniatura")).toBe(true);
+  });
+
+  // Comprueba el borrado selectivo y la recuperación ante un fallo parcial.
+  it("elimina comprados confirmados y conserva los que fallan", async () => {
+    const usuario = userEvent.setup();
+    const confirmar = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const borrar = vi.fn().mockImplementation((id: string) => id === "fallo" ? Promise.reject(new Error("error")) : Promise.resolve(null));
+    render(<ShoppingList categories={[]} onCreateCategory={vi.fn()} onGetProducts={vi.fn()} onCreateProduct={vi.fn()} onDeleteItem={borrar}
+      onGetShoppingList={vi.fn().mockResolvedValue({ items: [{ id: "pendiente", product_id: "p", product_name: "Pera", quantity: 1, unit: "unit" }], purchased_items: [
+        { id: "ok", product_id: "a", product_name: "Manzana", quantity: 2, unit: "unit" },
+        { id: "fallo", product_id: "b", product_name: "Pan", quantity: 1, unit: "unit" },
+      ] })} />);
+    expect((await screen.findByRole("checkbox", { name: "Desmarcar Manzana como pendiente" }) as HTMLInputElement).checked).toBe(true);
+    await usuario.click(screen.getByRole("button", { name: "Eliminar todos los productos comprados" }));
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(borrar).toHaveBeenCalledTimes(2);
+    expect(borrar).not.toHaveBeenCalledWith("pendiente");
+    expect(screen.queryByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzana: 2 unidades")).toBeNull();
+    expect(screen.getByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Pan: 1 unidad")).toBeTruthy();
+    expect(screen.getByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Pera: 1 unidad")).toBeTruthy();
+    confirmar.mockRestore();
   });
 
   it("marca como comprado un ingrediente de receta", async () => {
@@ -32,8 +68,12 @@ describe("ShoppingList", () => {
       onGetShoppingList={vi.fn().mockResolvedValue({ items: [], recipe_sections: [
         { id: "seccion", name: "Sopa", ingredients: [{ id: "agua-1", text: "agua", purchased: false }] },
       ] })} />);
-    await user.click(await screen.findByRole("button", { name: "Marcar agua como comprado" }));
+    await userEvent.setup().click(screen.getByRole("tab", { name: /^Recetas/ }));
+    await user.click(await screen.findByRole("checkbox", { name: "Marcar agua como comprado" }));
     expect(onMarkRecipeIngredient).toHaveBeenCalledWith("agua-1");
+    const seccion = screen.getByRole("region", { name: "Sopa" });
+    expect(within(seccion).getByRole("heading", { name: "Comprados" })).toBeTruthy();
+    expect(within(seccion).getByText("agua")).toBeTruthy();
   });
 
   it("devuelve a pendiente un ingrediente de receta", async () => {
@@ -45,8 +85,12 @@ describe("ShoppingList", () => {
       onGetShoppingList={vi.fn().mockResolvedValue({ items: [], recipe_sections: [
         { id: "seccion", name: "Sopa", ingredients: [{ id: "agua-1", text: "agua", purchased: true }] },
       ] })} />);
-    await user.click(await screen.findByRole("button", { name: "Desmarcar agua como comprado" }));
+    await userEvent.setup().click(screen.getByRole("tab", { name: /^Recetas/ }));
+    await user.click(await screen.findByRole("checkbox", { name: "Desmarcar agua como comprado" }));
     expect(onUnmarkRecipeIngredient).toHaveBeenCalledWith("agua-1");
+    const seccion = screen.getByRole("region", { name: "Sopa" });
+    expect(within(seccion).getByRole("heading", { name: "Pendientes" })).toBeTruthy();
+    expect(within(seccion).getByText("agua")).toBeTruthy();
   });
 
   it("elimina un ingrediente de receta de su sección", async () => {
@@ -61,10 +105,11 @@ describe("ShoppingList", () => {
           { id: "sal-1", text: "sal", purchased: false },
         ] },
       ] })} />);
+    await userEvent.setup().click(screen.getByRole("tab", { name: /^Recetas/ }));
     await user.click(await screen.findByRole("button", { name: "Eliminar agua" }));
     expect(onDeleteRecipeIngredient).toHaveBeenCalledWith("agua-1");
-    expect(screen.queryByText("agua", { selector: "li" })).toBeNull();
-    expect(screen.getByText("sal", { selector: "li" })).not.toBeNull();
+    expect(screen.queryByText("agua")).toBeNull();
+    expect(screen.getByText("sal")).not.toBeNull();
   });
 
   it("elimina una sección de receta completa", async () => {
@@ -77,6 +122,7 @@ describe("ShoppingList", () => {
         { id: "seccion", name: "Sopa", ingredients: [{ id: "agua-1", text: "agua", purchased: false }] },
         { id: "otra", name: "Ensalada", ingredients: [{ id: "tomate-1", text: "tomate", purchased: false }] },
       ] })} />);
+    await userEvent.setup().click(screen.getByRole("tab", { name: /^Recetas/ }));
     await user.click(await screen.findByRole("button", { name: "Eliminar sección Sopa" }));
     expect(onDeleteRecipeSection).toHaveBeenCalledWith("seccion");
     expect(screen.queryByRole("region", { name: "Sopa" })).toBeNull();
@@ -117,4 +163,55 @@ describe("ShoppingList", () => {
 
     expect(onAddToShoppingList).toHaveBeenCalledWith("product-1", 1.5, "kg");
   });
+});
+
+// Comprueba la edición de un producto pendiente y la presentación del texto guardado.
+it("edita un producto pendiente con texto libre", async () => {
+  HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
+  HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
+  const usuario = userEvent.setup();
+  const entrada = { id: "i", product_id: "p", product_name: "Pera", quantity: 2, unit: "unit" };
+  const guardar = vi.fn().mockResolvedValue({ ...entrada, quantity_text: "un puñado", observation: "marca ecológica" });
+  render(<ShoppingList categories={[]} onCreateCategory={vi.fn()} onGetProducts={vi.fn()} onCreateProduct={vi.fn()} onUpdateShoppingItem={guardar} onGetShoppingList={vi.fn().mockResolvedValue({ items: [entrada] })} />);
+  await usuario.click(await screen.findByRole("button", { name: "Editar Pera" }));
+  await usuario.click(screen.getByRole("button", { name: "Texto libre" }));
+  await usuario.type(screen.getByLabelText("Texto libre", { selector: "input" }), "un puñado");
+  await usuario.type(screen.getByLabelText("Observación", { selector: "input" }), "marca ecológica");
+  await usuario.click(screen.getByRole("button", { name: "Guardar" }));
+  expect(guardar).toHaveBeenCalledWith("i", { quantity_text: "un puñado", observation: "marca ecológica" });
+  expect((await screen.findByRole("button", { name: "Editar Pera" })).textContent).toBe("Pera: un puñado · marca ecológica");
+});
+
+// Comprueba la separación de las vistas y la pestaña inicial.
+it("abre Productos por defecto y separa las recetas", async () => {
+  const usuario = userEvent.setup();
+  render(<ShoppingList categories={[]} onCreateCategory={vi.fn()} onGetProducts={vi.fn()} onCreateProduct={vi.fn()}
+    onGetShoppingList={vi.fn().mockResolvedValue({ items: [], recipe_sections: [{ id: "s", name: "Sopa", ingredients: [] }] })} />);
+  expect(screen.getByRole("tab", { name: "Productos" }).getAttribute("aria-selected")).toBe("true");
+  expect(screen.getByRole("region", { name: "Añadir productos" })).toBeTruthy();
+  expect(screen.queryByRole("region", { name: "Sopa" })).toBeNull();
+  await usuario.click(screen.getByRole("tab", { name: /^Recetas/ }));
+  expect(await screen.findByRole("region", { name: "Sopa" })).toBeTruthy();
+  expect(screen.queryByRole("region", { name: "Añadir productos" })).toBeNull();
+  expect(screen.queryByRole("region", { name: "Lista de la compra" })).toBeNull();
+});
+
+// Comprueba que el contador refleja las recetas presentes y desaparece al vaciar la lista.
+it("actualiza el contador de recetas de la pestaña", async () => {
+  const usuario = userEvent.setup();
+  render(<ShoppingList categories={[]} onCreateCategory={vi.fn()} onGetProducts={vi.fn()} onCreateProduct={vi.fn()} onDeleteRecipeSection={vi.fn().mockResolvedValue(undefined)}
+    onGetShoppingList={vi.fn().mockResolvedValue({ items: [], recipe_sections: [{ id: "s", name: "Sopa", ingredients: [] }] })} />);
+  expect((await screen.findByRole("tab", { name: "Recetas (1)" }))).toBeTruthy();
+  await usuario.click(screen.getByRole("tab", { name: "Recetas (1)" }));
+  await usuario.click(screen.getByRole("button", { name: "Eliminar sección Sopa" }));
+  expect(await screen.findByRole("tab", { name: "Recetas" })).toBeTruthy();
+});
+
+// Comprueba la miniatura junto al nombre de la receta en su pestaña.
+it("muestra la imagen de la receta en la lista", async () => {
+  render(<ShoppingList categories={[]} onCreateCategory={vi.fn()} onGetProducts={vi.fn()} onCreateProduct={vi.fn()}
+    onGetShoppingList={vi.fn().mockResolvedValue({ items: [], recipe_sections: [{ id: "s", name: "Sopa", image_url: "/recipes/r/image?v=1", ingredients: [] }] })} />);
+  await userEvent.setup().click(await screen.findByRole("tab", { name: "Recetas (1)" }));
+  const seccion = screen.getByRole("region", { name: "Sopa" });
+  expect(seccion.querySelector("img")?.getAttribute("src")).toContain("/api/v1/recipes/r/image?v=1");
 });

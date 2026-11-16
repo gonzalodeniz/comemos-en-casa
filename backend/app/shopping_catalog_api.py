@@ -4,6 +4,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from uuid import UUID
 import hashlib
+import unicodedata
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -121,7 +122,13 @@ async def create_product(
         raise HTTPException(status_code=422, detail="Prepared image expired")
     product = ShoppingProduct(category_id=category.id, name=name, image_path=image_path)
     db.add(product)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as error:
+        db.rollback()
+        if image_path:
+            images._remove_food_image(image_path, "productos")
+        raise HTTPException(status_code=409, detail="Product name already exists") from error
     db.refresh(product)
     return {"id": str(product.id), "name": product.name}
 
@@ -154,19 +161,30 @@ async def update_product_image(category_id: UUID, product_id: UUID, payload: dic
     db: Session = Depends(get_database_session)):
     """Sustituye o elimina la imagen del producto sin alterar su nombre."""
     require_csrf(request, session)
-    if set(payload) not in ({"image_token"}, {"remove_image"}) or ("remove_image" in payload and payload["remove_image"] is not True):
+    if not payload or set(payload) - {"name", "image_token", "remove_image"} or ("image_token" in payload and "remove_image" in payload) or ("remove_image" in payload and payload["remove_image"] is not True):
         raise HTTPException(status_code=422, detail="Invalid image update")
+    if "name" in payload and (not isinstance(payload["name"], str) or not payload["name"].strip() or len(payload["name"].strip()) > 100):
+        raise HTTPException(status_code=422, detail="Invalid product name")
     if "image_token" in payload and not isinstance(payload["image_token"], str):
         raise HTTPException(status_code=422, detail="Invalid image token")
     product = db.get(ShoppingProduct, product_id)
     if product is None or product.category_id != category_id:
         raise HTTPException(status_code=404, detail="Product not found")
     old_path = product.image_path
-    new_path = None if payload.get("remove_image") else publish_temporary(images.DATA_ROOT, session.session.id, payload["image_token"], category="productos")
-    if not payload.get("remove_image") and new_path is None:
+    new_path = None if payload.get("remove_image") else publish_temporary(images.DATA_ROOT, session.session.id, payload["image_token"], category="productos") if "image_token" in payload else old_path
+    if "image_token" in payload and new_path is None:
         raise HTTPException(status_code=422, detail="Prepared image expired")
+    if "name" in payload:
+        product.name = payload["name"].strip()
+        product.name_canonical = unicodedata.normalize("NFC", product.name).casefold()
     product.image_path = new_path
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as error:
+        db.rollback()
+        if new_path and new_path != old_path:
+            images._remove_food_image(new_path, "productos")
+        raise HTTPException(status_code=409, detail="Product name already exists") from error
     if old_path and old_path != new_path:
         images._remove_food_image(old_path, "productos")
     return {"id": str(product.id), "name": product.name, "image_url": _product_image_url(product) if new_path else None}

@@ -10,6 +10,20 @@ vi.mock("react-easy-crop", () => ({ default: ({ onCropComplete }: { onCropComple
 
 vi.mock("./MealPlanning", () => ({ default: () => <div>Plan semanal</div> }));
 
+HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
+HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
+
+/** Añade un producto mediante el nuevo selector y diálogo. */
+async function agregarManzanas(user: ReturnType<typeof userEvent.setup>, cantidad: string, unidad = "unit") {
+  await user.click(await screen.findByRole("button", { name: "Manzanas" }));
+  const dialogo = screen.getByRole("dialog");
+  const campo = within(dialogo).getByLabelText("Unidades", { selector: "input" });
+  await user.clear(campo); await user.type(campo, cantidad);
+  await user.click(within(dialogo).getByRole("button", { name: unidad === "kg" ? "Kilogramos" : unidad === "g" ? "Gramos" : "Unidades" }));
+  await user.click(within(dialogo).getByRole("button", { name: "Añadir" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+}
+
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); sessionStorage.clear(); });
 
 describe("shopping list integration", () => {
@@ -618,7 +632,9 @@ describe("shopping list integration", () => {
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
 
-    await waitFor(() => expect(screen.getAllByRole("img", { name: "Manzanas" })).toHaveLength(2));
+    expect(await screen.findByRole("img", { name: "Manzanas" })).toBeTruthy();
+    await user.click(await screen.findByRole("button", { name: "Fruta" }));
+    expect(await screen.findByRole("button", { name: "Manzanas" })).toBeTruthy();
   });
 
   it("shows_product_image_file_picker_and_crop_preview", async () => {
@@ -635,10 +651,13 @@ describe("shopping list integration", () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
-    const archivo = await screen.findByLabelText("Imagen del producto") as HTMLInputElement;
+    await user.click(screen.getByRole("button", { name: "Gestionar catálogo" }));
+    await user.click(await screen.findByRole("button", { name: "Fruta" }));
+    await user.click(await screen.findByRole("button", { name: "Nuevo producto" }));
+    const archivo = await screen.findByLabelText("Seleccionar, pegar o arrastrar imagen") as HTMLInputElement;
     await user.upload(archivo, new File(["image"], "apple.png", { type: "image/png" }));
 
-    expect(await screen.findByRole("img", { name: "Vista previa del producto" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Confirmar recorte" })).toBeTruthy();
     expect(screen.getByRole("slider", { name: "Zoom" })).toBeTruthy();
   });
 
@@ -657,10 +676,13 @@ describe("shopping list integration", () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
-    await user.upload(await screen.findByLabelText("Imagen del producto"), new File(["image"], "apple.png", { type: "image/png" }));
+    await user.click(screen.getByRole("button", { name: "Gestionar catálogo" }));
+    await user.click(await screen.findByRole("button", { name: "Fruta" }));
+    await user.click(await screen.findByRole("button", { name: "Nuevo producto" }));
+    await user.upload(await screen.findByLabelText("Seleccionar, pegar o arrastrar imagen"), new File(["image"], "apple.png", { type: "image/png" }));
     await user.click(await screen.findByRole("button", { name: "Confirmar recorte" }));
-    await user.type(screen.getByLabelText("Nombre del producto en Fruta"), "Manzana");
-    await user.click(screen.getByRole("button", { name: "Crear producto" }));
+    await user.type(screen.getByLabelText("Nombre del producto"), "Manzana");
+    await user.click(screen.getByRole("button", { name: "Guardar" }));
 
     await waitFor(() => expect(fetchMock.mock.calls.some(([url]) => String(url).endsWith("/food-labels/images/prepare"))).toBe(true));
     const [, options] = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/food-labels/images/prepare"))!;
@@ -705,21 +727,16 @@ describe("shopping list integration", () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
-    const cantidad = await screen.findByLabelText("Cantidad de Manzanas");
-    await user.type(cantidad, "2");
-    await user.selectOptions(screen.getByLabelText("Unidad de Manzanas"), "unit");
-    await user.click(screen.getByRole("button", { name: "Añadir Manzanas a la lista" }));
-    await user.clear(cantidad);
-    await user.type(cantidad, "500");
-    await user.selectOptions(screen.getByLabelText("Unidad de Manzanas"), "g");
-    await user.click(screen.getByRole("button", { name: "Añadir Manzanas a la lista" }));
+    await user.click(await screen.findByRole("button", { name: "Fruta" }));
+    await agregarManzanas(user, "2", "unit");
+    await agregarManzanas(user, "500", "g");
 
     const llamadas = fetchMock.mock.calls.filter(([url, init]) => String(url).endsWith("/shopping-list") && init?.method === "POST");
     expect(llamadas).toHaveLength(2);
     expect(JSON.parse(String(llamadas[0]?.[1]?.body))).toEqual({ product_id: "product-1", quantity: 2, unit: "unit" });
     expect(JSON.parse(String(llamadas[1]?.[1]?.body))).toEqual({ product_id: "product-1", quantity: 500, unit: "g" });
     const lista = screen.getByRole("region", { name: "Lista de la compra" });
-    await waitFor(() => expect(lista.textContent).toContain("Manzanas: 2 unidad"));
+    await waitFor(() => expect(lista.textContent).toContain("Manzanas: 2 unidades"));
     expect(lista.textContent).toContain("Manzanas: 500 g");
     expect(lista.querySelectorAll("li")).toHaveLength(2);
   });
@@ -744,19 +761,16 @@ describe("shopping list integration", () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
-    const cantidad = await screen.findByLabelText("Cantidad de Manzanas");
-    await user.type(cantidad, "2");
-    await user.click(screen.getByRole("button", { name: "Añadir Manzanas a la lista" }));
-    await user.clear(cantidad);
-    await user.type(cantidad, "3");
-    await user.click(screen.getByRole("button", { name: "Añadir Manzanas a la lista" }));
+    await user.click(await screen.findByRole("button", { name: "Fruta" }));
+    await agregarManzanas(user, "2", "unit");
+    await agregarManzanas(user, "3", "unit");
 
     const llamadas = fetchMock.mock.calls.filter(([url, init]) => String(url).endsWith("/shopping-list") && init?.method === "POST");
     expect(llamadas).toHaveLength(2);
     expect(JSON.parse(String(llamadas[0]?.[1]?.body))).toEqual({ product_id: "product-1", quantity: 2, unit: "unit" });
     expect(JSON.parse(String(llamadas[1]?.[1]?.body))).toEqual({ product_id: "product-1", quantity: 3, unit: "unit" });
     const lista = screen.getByRole("region", { name: "Lista de la compra" });
-    await waitFor(() => expect(lista.textContent).toContain("Manzanas: 5 unidad"));
+    await waitFor(() => expect(lista.textContent).toContain("Manzanas: 5 unidades"));
     expect(lista.querySelectorAll("li")).toHaveLength(1);
   });
 
@@ -780,14 +794,9 @@ describe("shopping list integration", () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
-    const cantidad = await screen.findByLabelText("Cantidad de Manzanas");
-    await user.type(cantidad, "0.5");
-    await user.selectOptions(screen.getByLabelText("Unidad de Manzanas"), "kg");
-    await user.click(screen.getByRole("button", { name: "Añadir Manzanas a la lista" }));
-    await user.clear(cantidad);
-    await user.type(cantidad, "250");
-    await user.selectOptions(screen.getByLabelText("Unidad de Manzanas"), "g");
-    await user.click(screen.getByRole("button", { name: "Añadir Manzanas a la lista" }));
+    await user.click(await screen.findByRole("button", { name: "Fruta" }));
+    await agregarManzanas(user, "0.5", "kg");
+    await agregarManzanas(user, "250", "g");
 
     const llamadas = fetchMock.mock.calls.filter(([url, init]) => String(url).endsWith("/shopping-list") && init?.method === "POST");
     expect(llamadas).toHaveLength(2);
@@ -806,7 +815,7 @@ describe("shopping list integration", () => {
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Fruta" }] }), { status: 200 });
       if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [{ id: "product-1", name: "Manzanas" }] }), { status: 200 });
-      if (url.endsWith("/shopping-list")) return new Response(JSON.stringify({ items: [{ product_id: "product-1", quantity: 1500, unit: "g" }] }), { status: 200 });
+      if (url.endsWith("/shopping-list")) return new Response(JSON.stringify({ items: [{ product_id: "product-1", product_name: "Manzanas", quantity: 1500, unit: "g" }] }), { status: 200 });
       return new Response(JSON.stringify({}), { status: 404 });
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -834,9 +843,8 @@ describe("shopping list integration", () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
-    await user.type(await screen.findByLabelText("Cantidad de Manzanas"), "1.5");
-    await user.selectOptions(screen.getByLabelText("Unidad de Manzanas"), "kg");
-    await user.click(screen.getByRole("button", { name: "Añadir Manzanas a la lista" }));
+    await user.click(await screen.findByRole("button", { name: "Fruta" }));
+    await agregarManzanas(user, "1.5", "kg");
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/shopping-list"), expect.anything()));
     const [, init] = fetchMock.mock.calls.find(([url, options]) => String(url).endsWith("/shopping-list") && options?.method === "POST")!;
@@ -865,7 +873,7 @@ describe("shopping list integration", () => {
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
 
-    expect(await screen.findByText("Verduras")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Verduras" })).toBeTruthy();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/shopping-categories"), expect.anything()));
   });
 
@@ -884,10 +892,12 @@ describe("shopping list integration", () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(screen.getByRole("button", { name: "Gestionar catálogo" }));
+    await user.click(await screen.findByRole("button", { name: "Nueva categoría" }));
     await user.type(screen.getByLabelText("Nombre de la categoría"), "Verduras");
-    await user.click(screen.getByRole("button", { name: "Crear categoría" }));
+    await user.click(screen.getByRole("button", { name: "Guardar" }));
 
-    expect(await screen.findByText("Verduras")).toBeTruthy();
+    expect(await screen.findByRole("button", { name: "Verduras" })).toBeTruthy();
     const [, init] = fetchMock.mock.calls.find(([url, options]) => String(url).endsWith("/shopping-categories") && options?.method === "POST")!;
     expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-1");
     expect(JSON.parse(String(init?.body))).toEqual({ name: "Verduras" });
@@ -909,10 +919,13 @@ describe("shopping list integration", () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
-    await user.type(await screen.findByLabelText("Nombre del producto en Verduras"), "Manzanas");
-    await user.click(screen.getByRole("button", { name: "Crear producto" }));
+    await user.click(screen.getByRole("button", { name: "Gestionar catálogo" }));
+    await user.click(await screen.findByRole("button", { name: "Verduras" }));
+    await user.click(await screen.findByRole("button", { name: "Nuevo producto" }));
+    await user.type(await screen.findByLabelText("Nombre del producto"), "Manzanas");
+    await user.click(screen.getByRole("button", { name: "Guardar" }));
 
-    expect(await screen.findByText("Manzanas")).toBeTruthy();
+    await waitFor(() => expect(fetchMock.mock.calls.some(([url, options]) => String(url).endsWith("/category-1/products") && options?.method === "POST")).toBe(true));
     const [, init] = fetchMock.mock.calls.find(([url, options]) => String(url).endsWith("/category-1/products") && options?.method === "POST")!;
     expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-1");
     expect(JSON.parse(String(init?.body))).toEqual({ name: "Manzanas" });
@@ -934,17 +947,20 @@ describe("shopping list integration", () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
-    const input = await screen.findByLabelText("Nombre del producto en Verduras");
+    await user.click(screen.getByRole("button", { name: "Gestionar catálogo" }));
+    await user.click(await screen.findByRole("button", { name: "Verduras" }));
+    await user.click(await screen.findByRole("button", { name: "Nuevo producto" }));
+    const input = await screen.findByLabelText("Nombre del producto");
     await user.type(input, "Manzanas");
-    await user.click(screen.getByRole("button", { name: "Crear producto" }));
+    await user.click(screen.getByRole("button", { name: "Guardar" }));
 
-    expect((await screen.findByRole("alert")).textContent).toContain("No se pudo crear el producto");
+    expect((await screen.findByRole("alert")).textContent).toContain("No se pudo guardar");
     expect((input as HTMLInputElement).value).toBe("Manzanas");
   });
 
   // Comprueba que una entrada pendiente se puede marcar desde la interfaz.
   it("marca_un_producto_como_comprado_y_lo_mueve_a_la_seccion_inferior", async () => {
-    const item = { id: "item-1", product_id: "product-1", quantity: 3, unit: "unit" };
+    const item = { id: "item-1", product_id: "product-1", product_name: "Manzanas", quantity: 3, unit: "unit" };
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
@@ -960,7 +976,7 @@ describe("shopping list integration", () => {
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
 
-    await user.click(await screen.findByRole("button", { name: "Marcar Manzanas como comprado" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Marcar Manzanas como comprado" }));
 
     const [, init] = fetchMock.mock.calls.find(([url, options]) => String(url).endsWith("/item-1/purchase") && options?.method === "POST")!;
     expect(new Headers(init?.headers).get("X-CSRF-Token")).toBe("csrf-1");
@@ -968,13 +984,13 @@ describe("shopping list integration", () => {
     expect(lista.textContent).toContain("Pendientes");
     expect(lista.textContent).toContain("Comprados");
     expect(lista.textContent!.indexOf("Pendientes")).toBeLessThan(lista.textContent!.indexOf("Comprados"));
-    expect(lista.textContent).toContain("Manzanas: 3 unidad");
+    expect(lista.textContent).toContain("Manzanas: 3 unidades");
     expect(lista.querySelectorAll("li")).toHaveLength(1);
   });
 
   // Comprueba que el estado comprado se recupera del servidor al volver a abrir la lista.
   it("mantiene_el_estado_comprado_al_recargar_la_lista", async () => {
-    const item = { id: "item-1", product_id: "product-1", quantity: 3, unit: "unit" };
+    const item = { id: "item-1", product_id: "product-1", product_name: "Manzanas", quantity: 3, unit: "unit" };
     let comprado = false;
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -993,13 +1009,13 @@ describe("shopping list integration", () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
-    await user.click(await screen.findByRole("button", { name: "Marcar Manzanas como comprado" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Marcar Manzanas como comprado" }));
     await user.click(screen.getByRole("button", { name: "Plan semanal" }));
     await user.click(screen.getByRole("button", { name: "Lista de la compra" }));
 
     const lista = await screen.findByRole("region", { name: "Lista de la compra" });
     await waitFor(() => expect(lista.textContent).toContain("Comprados"));
-    expect(lista.textContent).toContain("Manzanas: 3 unidad");
+    expect(lista.textContent).toContain("Manzanas: 3 unidades");
     expect(lista.textContent!.indexOf("Pendientes")).toBeLessThan(lista.textContent!.indexOf("Comprados"));
     expect(lista.querySelectorAll("li")).toHaveLength(1);
     expect(fetchMock.mock.calls.filter(([url, init]) => String(url).endsWith("/shopping-list") && init?.method !== "POST")).toHaveLength(2);
@@ -1007,7 +1023,7 @@ describe("shopping list integration", () => {
 
   // Comprueba que los productos comprados ofrecen la acción para volver a pendientes.
   it("renders_unmark_action_for_purchased_items", async () => {
-    const comprado = { id: "item-1", product_id: "product-1", quantity: 3, unit: "unit" };
+    const comprado = { id: "item-1", product_id: "product-1", product_name: "Manzanas", quantity: 3, unit: "unit" };
     render(<ShoppingList
       categories={[{ id: "category-1", name: "Fruta" }]}
       onCreateCategory={() => {}}
@@ -1017,12 +1033,12 @@ describe("shopping list integration", () => {
       onUnmarkPurchased={async () => comprado}
     />);
 
-    expect(await screen.findByRole("button", { name: "Desmarcar Manzanas como pendiente" })).toBeTruthy();
+    expect(await screen.findByRole("checkbox", { name: "Desmarcar Manzanas como pendiente" })).toBeTruthy();
   });
 
   // Comprueba que desmarcar mueve el producto desde Comprados a Pendientes.
   it("unmarking_refreshes_pending_and_purchased_sections", async () => {
-    const comprado = { id: "item-1", product_id: "product-1", quantity: 3, unit: "unit" };
+    const comprado = { id: "item-1", product_id: "product-1", product_name: "Manzanas", quantity: 3, unit: "unit" };
     const user = userEvent.setup();
     render(<ShoppingList
       categories={[{ id: "category-1", name: "Fruta" }]}
@@ -1034,20 +1050,20 @@ describe("shopping list integration", () => {
     />);
     const lista = await screen.findByRole("region", { name: "Lista de la compra" });
 
-    await user.click(await within(lista).findByRole("button", { name: "Desmarcar Manzanas como pendiente" }));
+    await user.click(await within(lista).findByRole("checkbox", { name: "Desmarcar Manzanas como pendiente" }));
 
     const seccionPendientes = within(lista).getByRole("heading", { name: "Pendientes" }).nextElementSibling;
     const seccionComprados = within(lista).getByRole("heading", { name: "Comprados" }).nextElementSibling;
     if (!(seccionPendientes instanceof HTMLElement) || !(seccionComprados instanceof HTMLElement)) {
       throw new Error("No se encontraron las listas de pendientes y comprados.");
     }
-    expect(within(seccionPendientes).getByText("Manzanas: 3 unidad")).toBeTruthy();
-    expect(within(seccionComprados).queryByText("Manzanas: 3 unidad")).toBeNull();
+    expect(within(seccionPendientes).getByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidades")).toBeTruthy();
+    expect(within(seccionComprados).queryByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidades")).toBeNull();
   });
 
   // Comprueba que la aplicación envía el desmarcado a la API y actualiza ambas secciones.
   it("unmarking_posts_to_api_and_updates_sections", async () => {
-    const comprado = { id: "item-1", product_id: "product-1", quantity: 3, unit: "unit" };
+    const comprado = { id: "item-1", product_id: "product-1", product_name: "Manzanas", quantity: 3, unit: "unit" };
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
@@ -1064,7 +1080,7 @@ describe("shopping list integration", () => {
     await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
     const lista = await screen.findByRole("region", { name: "Lista de la compra" });
 
-    await user.click(await within(lista).findByRole("button", { name: "Desmarcar Manzanas como pendiente" }));
+    await user.click(await within(lista).findByRole("checkbox", { name: "Desmarcar Manzanas como pendiente" }));
 
     const llamada = fetchMock.mock.calls.find(([url, options]) => String(url).endsWith("/item-1/unpurchase") && options?.method === "POST");
     expect(llamada).toBeTruthy();
@@ -1074,14 +1090,14 @@ describe("shopping list integration", () => {
     if (!(seccionPendientes instanceof HTMLElement) || !(seccionComprados instanceof HTMLElement)) {
       throw new Error("No se encontraron las listas de pendientes y comprados.");
     }
-    expect(within(seccionPendientes).getByText("Manzanas: 3 unidad")).toBeTruthy();
-    expect(within(seccionComprados).queryByText("Manzanas: 3 unidad")).toBeNull();
+    expect(within(seccionPendientes).getByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidades")).toBeTruthy();
+    expect(within(seccionComprados).queryByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidades")).toBeNull();
   });
 
   // Comprueba que volver a añadir un producto comprado crea una entrada pendiente distinta.
   it("vuelve_a_anadir_un_producto_comprado_como_entrada_pendiente", async () => {
-    const comprado = { id: "item-bought", product_id: "product-1", quantity: 3, unit: "unit" };
-    const pendiente = { id: "item-pending", product_id: "product-1", quantity: 2, unit: "unit" };
+    const comprado = { id: "item-bought", product_id: "product-1", product_name: "Manzanas", quantity: 3, unit: "unit" };
+    const pendiente = { id: "item-pending", product_id: "product-1", product_name: "Manzanas", quantity: 2, unit: "unit" };
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
@@ -1096,23 +1112,23 @@ describe("shopping list integration", () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
-    await user.type(await screen.findByLabelText("Cantidad de Manzanas"), "2");
-    await user.click(screen.getByRole("button", { name: "Añadir Manzanas a la lista" }));
+    await user.click(await screen.findByRole("button", { name: "Fruta" }));
+    await agregarManzanas(user, "2");
 
     const lista = screen.getByRole("region", { name: "Lista de la compra" });
     await waitFor(() => expect(lista.querySelectorAll("li")).toHaveLength(2));
     expect(lista.textContent).toContain("Pendientes");
     expect(lista.textContent).toContain("Comprados");
-    expect(lista.textContent).toContain("Manzanas: 2 unidad");
-    expect(lista.textContent).toContain("Manzanas: 3 unidad");
+    expect(lista.textContent).toContain("Manzanas: 2 unidades");
+    expect(lista.textContent).toContain("Manzanas: 3 unidades");
     const [, request] = fetchMock.mock.calls.find(([url, options]) => String(url).endsWith("/shopping-list") && options?.method === "POST")!;
     expect(JSON.parse(String(request?.body))).toEqual({ product_id: "product-1", quantity: 2, unit: "unit" });
   });
 
   // Comprueba que al marcar desde la interfaz se refleja la fusión devuelta por la API.
   it("fusiona_cantidades_compradas_compatibles_al_marcar", async () => {
-    const comprado = { id: "item-bought", product_id: "product-1", quantity: 3, unit: "unit" };
-    const pendiente = { id: "item-pending", product_id: "product-1", quantity: 2, unit: "unit" };
+    const comprado = { id: "item-bought", product_id: "product-1", product_name: "Manzanas", quantity: 3, unit: "unit" };
+    const pendiente = { id: "item-pending", product_id: "product-1", product_name: "Manzanas", quantity: 2, unit: "unit" };
     const fusionado = { ...comprado, quantity: 5 };
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -1128,10 +1144,10 @@ describe("shopping list integration", () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
-    await user.click(await screen.findByRole("button", { name: "Marcar Manzanas como comprado" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Marcar Manzanas como comprado" }));
 
     const lista = screen.getByRole("region", { name: "Lista de la compra" });
-    expect(lista.textContent).toContain("Manzanas: 5 unidad");
+    expect(lista.textContent).toContain("Manzanas: 5 unidades");
     expect(lista.querySelectorAll("li")).toHaveLength(1);
     expect(lista.querySelector("h4")?.textContent).toBe("Pendientes");
     expect(lista.textContent!.indexOf("Pendientes")).toBeLessThan(lista.textContent!.indexOf("Comprados"));
@@ -1140,8 +1156,8 @@ describe("shopping list integration", () => {
 
   // Comprueba que unidades incompatibles continúan como entradas compradas distintas.
   it("mantiene_separadas_las_medidas_incompatibles_al_marcar", async () => {
-    const comprado = { id: "item-bought", product_id: "product-1", quantity: 3, unit: "unit" };
-    const pendiente = { id: "item-pending", product_id: "product-1", quantity: 500, unit: "g" };
+    const comprado = { id: "item-bought", product_id: "product-1", product_name: "Manzanas", quantity: 3, unit: "unit" };
+    const pendiente = { id: "item-pending", product_id: "product-1", product_name: "Manzanas", quantity: 500, unit: "g" };
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
@@ -1156,11 +1172,11 @@ describe("shopping list integration", () => {
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
-    await user.click(await screen.findByRole("button", { name: "Marcar Manzanas como comprado" }));
+    await user.click(await screen.findByRole("checkbox", { name: "Marcar Manzanas como comprado" }));
 
     const lista = screen.getByRole("region", { name: "Lista de la compra" });
     await waitFor(() => expect(lista.querySelectorAll("li")).toHaveLength(2));
-    expect(lista.textContent).toContain("Manzanas: 3 unidad");
+    expect(lista.textContent).toContain("Manzanas: 3 unidades");
     expect(lista.textContent).toContain("Manzanas: 500 g");
     expect(lista.querySelector("h4")?.textContent).toBe("Pendientes");
     expect(lista.textContent!.indexOf("Pendientes")).toBeLessThan(lista.textContent!.indexOf("Comprados"));
@@ -1182,13 +1198,14 @@ describe("shopping list integration", () => {
     render(<App />);
     await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
 
+    await user.click(await screen.findByRole("button", { name: "Verduras" }));
     expect((await screen.findByRole("alert")).textContent).toContain("No se pudieron cargar los productos");
   });
 
   // Comprueba que eliminar desde ambas secciones afecta solo a la entrada elegida.
   it("deleting_item_from_either_section_updates_only_that_entry", async () => {
-    const pendiente = { id: "item-pending", product_id: "product-1", quantity: 2, unit: "unit" };
-    const comprado = { id: "item-bought", product_id: "product-1", quantity: 3, unit: "unit" };
+    const pendiente = { id: "item-pending", product_id: "product-1", product_name: "Manzanas", quantity: 2, unit: "unit" };
+    const comprado = { id: "item-bought", product_id: "product-1", product_name: "Manzanas", quantity: 3, unit: "unit" };
     const lista = { items: [pendiente], purchased_items: [comprado] };
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -1210,9 +1227,9 @@ describe("shopping list integration", () => {
     const purchased = within(region).getByRole("heading", { name: "Comprados" }).nextElementSibling as HTMLElement;
 
     await user.click(await within(pending).findByRole("button", { name: /Eliminar/ }));
-    await waitFor(() => expect(within(pending).queryByText("Manzanas: 2 unidad")).toBeNull());
-    expect(within(purchased).getByText("Manzanas: 3 unidad")).toBeTruthy();
+    await waitFor(() => expect(within(pending).queryByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 2 unidades")).toBeNull());
+    expect(within(purchased).getByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidades")).toBeTruthy();
     await user.click(await within(purchased).findByRole("button", { name: /Eliminar/ }));
-    await waitFor(() => expect(within(purchased).queryByText("Manzanas: 3 unidad")).toBeNull());
+    await waitFor(() => expect(within(purchased).queryByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidades")).toBeNull());
   });
 });

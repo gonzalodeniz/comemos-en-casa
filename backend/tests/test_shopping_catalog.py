@@ -5,6 +5,23 @@ from sqlalchemy import create_engine, select
 from meal_planning_test_support import meal_database, api_get, authenticate, post_with_session
 
 
+def test_renombrar_y_rechazar_duplicados_en_distintas_categorias(meal_database):
+    """Impide duplicados globales al crear o renombrar, ignorando espacios y mayúsculas."""
+    from meal_planning_test_support import api_patch
+    cookies = authenticate(meal_database)
+    primera = post_with_session("/api/v1/shopping-categories", {"name": "Fruta"}, cookies).json()
+    segunda = post_with_session("/api/v1/shopping-categories", {"name": "Otros"}, cookies).json()
+    ruta = f"/api/v1/shopping-categories/{primera['id']}/products"
+    producto = post_with_session(ruta, {"name": "Pera"}, cookies).json()
+    otra_ruta = f"/api/v1/shopping-categories/{segunda['id']}/products"
+    otro = post_with_session(otra_ruta, {"name": "Manzana"}, cookies).json()
+    assert post_with_session(otra_ruta, {"name": "  pERA  "}, cookies).status_code == 409
+    assert api_patch(f"{otra_ruta}/{otro['id']}", payload={"name": " PERA "}, cookies=cookies, csrf_token=cookies["csrf_token"]).status_code == 409
+    respuesta = api_patch(f"{ruta}/{producto['id']}", payload={"name": " Pera conferencia "}, cookies=cookies, csrf_token=cookies["csrf_token"])
+    assert respuesta.status_code == 200
+    assert respuesta.json()["name"] == "Pera conferencia"
+
+
 def test_authenticated_user_can_create_category(meal_database):
     cookies = authenticate(meal_database)
 

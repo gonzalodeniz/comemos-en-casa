@@ -177,12 +177,14 @@ class ShoppingProduct(Base):
     """Representa un producto compartido asociado a una categoría de compra."""
 
     __tablename__ = "shopping_products"
+    __table_args__ = (UniqueConstraint("name_canonical", name="uq_shopping_products_name_canonical"),)
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     category_id: Mapped[UUID] = mapped_column(
         ForeignKey("shopping_categories.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
+    name_canonical: Mapped[str] = mapped_column(Text, nullable=False, default=lambda context: unicodedata.normalize("NFC", context.get_current_parameters()["name"].strip()).casefold())
     image_path: Mapped[str | None] = mapped_column(String(255))
 
 
@@ -197,6 +199,8 @@ class ShoppingListItem(Base):
     )
     quantity: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
     unit: Mapped[str] = mapped_column(String(32), nullable=False)
+    quantity_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    observation: Mapped[str | None] = mapped_column(Text, nullable=True)
     purchased: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false", nullable=False
     )
@@ -209,6 +213,7 @@ class RecipeShoppingSection(Base):
 
     id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String(150), nullable=False)
+    recipe_id: Mapped[UUID | None] = mapped_column(ForeignKey("recipes.id", ondelete="SET NULL"), nullable=True)
 
 
 class RecipeShoppingIngredient(Base):

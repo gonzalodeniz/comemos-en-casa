@@ -2,11 +2,16 @@
 // Comprueba la consulta y la sesión del catálogo mediante interacciones.
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ApiError } from "./api";
 import ProductCatalog from "./ProductCatalog";
 
 afterEach(cleanup);
+beforeEach(() => {
+  // Simula el diálogo nativo que jsdom no implementa.
+  HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
+  HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
+});
 
 it("muestra la imagen y el nombre de los productos de la categoría", async () => {
   const usuario = userEvent.setup();
@@ -14,6 +19,22 @@ it("muestra la imagen y el nombre de los productos de la categoría", async () =
   await usuario.click(screen.getByRole("button", { name: "Frutas" }));
   expect(await screen.findByText("Pera")).toBeTruthy();
   expect(document.querySelector('img[src$="/api/v1/imagen"]')).toBeTruthy();
+});
+
+// Comprueba que el nombre se edita sin exigir un cambio de imagen.
+it("renombra un producto sin modificar su imagen", async () => {
+  const usuario = userEvent.setup();
+  const actualizar = vi.fn().mockResolvedValue({ id: "p", name: "Pera conferencia", image_url: "/imagen" });
+  render(<ProductCatalog onUpdateCategoryImage={vi.fn()} onUpdateProductImage={actualizar} onImportImage={vi.fn()} onPrepareImage={vi.fn()} categories={[{ id: "1", name: "Frutas" }]} onGetProducts={async () => [{ id: "p", name: "Pera", image_url: "/imagen" }]} onCreateCategory={vi.fn()} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} />);
+  await usuario.click(screen.getByRole("button", { name: "Frutas" }));
+  await usuario.click(await screen.findByRole("button", { name: "Gestionar imagen de Pera" }));
+  expect(screen.getByRole("dialog", { name: "Producto Pera" })).toBeTruthy();
+  const nombre = screen.getByLabelText("Nombre del producto");
+  await usuario.clear(nombre);
+  await usuario.type(nombre, "Pera conferencia");
+  await usuario.click(screen.getByRole("button", { name: "Guardar" }));
+  expect(actualizar).toHaveBeenCalledWith("1", "p", { name: "Pera conferencia" });
+  expect(await screen.findByText("Pera conferencia")).toBeTruthy();
 });
 
 it("notifica la expiración de la sesión al fallar la consulta de productos", async () => {
@@ -67,7 +88,7 @@ it("crea productos y actualiza su imagen", async () => {
   await usuario.click(await screen.findByRole("button", { name: "Gestionar imagen de Pera" }));
   await usuario.click(screen.getByLabelText("Quitar imagen actual"));
   await usuario.click(screen.getByRole("button", { name: "Guardar" }));
-  expect(actualizar).toHaveBeenCalledWith("1", "p", { remove_image: true });
+  expect(actualizar).toHaveBeenCalledWith("1", "p", { name: "Pera", remove_image: true });
 });
 
 it("ofrece reintentar cuando falla la carga de categorías", async () => {

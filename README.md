@@ -45,3 +45,7 @@ Si ya instalaste dependencias locales, las pruebas aisladas de la API se ejecuta
 ## Publicación HTTPS
 
 El procedimiento inicial, prerrequisitos HTTP-01, activación TLS y renovación están en [administración](docs/manual/administracion.md#proxy-público-y-https). No se afirma disponibilidad pública hasta validar DNS, emisión y respuesta HTTPS.
+
+### Edición de cantidades en la lista de la compra
+
+Al añadir un producto o seleccionar uno pendiente se puede elegir una cantidad y unidad o escribir una descripción libre. Las entradas con texto libre se mantienen separadas y no se suman a otras entradas. Una cantidad numérica editada no puede coincidir con otra entrada pendiente del mismo producto y unidad; primero hay que modificar o eliminar la otra entrada. Tras actualizar la aplicación, aplica las migraciones de Alembic antes de utilizar esta función. La reversión de la migración `0015_shopping_quantity_text` elimina las descripciones libres guardadas.

@@ -29,11 +29,11 @@ describe("ShoppingList", () => {
   // Verifica que las acciones compactas conservan nombre y descripción accesibles.
   it("muestra acciones con iconos y descripción en la lista", async () => {
     render(<ShoppingList categories={[]} onCreateCategory={vi.fn()} onGetProducts={vi.fn()} onCreateProduct={vi.fn()}
-      onGetShoppingList={vi.fn().mockResolvedValue({ items: [{ id: "1", product_id: "p", product_name: "Manzana", quantity: 2, unit: "unit", image_url: "/manzana" }] })}
+      onGetShoppingList={vi.fn().mockResolvedValue({ items: [{ id: "1", product_id: "p", product_name: "Manzana", quantity: 2, unit: "unit", image_url: "/manzana", observation: "Marca especial" }] })}
       onMarkPurchased={vi.fn()} onDeleteItem={vi.fn()} />);
     const accion = await screen.findByRole("checkbox", { name: "Marcar Manzana como comprado" });
     expect((accion as HTMLInputElement).checked).toBe(false);
-    expect(screen.getByRole("button", { name: "Editar Manzana" }).textContent).toBe("Manzana: 2 unidades");
+    expect(screen.getByRole("button", { name: "Editar Manzana" }).textContent).toBe("Manzana: 2 unidades · Marca especial");
     expect(screen.getByRole("button", { name: "Eliminar Manzana de Pendientes" }).querySelector("svg")).not.toBeNull();
     expect(screen.getByRole("img", { name: "Manzana" }).classList.contains("compra-miniatura")).toBe(true);
   });
@@ -171,14 +171,15 @@ it("edita un producto pendiente con texto libre", async () => {
   HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
   const usuario = userEvent.setup();
   const entrada = { id: "i", product_id: "p", product_name: "Pera", quantity: 2, unit: "unit" };
-  const guardar = vi.fn().mockResolvedValue({ ...entrada, quantity_text: "un puñado" });
+  const guardar = vi.fn().mockResolvedValue({ ...entrada, quantity_text: "un puñado", observation: "marca ecológica" });
   render(<ShoppingList categories={[]} onCreateCategory={vi.fn()} onGetProducts={vi.fn()} onCreateProduct={vi.fn()} onUpdateShoppingItem={guardar} onGetShoppingList={vi.fn().mockResolvedValue({ items: [entrada] })} />);
   await usuario.click(await screen.findByRole("button", { name: "Editar Pera" }));
   await usuario.click(screen.getByRole("button", { name: "Texto libre" }));
   await usuario.type(screen.getByLabelText("Texto libre", { selector: "input" }), "un puñado");
+  await usuario.type(screen.getByLabelText("Observación", { selector: "input" }), "marca ecológica");
   await usuario.click(screen.getByRole("button", { name: "Guardar" }));
-  expect(guardar).toHaveBeenCalledWith("i", { quantity_text: "un puñado" });
-  expect((await screen.findByRole("button", { name: "Editar Pera" })).textContent).toBe("Pera: un puñado");
+  expect(guardar).toHaveBeenCalledWith("i", { quantity_text: "un puñado", observation: "marca ecológica" });
+  expect((await screen.findByRole("button", { name: "Editar Pera" })).textContent).toBe("Pera: un puñado · marca ecológica");
 });
 
 // Comprueba la separación de las vistas y la pestaña inicial.

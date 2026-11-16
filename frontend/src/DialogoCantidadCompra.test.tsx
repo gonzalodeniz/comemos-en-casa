@@ -15,7 +15,7 @@ afterEach(() => cleanup());
 // Comprueba que la respuesta de la API se transmite sin recalcular cantidades.
 it("envía cantidad y unidad y entrega la respuesta del servidor", async () => {
   const usuario = userEvent.setup();
-  const entrada = { id: "i", product_id: "m", quantity: 1500, unit: "g" };
+  const entrada = { id: "i", product_id: "m", quantity: 1500, unit: "g", observation: "Marca especial" };
   const agregar = vi.fn().mockResolvedValue(entrada);
   const alAgregar = vi.fn();
   const cerrar = vi.fn();
@@ -25,8 +25,9 @@ it("envía cantidad y unidad y entrega la respuesta del servidor", async () => {
   await usuario.clear(cantidad);
   await usuario.type(cantidad, "1.5");
   await usuario.click(screen.getByRole("button", { name: "Kilogramos" }));
+  await usuario.type(screen.getByLabelText("Observación", { selector: "input" }), "Marca especial");
   await usuario.click(screen.getByRole("button", { name: "Añadir" }));
-  expect(agregar).toHaveBeenCalledWith("m", 1.5, "kg");
+  expect(agregar).toHaveBeenCalledWith("m", 1.5, "kg", undefined, "Marca especial");
   await waitFor(() => expect(alAgregar).toHaveBeenCalledWith(entrada));
   expect(cerrar).toHaveBeenCalledOnce();
 });

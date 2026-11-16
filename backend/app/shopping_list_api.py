@@ -23,6 +23,7 @@ class ShoppingListItemPayload(BaseModel):
     quantity: Decimal | None = None
     unit: str | None = None
     quantity_text: str | None = None
+    observation: str | None = None
 
 
 class ActualizacionCantidad(BaseModel):
@@ -31,6 +32,7 @@ class ActualizacionCantidad(BaseModel):
     quantity: Decimal | None = None
     unit: str | None = None
     quantity_text: str | None = None
+    observation: str | None = None
 
 
 @router.post("", status_code=201)
@@ -44,14 +46,19 @@ async def add_shopping_list_item(
     require_csrf(request, session)
     if db.get(ShoppingProduct, payload.product_id) is None:
         raise HTTPException(status_code=404, detail="Product not found")
+    observacion = payload.observation.strip() if payload.observation is not None else None
+    if observacion == "":
+        observacion = None
+    if observacion is not None and len(observacion) > 255:
+        raise HTTPException(status_code=422, detail="Invalid observation")
     if payload.quantity_text is not None:
         texto = payload.quantity_text.strip()
         if not texto or len(texto) > 255 or payload.quantity is not None or payload.unit is not None:
             raise HTTPException(status_code=422, detail="Invalid free text")
-        item = ShoppingListItem(product_id=payload.product_id, quantity=0, unit="unit", quantity_text=texto)
+        item = ShoppingListItem(product_id=payload.product_id, quantity=0, unit="unit", quantity_text=texto, observation=observacion)
         db.add(item)
         db.commit()
-        return {"id": str(item.id), "product_id": str(item.product_id), "quantity": 0, "unit": "unit", "quantity_text": texto}
+        return {"id": str(item.id), "product_id": str(item.product_id), "quantity": 0, "unit": "unit", "quantity_text": texto, **({"observation": observacion} if observacion is not None else {})}
     unit = payload.unit
     quantity = payload.quantity
     if quantity is None or not quantity.is_finite() or quantity <= 0 or unit not in {"unit", "g", "kg"}:
@@ -61,17 +68,19 @@ async def add_shopping_list_item(
         unit = "g"
     else:
         quantity = quantity.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    criterio_observacion = ShoppingListItem.observation.is_(None) if observacion is None else ShoppingListItem.observation == observacion
     item = db.scalar(
         select(ShoppingListItem).where(
             ShoppingListItem.product_id == payload.product_id,
             ShoppingListItem.unit == unit,
             ShoppingListItem.purchased.is_(False),
             ShoppingListItem.quantity_text.is_(None),
+            criterio_observacion,
         )
     )
     if item is None:
         item = ShoppingListItem(
-            product_id=payload.product_id, quantity=quantity, unit=unit
+            product_id=payload.product_id, quantity=quantity, unit=unit, observation=observacion
         )
         db.add(item)
     else:
@@ -82,6 +91,7 @@ async def add_shopping_list_item(
         "product_id": str(item.product_id),
         "quantity": int(item.quantity),
         "unit": item.unit,
+        **({"observation": item.observation} if item.observation is not None else {}),
     }
 
 
@@ -106,6 +116,7 @@ async def list_shopping_list_items(
             "quantity": int(item.quantity),
             "unit": item.unit,
             **({"quantity_text": item.quantity_text} if item.quantity_text is not None else {}),
+            **({"observation": item.observation} if item.observation is not None else {}),
         }
         for item in items
     ]
@@ -142,10 +153,16 @@ async def actualizar_cantidad(
     if item is None or item.purchased:
         raise HTTPException(status_code=404, detail="Pending shopping list item not found")
     texto = payload.quantity_text.strip() if payload.quantity_text is not None else None
+    observacion = payload.observation.strip() if payload.observation is not None else item.observation
+    if observacion == "":
+        observacion = None
+    if observacion is not None and len(observacion) > 255:
+        raise HTTPException(status_code=422, detail="Invalid observation")
     if texto is not None:
         if not texto or len(texto) > 255 or payload.quantity is not None or payload.unit is not None:
             raise HTTPException(status_code=422, detail="Invalid free text")
         item.quantity_text = texto
+        item.observation = observacion
     else:
         if payload.quantity is None or not payload.quantity.is_finite() or payload.quantity <= 0 or payload.unit not in {"unit", "g", "kg"}:
             raise HTTPException(status_code=422, detail="Invalid quantity or unit")
@@ -153,14 +170,16 @@ async def actualizar_cantidad(
         if cantidad <= 0 or cantidad > 999999999:
             raise HTTPException(status_code=422, detail="Invalid quantity")
         unidad = "g" if payload.unit == "kg" else payload.unit
-        duplicado = db.scalar(select(ShoppingListItem).where(ShoppingListItem.id != item.id, ShoppingListItem.product_id == item.product_id, ShoppingListItem.unit == unidad, ShoppingListItem.purchased.is_(False), ShoppingListItem.quantity_text.is_(None)))
+        criterio_observacion = ShoppingListItem.observation.is_(None) if observacion is None else ShoppingListItem.observation == observacion
+        duplicado = db.scalar(select(ShoppingListItem).where(ShoppingListItem.id != item.id, ShoppingListItem.product_id == item.product_id, ShoppingListItem.unit == unidad, ShoppingListItem.purchased.is_(False), ShoppingListItem.quantity_text.is_(None), criterio_observacion))
         if duplicado is not None:
             raise HTTPException(status_code=409, detail="A numeric entry already exists for this unit")
         item.quantity = cantidad
         item.unit = unidad
         item.quantity_text = None
+        item.observation = observacion
     db.commit()
-    return {"id": str(item.id), "product_id": str(item.product_id), "quantity": int(item.quantity), "unit": item.unit, "quantity_text": item.quantity_text}
+    return {"id": str(item.id), "product_id": str(item.product_id), "quantity": int(item.quantity), "unit": item.unit, "quantity_text": item.quantity_text, "observation": item.observation}
 
 
 def imagen_receta_compra(seccion: RecipeShoppingSection, db: Session) -> str | None:
@@ -220,6 +239,7 @@ async def mark_shopping_list_item_as_purchased(
             ShoppingListItem.unit == item.unit,
             ShoppingListItem.purchased.is_(True),
             ShoppingListItem.quantity_text.is_(None),
+            ShoppingListItem.observation == item.observation if item.observation is not None else ShoppingListItem.observation.is_(None),
         )
     )
     if item.quantity_text is not None:
@@ -237,6 +257,7 @@ async def mark_shopping_list_item_as_purchased(
         "quantity": int(item.quantity),
         "unit": item.unit,
         **({"quantity_text": item.quantity_text} if item.quantity_text is not None else {}),
+        **({"observation": item.observation} if item.observation is not None else {}),
     }
 
 
@@ -258,6 +279,7 @@ async def unmark_shopping_list_item_as_purchased(
             ShoppingListItem.unit == item.unit,
             ShoppingListItem.purchased.is_(False),
             ShoppingListItem.quantity_text.is_(None),
+            ShoppingListItem.observation == item.observation if item.observation is not None else ShoppingListItem.observation.is_(None),
         )
     )
     if item.quantity_text is not None:
@@ -275,6 +297,7 @@ async def unmark_shopping_list_item_as_purchased(
         "quantity": int(item.quantity),
         "unit": item.unit,
         **({"quantity_text": item.quantity_text} if item.quantity_text is not None else {}),
+        **({"observation": item.observation} if item.observation is not None else {}),
     }
 
 

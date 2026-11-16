@@ -101,6 +101,18 @@ describe("meal planning API client", () => {
     expect(JSON.parse(String(init.body))).toEqual({ product_id: "product-1", quantity: 1.5, unit: "kg" });
   });
 
+  it("agrega_observacion_a_la_cantidad_de_compra", async () => {
+    const response = { product_id: "product-1", quantity: 2, unit: "unit", observation: "Marca especial" };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(response), { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { agregarProductoListaCompra } = await import("./mealPlanningApi");
+    await expect(agregarProductoListaCompra("product-1", 2, "unit", "csrf-1", undefined, "Marca especial")).resolves.toEqual(response);
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({ product_id: "product-1", quantity: 2, unit: "unit", observation: "Marca especial" });
+  });
+
   // Comprueba que se elimina una entrada concreta con el token CSRF.
   it("elimina_una_entrada_de_lista_con_csrf", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));

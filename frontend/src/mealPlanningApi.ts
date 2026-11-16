@@ -5,10 +5,10 @@ export type FoodLabel = { id: string; code: string; name: string; image_url?: st
 export type ShoppingCategory = { id: string; name: string; image_url?: string | null };
 export type ShoppingProduct = { id: string; name: string; image_url?: string | null };
 // Representa un producto agregado a la lista de la compra.
-export type ShoppingListItem = { id?: string; product_id: string; product_name?: string; image_url?: string | null; quantity: number; unit: string; quantity_text?: string | null };
+export type ShoppingListItem = { id?: string; product_id: string; product_name?: string; image_url?: string | null; quantity: number; unit: string; quantity_text?: string | null; observation?: string | null };
 
 // Representa una cantidad numérica o una descripción libre.
-export type CambioCantidad = { quantity: number; unit: string } | { quantity_text: string };
+export type CambioCantidad = { quantity: number; unit: string; observation?: string | null } | { quantity_text: string; observation?: string | null };
 
 /** Guarda la nueva cantidad de una entrada pendiente. */
 export function actualizarCantidadCompra(id: string, cambio: CambioCantidad, csrfToken: string): Promise<ShoppingListItem> {
@@ -84,8 +84,8 @@ export function updateShoppingProductImage(categoryId: string, productId: string
 }
 
 /** Añade un producto a la lista y devuelve su cantidad agregada. */
-export function agregarProductoListaCompra(productId: string, quantity: number, unit: string, csrfToken: string, texto?: string): Promise<ShoppingListItem> {
-  return apiRequest("/shopping-list", { method: "POST", csrfToken, body: texto !== undefined ? { product_id: productId, quantity_text: texto } : { product_id: productId, quantity, unit } });
+export function agregarProductoListaCompra(productId: string, quantity: number, unit: string, csrfToken: string, texto?: string, observacion?: string): Promise<ShoppingListItem> {
+  return apiRequest("/shopping-list", { method: "POST", csrfToken, body: { product_id: productId, ...(texto !== undefined ? { quantity_text: texto } : { quantity, unit }), ...(observacion ? { observation: observacion } : {}) } });
 }
 
 export type MealSlot = "lunch" | "dinner";

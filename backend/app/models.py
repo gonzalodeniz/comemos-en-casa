@@ -198,6 +198,7 @@ class ShoppingListItem(Base):
     quantity: Mapped[Decimal] = mapped_column(Numeric(12, 3), nullable=False)
     unit: Mapped[str] = mapped_column(String(32), nullable=False)
     quantity_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    observation: Mapped[str | None] = mapped_column(Text, nullable=True)
     purchased: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default="false", nullable=False
     )

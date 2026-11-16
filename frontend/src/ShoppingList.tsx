@@ -23,14 +23,13 @@ function urlImagenApi(url: string): string {
 
 /** Identifica independientemente las entradas de texto libre. */
 function claveEntrada(item: ShoppingListItem): string {
-  return item.quantity_text != null && item.id ? item.id : `${item.product_id}:${item.unit}`;
+  return (item.quantity_text != null || item.observation != null) && item.id ? item.id : `${item.product_id}:${item.unit}`;
 }
 
 /** Presenta la cantidad con la unidad en singular o plural según corresponda. */
 function textoCantidadCompra(item: ShoppingListItem): string {
-  if (item.quantity_text != null) return item.quantity_text;
-  const unidad = item.unit === "unit" ? (item.quantity > 1 ? "unidades" : "unidad") : item.unit;
-  return `${item.quantity} ${unidad}`;
+  const cantidad = item.quantity_text ?? `${item.quantity} ${item.unit === "unit" ? (item.quantity > 1 ? "unidades" : "unidad") : item.unit}`;
+  return item.observation ? `${cantidad} · ${item.observation}` : cantidad;
 }
 
 type Props = {
@@ -44,7 +43,7 @@ type Props = {
   onImportImage?: (url: string) => Promise<string>;
   onUpdateProductImage?: (categoryId: string, productId: string, change: { image_token: string } | { remove_image: true }) => Promise<ShoppingProduct>;
   onUpdateCategoryImage?: (categoryId: string, change: { image_token: string } | { remove_image: true }) => Promise<ShoppingCategory>;
-  onAddToShoppingList?: (productId: string, quantity: number, unit: ShoppingUnit, texto?: string) => Promise<ShoppingListItem>;
+  onAddToShoppingList?: (productId: string, quantity: number, unit: ShoppingUnit, texto?: string, observacion?: string) => Promise<ShoppingListItem>;
   onUpdateShoppingItem?: (id: string, cambio: CambioCantidad) => Promise<ShoppingListItem>;
   onGetShoppingList?: () => Promise<{ items: ShoppingListItem[]; purchased_items?: ShoppingListItem[]; recipe_sections?: RecipeSection[] }>;
   onMarkRecipeIngredient?: (ingredientId: string) => Promise<unknown>;

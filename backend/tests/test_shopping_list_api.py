@@ -154,7 +154,7 @@ def test_database_schema_contains_shopping_list_items_with_quantity_and_unit(
     try:
         inspector = inspect(engine)
         assert "shopping_list_items" in inspector.get_table_names()
-        assert {"id", "quantity", "unit", "purchased"}.issubset(
+        assert {"id", "quantity", "unit", "purchased", "observation"}.issubset(
             {column["name"] for column in inspector.get_columns("shopping_list_items")}
         )
         quantity_column = next(
@@ -1270,3 +1270,39 @@ def test_anadir_texto_libre_crea_entradas_independientes(meal_database):
     assert primera.json()["id"] != segunda.json()["id"]
     assert primera.json()["quantity_text"] == "un puñado"
     assert len(api_get("/api/v1/shopping-list", cookies=cookies).json()["items"]) == 3
+
+
+def test_observacion_se_guarda_se_muestra_y_no_se_mezcla(meal_database):
+    """Conserva la observación en la lista y separa entradas con notas distintas."""
+    from meal_planning_test_support import api_patch, api_post
+
+    cookies = authenticate(meal_database)
+    categoria = post_with_session("/api/v1/shopping-categories", {"name": "Despensa"}, cookies).json()
+    producto = post_with_session(f"/api/v1/shopping-categories/{categoria['id']}/products", {"name": "Café"}, cookies).json()
+    base = {"product_id": producto["id"], "quantity": 1, "unit": "unit"}
+    con_observacion = post_with_session("/api/v1/shopping-list", {**base, "observation": "Marca favorita"}, cookies)
+    repetida = post_with_session("/api/v1/shopping-list", {**base, "quantity": 2, "observation": "Marca favorita"}, cookies)
+    sin_observacion = post_with_session("/api/v1/shopping-list", base, cookies)
+
+    assert con_observacion.status_code == repetida.status_code == sin_observacion.status_code == 201
+    assert con_observacion.json()["observation"] == "Marca favorita"
+    assert repetida.json()["id"] == con_observacion.json()["id"]
+    assert repetida.json()["quantity"] == 3
+    assert con_observacion.json()["id"] != sin_observacion.json()["id"]
+    elementos = api_get("/api/v1/shopping-list", cookies=cookies).json()["items"]
+    assert next(item for item in elementos if item["id"] == con_observacion.json()["id"])["observation"] == "Marca favorita"
+
+    editada = api_patch(
+        f"/api/v1/shopping-list/{con_observacion.json()['id']}",
+        payload={"quantity": 2, "unit": "unit", "observation": "Sin cafeína"},
+        cookies=cookies,
+        csrf_token=cookies["csrf_token"],
+    )
+    assert editada.status_code == 200
+    assert editada.json()["observation"] == "Sin cafeína"
+    comprada = api_post(
+        f"/api/v1/shopping-list/{con_observacion.json()['id']}/purchase",
+        payload={}, cookies=cookies, csrf_token=cookies["csrf_token"],
+    )
+    assert comprada.status_code == 200
+    assert comprada.json()["observation"] == "Sin cafeína"

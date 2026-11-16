@@ -736,7 +736,7 @@ describe("shopping list integration", () => {
     expect(JSON.parse(String(llamadas[0]?.[1]?.body))).toEqual({ product_id: "product-1", quantity: 2, unit: "unit" });
     expect(JSON.parse(String(llamadas[1]?.[1]?.body))).toEqual({ product_id: "product-1", quantity: 500, unit: "g" });
     const lista = screen.getByRole("region", { name: "Lista de la compra" });
-    await waitFor(() => expect(lista.textContent).toContain("Manzanas: 2 unidad"));
+    await waitFor(() => expect(lista.textContent).toContain("Manzanas: 2 unidades"));
     expect(lista.textContent).toContain("Manzanas: 500 g");
     expect(lista.querySelectorAll("li")).toHaveLength(2);
   });
@@ -770,7 +770,7 @@ describe("shopping list integration", () => {
     expect(JSON.parse(String(llamadas[0]?.[1]?.body))).toEqual({ product_id: "product-1", quantity: 2, unit: "unit" });
     expect(JSON.parse(String(llamadas[1]?.[1]?.body))).toEqual({ product_id: "product-1", quantity: 3, unit: "unit" });
     const lista = screen.getByRole("region", { name: "Lista de la compra" });
-    await waitFor(() => expect(lista.textContent).toContain("Manzanas: 5 unidad"));
+    await waitFor(() => expect(lista.textContent).toContain("Manzanas: 5 unidades"));
     expect(lista.querySelectorAll("li")).toHaveLength(1);
   });
 
@@ -984,7 +984,7 @@ describe("shopping list integration", () => {
     expect(lista.textContent).toContain("Pendientes");
     expect(lista.textContent).toContain("Comprados");
     expect(lista.textContent!.indexOf("Pendientes")).toBeLessThan(lista.textContent!.indexOf("Comprados"));
-    expect(lista.textContent).toContain("Manzanas: 3 unidad");
+    expect(lista.textContent).toContain("Manzanas: 3 unidades");
     expect(lista.querySelectorAll("li")).toHaveLength(1);
   });
 
@@ -1015,7 +1015,7 @@ describe("shopping list integration", () => {
 
     const lista = await screen.findByRole("region", { name: "Lista de la compra" });
     await waitFor(() => expect(lista.textContent).toContain("Comprados"));
-    expect(lista.textContent).toContain("Manzanas: 3 unidad");
+    expect(lista.textContent).toContain("Manzanas: 3 unidades");
     expect(lista.textContent!.indexOf("Pendientes")).toBeLessThan(lista.textContent!.indexOf("Comprados"));
     expect(lista.querySelectorAll("li")).toHaveLength(1);
     expect(fetchMock.mock.calls.filter(([url, init]) => String(url).endsWith("/shopping-list") && init?.method !== "POST")).toHaveLength(2);
@@ -1057,8 +1057,8 @@ describe("shopping list integration", () => {
     if (!(seccionPendientes instanceof HTMLElement) || !(seccionComprados instanceof HTMLElement)) {
       throw new Error("No se encontraron las listas de pendientes y comprados.");
     }
-    expect(within(seccionPendientes).getByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidad")).toBeTruthy();
-    expect(within(seccionComprados).queryByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidad")).toBeNull();
+    expect(within(seccionPendientes).getByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidades")).toBeTruthy();
+    expect(within(seccionComprados).queryByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidades")).toBeNull();
   });
 
   // Comprueba que la aplicación envía el desmarcado a la API y actualiza ambas secciones.
@@ -1090,8 +1090,8 @@ describe("shopping list integration", () => {
     if (!(seccionPendientes instanceof HTMLElement) || !(seccionComprados instanceof HTMLElement)) {
       throw new Error("No se encontraron las listas de pendientes y comprados.");
     }
-    expect(within(seccionPendientes).getByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidad")).toBeTruthy();
-    expect(within(seccionComprados).queryByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidad")).toBeNull();
+    expect(within(seccionPendientes).getByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidades")).toBeTruthy();
+    expect(within(seccionComprados).queryByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidades")).toBeNull();
   });
 
   // Comprueba que volver a añadir un producto comprado crea una entrada pendiente distinta.
@@ -1119,8 +1119,8 @@ describe("shopping list integration", () => {
     await waitFor(() => expect(lista.querySelectorAll("li")).toHaveLength(2));
     expect(lista.textContent).toContain("Pendientes");
     expect(lista.textContent).toContain("Comprados");
-    expect(lista.textContent).toContain("Manzanas: 2 unidad");
-    expect(lista.textContent).toContain("Manzanas: 3 unidad");
+    expect(lista.textContent).toContain("Manzanas: 2 unidades");
+    expect(lista.textContent).toContain("Manzanas: 3 unidades");
     const [, request] = fetchMock.mock.calls.find(([url, options]) => String(url).endsWith("/shopping-list") && options?.method === "POST")!;
     expect(JSON.parse(String(request?.body))).toEqual({ product_id: "product-1", quantity: 2, unit: "unit" });
   });
@@ -1147,7 +1147,7 @@ describe("shopping list integration", () => {
     await user.click(await screen.findByRole("checkbox", { name: "Marcar Manzanas como comprado" }));
 
     const lista = screen.getByRole("region", { name: "Lista de la compra" });
-    expect(lista.textContent).toContain("Manzanas: 5 unidad");
+    expect(lista.textContent).toContain("Manzanas: 5 unidades");
     expect(lista.querySelectorAll("li")).toHaveLength(1);
     expect(lista.querySelector("h4")?.textContent).toBe("Pendientes");
     expect(lista.textContent!.indexOf("Pendientes")).toBeLessThan(lista.textContent!.indexOf("Comprados"));
@@ -1176,7 +1176,7 @@ describe("shopping list integration", () => {
 
     const lista = screen.getByRole("region", { name: "Lista de la compra" });
     await waitFor(() => expect(lista.querySelectorAll("li")).toHaveLength(2));
-    expect(lista.textContent).toContain("Manzanas: 3 unidad");
+    expect(lista.textContent).toContain("Manzanas: 3 unidades");
     expect(lista.textContent).toContain("Manzanas: 500 g");
     expect(lista.querySelector("h4")?.textContent).toBe("Pendientes");
     expect(lista.textContent!.indexOf("Pendientes")).toBeLessThan(lista.textContent!.indexOf("Comprados"));
@@ -1227,9 +1227,9 @@ describe("shopping list integration", () => {
     const purchased = within(region).getByRole("heading", { name: "Comprados" }).nextElementSibling as HTMLElement;
 
     await user.click(await within(pending).findByRole("button", { name: /Eliminar/ }));
-    await waitFor(() => expect(within(pending).queryByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 2 unidad")).toBeNull());
-    expect(within(purchased).getByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidad")).toBeTruthy();
+    await waitFor(() => expect(within(pending).queryByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 2 unidades")).toBeNull());
+    expect(within(purchased).getByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidades")).toBeTruthy();
     await user.click(await within(purchased).findByRole("button", { name: /Eliminar/ }));
-    await waitFor(() => expect(within(purchased).queryByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidad")).toBeNull());
+    await waitFor(() => expect(within(purchased).queryByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzanas: 3 unidades")).toBeNull());
   });
 });

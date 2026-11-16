@@ -33,6 +33,7 @@ describe("ShoppingList", () => {
       onMarkPurchased={vi.fn()} onDeleteItem={vi.fn()} />);
     const accion = await screen.findByRole("checkbox", { name: "Marcar Manzana como comprado" });
     expect((accion as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByRole("button", { name: "Editar Manzana" }).textContent).toBe("Manzana: 2 unidades");
     expect(screen.getByRole("button", { name: "Eliminar Manzana de Pendientes" }).querySelector("svg")).not.toBeNull();
     expect(screen.getByRole("img", { name: "Manzana" }).classList.contains("compra-miniatura")).toBe(true);
   });
@@ -52,7 +53,7 @@ describe("ShoppingList", () => {
     expect(await screen.findByRole("alert")).toBeTruthy();
     expect(borrar).toHaveBeenCalledTimes(2);
     expect(borrar).not.toHaveBeenCalledWith("pendiente");
-    expect(screen.queryByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzana: 2 unidad")).toBeNull();
+    expect(screen.queryByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Manzana: 2 unidades")).toBeNull();
     expect(screen.getByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Pan: 1 unidad")).toBeTruthy();
     expect(screen.getByText((_, elemento) => elemento?.classList.contains("compra-fila-texto") === true && elemento.textContent === "Pera: 1 unidad")).toBeTruthy();
     confirmar.mockRestore();

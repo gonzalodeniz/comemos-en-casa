@@ -26,6 +26,13 @@ function claveEntrada(item: ShoppingListItem): string {
   return item.quantity_text != null && item.id ? item.id : `${item.product_id}:${item.unit}`;
 }
 
+/** Presenta la cantidad con la unidad en singular o plural según corresponda. */
+function textoCantidadCompra(item: ShoppingListItem): string {
+  if (item.quantity_text != null) return item.quantity_text;
+  const unidad = item.unit === "unit" ? (item.quantity > 1 ? "unidades" : "unidad") : item.unit;
+  return `${item.quantity} ${unidad}`;
+}
+
 type Props = {
   categories: ShoppingCategory[];
   mostrarAdministracion?: boolean;
@@ -455,7 +462,7 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
         return <li className="compra-fila" key={claveEntrada(item)}>
           <input className="compra-casilla" type="checkbox" checked={false} disabled={!item.id || borrandoComprados} aria-label={marcar} onChange={() => void markPurchased(item)} />
           {item.image_url && <img className="compra-miniatura" src={urlImagenApi(item.image_url)} alt={nombre} />}
-          <button type="button" className="compra-fila-texto compra-editar" disabled={!item.id || !onUpdateShoppingItem || borrandoComprados} onClick={() => setEntradaEditada(item)} aria-label={`Editar ${nombre}`}><strong>{nombre}</strong>: {item.quantity_text ?? `${item.quantity} ${item.unit === "unit" ? "unidad" : item.unit}`}</button>
+          <button type="button" className="compra-fila-texto compra-editar" disabled={!item.id || !onUpdateShoppingItem || borrandoComprados} onClick={() => setEntradaEditada(item)} aria-label={`Editar ${nombre}`}><strong>{nombre}</strong>: {textoCantidadCompra(item)}</button>
           <span className="compra-acciones">
             {item.id && onDeleteItem && <button className="compra-accion" type="button" aria-label={eliminar} data-tooltip={eliminar} onClick={() => void deleteItem(item, false)}><AppIcon name="trash" /></button>}
           </span>
@@ -468,7 +475,7 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
         return <li className="compra-fila compra-fila-comprada" key={claveEntrada(item)}>
           <input className="compra-casilla" type="checkbox" checked={true} disabled={!item.id || !onUnmarkPurchased || borrandoComprados} aria-label={desmarcar} onChange={() => void unmarkPurchased(item)} />
           {item.image_url && <img className="compra-miniatura" src={urlImagenApi(item.image_url)} alt={nombre} />}
-          <span className="compra-fila-texto"><strong>{nombre}</strong>: {item.quantity_text ?? `${item.quantity} ${item.unit === "unit" ? "unidad" : item.unit}`}</span>
+          <span className="compra-fila-texto"><strong>{nombre}</strong>: {textoCantidadCompra(item)}</span>
           <span className="compra-acciones">
             {item.id && onDeleteItem && <button className="compra-accion" type="button" aria-label={eliminar} data-tooltip={eliminar} disabled={borrandoComprados} onClick={() => void deleteItem(item, true)}><AppIcon name="trash" /></button>}
           </span>

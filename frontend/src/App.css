@@ -552,7 +552,7 @@ span.meal-thumbnail[role="button"]:focus-visible { outline:3px solid #00854a; ou
 
 /* Acompaña el texto de compra con miniaturas y acciones separadas. */
 .compra-filas { list-style: none; padding: 0; margin: 0 0 1rem; }
-.compra-fila { display: flex; align-items: center; gap: .75rem; padding: .65rem 0; border-bottom: 1px solid var(--color-border-subtle); min-width: 0; }
+.compra-fila { display: flex; align-items: center; gap: .75rem; padding: .65rem .6rem; border-bottom: 1px solid var(--color-border-subtle); min-width: 0; }
 .compra-miniatura { width: 40px; height: 40px; flex: 0 0 40px; object-fit: cover; border-radius: .5rem; }
 .compra-fila-texto { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .compra-acciones { display: flex; flex: 0 0 auto; align-items: center; gap: .75rem; }
@@ -573,6 +573,12 @@ input.compra-casilla { flex: 0 0 22px; width: 22px; height: 22px; min-height: 0;
 .compra-cabecera h2 { margin: 0; }
 
 button.compra-editar { background: transparent; color: inherit; text-align: left; padding: 0; min-height: 44px; border: 0; }
+/* Resalta toda la fila pendiente, incluso al pasar por sus controles, con margen interno. */
+.compra-fila:not(.compra-fila-comprada):hover,
+.compra-fila:not(.compra-fila-comprada):focus-within { border-radius: .65rem; background: #e8f3ef; }
+/* Evita que el hover propio de los botones pinte un verde más intenso dentro de la fila. */
+.compra-fila:not(.compra-fila-comprada):hover button:hover:not(:disabled) { background: transparent; }
+button.compra-editar:focus-visible { background: #e8f3ef; }
 button.compra-editar:disabled { opacity: 1; }
 
 .compra-modos { display: grid; grid-template-columns: repeat(4, 1fr); gap: .4rem; margin: .5rem 0 1rem; }

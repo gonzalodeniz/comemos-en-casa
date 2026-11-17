@@ -59,7 +59,7 @@ export default function AppWorkspace({ view, onViewChange, disabled, mealPlannin
           <AppIcon name="shopping-cart" /><span>Catálogo de productos</span>
         </button>
         <button type="button" aria-current={view === "backups" ? "page" : undefined} disabled={disabled} onClick={() => { onViewChange("backups"); setMenuOpen(false); }}>
-          <AppIcon name="users" /><span>Copias de seguridad</span>
+          <AppIcon name="database" /><span>Copias de seguridad</span>
         </button>
         <button
           type="button"

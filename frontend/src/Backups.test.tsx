@@ -46,7 +46,7 @@ it("no anuncia éxito al fallar la creación", async () => {
   expect(screen.queryByRole("status")).toBeNull();
 });
 it("confirma la eliminación y actualiza el resumen", async () => {
-  await iniciar(); fireEvent.click(screen.getByText("Eliminar copia"));
+  await iniciar(); fireEvent.click(screen.getByRole("button", { name: `Eliminar copia ${copia.filename}` }));
   expect(llamadas.some((valor) => valor.startsWith("DELETE"))).toBe(false);
   fireEvent.click(screen.getByRole("button", { name: "Confirmar eliminación" }));
   expect(await screen.findByText("Todavía no hay copias de seguridad")).toBeTruthy();

@@ -611,3 +611,10 @@ button.modal-aceptar:hover, button.modal-aceptar:focus-visible { background: #c3
 .compra-receta-titulo .compra-miniatura { width: 50px; height: 50px; flex-basis: 50px; }
 
 .receta-ingrediente { display: flex; align-items: center; gap: .65rem; }
+
+/* El filtro conserva el ancho de fecha y amplía solo el espacio de comidas. */
+.planning-switches { display: flex; flex-wrap: wrap; align-items: center; gap: .65rem; max-width: 100%; }
+.meal-filter { max-width: 100%; }
+.meal-filter button { padding: .45rem .7rem; transition: background-color .2s ease, color .2s ease; }
+.single-meal .week-heading-meals, .single-meal .week-grid .day-meals { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 600px) { .meal-filter button { padding: .4rem .5rem; font-size: .75rem; } }

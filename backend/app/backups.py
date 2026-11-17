@@ -6,18 +6,32 @@ import shutil
 import subprocess
 import tempfile
 import zipfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import FileResponse
+from pydantic import BaseModel, ConfigDict, Field, StrictInt
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.auth import ActiveSession, get_active_session, require_csrf
+from app.database import get_database_session
+from app.database import SessionFactory
+from app.models import BackupSchedule
 from app.meal_planning_api import DATA_ROOT
 
 router = APIRouter(prefix="/api/v1", tags=["backups"])
 BACKUP_ROOT = Path(os.getenv("APP_BACKUP_ROOT", "/app/data/backups"))
 _WRITE_LOCK = asyncio.Lock()
+
+
+class BackupScheduleRequest(BaseModel):
+    """Valida la frecuencia diaria/semanal y el máximo de archivos conservados."""
+    model_config = ConfigDict(extra="forbid")
+    frequency: Literal["daily", "weekly"]
+    maximum: StrictInt = Field(gt=0)
 
 
 @router.get("/backups")
@@ -54,6 +68,62 @@ async def restore_backup(filename: str, request: Request, active_session: Active
         return {"status": "restored"}
     except Exception as error:
         raise HTTPException(status_code=500, detail="La restauración falló; la recuperación debe realizarse manualmente") from error
+
+
+@router.post("/backups/schedule")
+async def save_backup_schedule(request: Request, settings: BackupScheduleRequest, active_session: ActiveSession = Depends(get_active_session), db: Session = Depends(get_database_session)):
+    """Guarda o actualiza la única configuración global de copias automáticas."""
+    require_csrf(request, active_session)
+    schedule = db.scalar(select(BackupSchedule).where(BackupSchedule.id == 1))
+    if schedule is None:
+        schedule = BackupSchedule(id=1, frequency=settings.frequency, maximum=settings.maximum)
+        db.add(schedule)
+    else:
+        schedule.frequency = settings.frequency
+        schedule.maximum = settings.maximum
+    db.commit()
+    return {"frequency": schedule.frequency, "maximum": schedule.maximum, "enabled": True}
+
+
+def create_backup_archive() -> str:
+    """Genera y guarda un ZIP de base de datos e imágenes."""
+    BACKUP_ROOT.mkdir(mode=0o700, parents=True, exist_ok=True)
+    filename = f"backup-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.zip"
+    destination = BACKUP_ROOT / filename
+    with tempfile.TemporaryDirectory(dir=BACKUP_ROOT) as temporary:
+        dump = Path(temporary) / "database.sql"
+        create_database_dump(dump)
+        with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            archive.write(dump, "database.sql")
+            if DATA_ROOT.exists():
+                for file in DATA_ROOT.rglob("*"):
+                    if file.is_file() and not file.is_symlink():
+                        archive.write(file, str(Path("images") / file.relative_to(DATA_ROOT)))
+    return filename
+
+
+async def run_scheduled_backup(now: datetime | None = None, session_factory=SessionFactory) -> bool:
+    """Crea una copia si la frecuencia global configurada ya venció."""
+    current = now or datetime.now(timezone.utc)
+    with session_factory() as db:
+        schedule = db.scalar(select(BackupSchedule).where(BackupSchedule.id == 1))
+        if schedule is None:
+            return False
+        interval = timedelta(days=1 if schedule.frequency == "daily" else 7)
+        previous = schedule.last_run_at
+        if previous is not None:
+            if previous.tzinfo is None:
+                previous = previous.replace(tzinfo=timezone.utc)
+            if current - previous < interval:
+                return False
+        async with _WRITE_LOCK:
+            await asyncio.to_thread(create_backup_archive)
+            files = sorted((path for path in BACKUP_ROOT.glob("backup-*.zip") if path.is_file() and not path.is_symlink()), key=lambda path: path.name)
+            for obsolete in files[:-schedule.maximum]:
+                obsolete.unlink()
+            schedule.last_run_at = current
+            db.commit()
+        return True
 
 
 def create_database_dump(target: Path) -> None:

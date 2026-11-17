@@ -4,6 +4,7 @@ Configura CORS, incorpora las rutas de autenticación y separa la disponibilidad
 """
 
 import asyncio
+import logging
 from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,10 +17,12 @@ from app.meal_planning_api import router as meal_planning_router
 from app.recipes_api import router as recipes_router
 from app.shopping_catalog_api import router as shopping_catalog_router
 from app.shopping_list_api import router as shopping_list_router
-from app.backups import router as backups_router, _WRITE_LOCK
+from app.backups import router as backups_router, _WRITE_LOCK, run_scheduled_backup
 from app.food_images import cleanup_expired_temporary
 from app.meal_planning_api import DATA_ROOT
 from app.settings import allowed_origins
+
+logger = logging.getLogger(__name__)
 
 async def _cleanup_food_image_temporaries() -> None:
     while True:
@@ -27,15 +30,29 @@ async def _cleanup_food_image_temporaries() -> None:
         await asyncio.sleep(300)
 
 
+async def _run_scheduled_backups() -> None:
+    """Comprueba cada minuto si la copia automática está vencida."""
+    while True:
+        try:
+            await run_scheduled_backup()
+        except Exception:
+            logger.exception("scheduled_backup_failed")
+        await asyncio.sleep(60)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     cleanup_task = asyncio.create_task(_cleanup_food_image_temporaries())
+    backup_task = asyncio.create_task(_run_scheduled_backups())
     try:
         yield
     finally:
         cleanup_task.cancel()
+        backup_task.cancel()
         with suppress(asyncio.CancelledError):
             await cleanup_task
+        with suppress(asyncio.CancelledError):
+            await backup_task
 
 
 app = FastAPI(title="Comemos en casa API", lifespan=lifespan)

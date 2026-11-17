@@ -59,4 +59,13 @@ describe("Backups", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirmar restauración" }));
     expect((await screen.findByRole("alert")).textContent).toContain("recuperación debe realizarse manualmente");
   });
+
+  it("configures daily or weekly frequency and maximum stored copies", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(JSON.stringify({ backups: [] }))).mockResolvedValueOnce(new Response(JSON.stringify({ frequency: "weekly", maximum: 4, enabled: true })));
+    render(<Backups csrfToken="csrf" onSessionExpired={vi.fn()} />);
+    fireEvent.change(await screen.findByLabelText("Frecuencia"), { target: { value: "weekly" } });
+    fireEvent.change(screen.getByLabelText("Máximo de copias"), { target: { value: "4" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar automatización" }));
+    expect((await screen.findByRole("status")).textContent).toContain("Configuración guardada");
+  });
 });

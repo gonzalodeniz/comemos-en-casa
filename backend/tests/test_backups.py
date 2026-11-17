@@ -134,3 +134,57 @@ def test_restore_service_applies_database_and_restores_image_files(tmp_path, mon
 
     assert executed == ["-- dump"]
     assert (backups.DATA_ROOT / "comidas/new.webp").read_bytes() == b"new image"
+
+
+def test_backup_schedule_requires_authenticated_user(meal_database):
+    response = api_post("/api/v1/backups/schedule", payload={})
+
+    assert response.status_code == 401
+
+
+def test_user_can_save_daily_or_weekly_schedule_and_maximum(meal_database):
+    cookies = authenticate(meal_database)
+
+    response = api_post("/api/v1/backups/schedule", payload={"frequency": "weekly", "maximum": 5}, cookies=cookies, csrf_token=cookies["csrf_token"])
+
+    assert response.status_code == 200
+    assert response.json() == {"frequency": "weekly", "maximum": 5, "enabled": True}
+
+
+def test_automatic_backup_runs_using_saved_schedule(meal_database, monkeypatch):
+    import asyncio
+    import app.backups as backups
+    from app.models import BackupSchedule
+
+    with meal_database() as db:
+        db.add(BackupSchedule(id=1, frequency="daily", maximum=3))
+        db.commit()
+    created = []
+    monkeypatch.setattr(backups, "create_backup_archive", lambda: created.append(True))
+
+    asyncio.run(backups.run_scheduled_backup(session_factory=meal_database))
+
+    assert created == [True]
+    with meal_database() as db:
+        schedule = db.get(BackupSchedule, 1)
+        assert schedule.last_run_at is not None
+
+
+def test_backup_retention_removes_oldest_when_limit_is_reached(meal_database, tmp_path, monkeypatch):
+    import asyncio
+    from datetime import datetime, timezone
+    import app.backups as backups
+    from app.models import BackupSchedule
+
+    monkeypatch.setattr(backups, "BACKUP_ROOT", tmp_path / "backups")
+    backups.BACKUP_ROOT.mkdir()
+    for filename in ("backup-20261110T020000Z.zip", "backup-20261111T020000Z.zip"):
+        (backups.BACKUP_ROOT / filename).write_bytes(b"old")
+    with meal_database() as db:
+        db.add(BackupSchedule(id=1, frequency="daily", maximum=2))
+        db.commit()
+    monkeypatch.setattr(backups, "create_backup_archive", lambda: (backups.BACKUP_ROOT / "backup-20261112T020000Z.zip").write_bytes(b"new"))
+
+    asyncio.run(backups.run_scheduled_backup(now=datetime(2026, 11, 12, 2, tzinfo=timezone.utc), session_factory=meal_database))
+
+    assert sorted(path.name for path in backups.BACKUP_ROOT.glob("backup-*.zip")) == ["backup-20261111T020000Z.zip", "backup-20261112T020000Z.zip"]

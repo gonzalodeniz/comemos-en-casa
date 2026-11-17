@@ -3,7 +3,7 @@ import { useState, type ReactNode } from "react";
 import AppBrand from "./AppBrand";
 import AppIcon from "./AppIcon";
 
-export type AppView = "meal-planning" | "food-catalog" | "recipes" | "shopping-list" | "product-catalog" | "users";
+export type AppView = "meal-planning" | "food-catalog" | "recipes" | "shopping-list" | "product-catalog" | "backups" | "users";
 
 type Props = {
   view: AppView;
@@ -15,11 +15,12 @@ type Props = {
   recipes?: ReactNode;
   shoppingList?: ReactNode;
   productCatalog?: ReactNode;
+  backups?: ReactNode;
   sessionTools?: ReactNode;
   notifications?: ReactNode;
 };
 
-export default function AppWorkspace({ view, onViewChange, disabled, mealPlanning, userManagement, foodCatalog, recipes, shoppingList, productCatalog, sessionTools, notifications }: Props) {
+export default function AppWorkspace({ view, onViewChange, disabled, mealPlanning, userManagement, foodCatalog, recipes, shoppingList, productCatalog, backups, sessionTools, notifications }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div className="app-workspace">
@@ -57,6 +58,9 @@ export default function AppWorkspace({ view, onViewChange, disabled, mealPlannin
         <button type="button" aria-current={view === "product-catalog" ? "page" : undefined} disabled={disabled} onClick={() => { onViewChange("product-catalog"); setMenuOpen(false); }}>
           <AppIcon name="shopping-cart" /><span>Catálogo de productos</span>
         </button>
+        <button type="button" aria-current={view === "backups" ? "page" : undefined} disabled={disabled} onClick={() => { onViewChange("backups"); setMenuOpen(false); }}>
+          <AppIcon name="database" /><span>Copias de seguridad</span>
+        </button>
         <button
           type="button"
           aria-current={view === "users" ? "page" : undefined}
@@ -71,7 +75,7 @@ export default function AppWorkspace({ view, onViewChange, disabled, mealPlannin
       </aside>
       <div className="workspace-content" id="workspace-content" tabIndex={-1}>
         {notifications}
-        {view === "meal-planning" ? mealPlanning : view === "food-catalog" ? foodCatalog : view === "recipes" ? recipes : view === "shopping-list" ? shoppingList : view === "product-catalog" ? productCatalog : userManagement}
+        {view === "meal-planning" ? mealPlanning : view === "food-catalog" ? foodCatalog : view === "recipes" ? recipes : view === "shopping-list" ? shoppingList : view === "product-catalog" ? productCatalog : view === "backups" ? backups : userManagement}
       </div>
     </div>
   );

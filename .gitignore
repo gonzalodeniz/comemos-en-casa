@@ -10,6 +10,7 @@ frontend/dist/
 frontend/ui-lib/dist/
 data/.tmp
 data/.publication.lock
+data/backups/
 data/comidas/
 data/**/*.webp
 data/**/*.png

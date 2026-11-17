@@ -612,3 +612,48 @@ button.modal-aceptar:hover, button.modal-aceptar:focus-visible { background: #c3
 .meal-filter button { padding: .45rem .7rem; transition: background-color .2s ease, color .2s ease; }
 .single-meal .week-heading-meals, .single-meal .week-grid .day-meals { grid-template-columns: minmax(0, 1fr); }
 @media (max-width: 600px) { .meal-filter button { padding: .4rem .5rem; font-size: .75rem; } }
+
+/* Organiza las copias con los colores y superficies compartidos. */
+.copias-pagina { display: block; }
+.copias-pagina header p { margin-top: .4rem; }
+.copias-resumen { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin: 1.5rem 0; }
+.copias-resumen article { display: flex; align-items: center; gap: .8rem; padding: 1rem; border: 1px solid var(--color-border); border-radius: .8rem; }
+.copias-resumen .app-icon { flex-shrink: 0; width: 2rem; height: 2rem; color: var(--color-primary); }
+.copias-resumen span { display: block; color: var(--color-text-muted); font-size: .85rem; }
+.copias-resumen strong { display: block; margin-top: .25rem; font-size: .95rem; }
+.copias-acciones, .copias-controles { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.copias-acciones button, .copias-controles button { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; }
+.copias-pagina h3 { margin-top: 1.5rem; }
+.copias-tabla { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.copias-tabla th { background: var(--color-secondary-bg); text-align: left; color: var(--color-secondary-text); }
+.copias-tabla th, .copias-tabla td { padding: .7rem; border-bottom: 1px solid var(--color-border-subtle); }
+.copias-archivo { overflow-wrap: anywhere; }
+.copias-controles { flex-wrap: nowrap; gap: .4rem; }
+.copias-descargar, .copias-eliminar { display: inline-flex; min-width: 44px; min-height: 44px; align-items: center; justify-content: center; border: 1px solid var(--color-border); border-radius: .7rem; color: var(--color-secondary-text); cursor: pointer; }
+.copias-eliminar { color: #a12828; background: white; border-color: var(--color-border); }
+.copias-eliminar:hover:not(:disabled) { color: white; background: #a12828; border-color: #a12828; }
+.copias-vacio { padding: 1rem; border: 1px dashed var(--color-border); border-radius: .8rem; }
+.copias-vacio button { margin-top: 1rem; }
+.copias-dialogo { width: min(36rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); overflow-y: auto; padding: 1.5rem; border: 1px solid var(--color-border); border-radius: 1rem; color: var(--color-text); box-shadow: var(--shadow-panel); }
+.copias-dialogo::backdrop { background: #10364266; }
+.copias-campos { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.copias-detalle { display: grid; grid-template-columns: auto 1fr; gap: .6rem; padding: 1rem; background: var(--color-secondary-bg); border-radius: .8rem; font-size: .9rem; }
+.copias-detalle dt { font-weight: 650; }
+.copias-detalle dd { margin: 0; overflow-wrap: anywhere; }
+.copias-advertencia { padding: .8rem; background: #fff5df; color: #854500; border: 1px solid #efcf93; border-radius: .7rem; }
+.copias-dialogo-pie { justify-content: flex-end; margin-top: 1.5rem; }
+.copias-pagina :focus-visible, .copias-dialogo :focus-visible { outline: 3px solid var(--color-primary); outline-offset: 3px; }
+@media (max-width: 760px) {
+  .copias-resumen, .copias-campos { grid-template-columns: 1fr; }
+  .copias-tabla thead { display: none; }
+  .copias-tabla, .copias-tabla tbody, .copias-tabla tr, .copias-tabla td { display: block; }
+  .copias-tabla tr { margin-bottom: 1rem; border: 1px solid var(--color-border); border-radius: .8rem; }
+  .copias-tabla td { border: 0; }
+  .copias-tabla td[data-label]::before { content: attr(data-label) ": "; color: var(--color-text-muted); }
+  .copias-acciones > button { width: 100%; }
+  .copias-controles { justify-content: flex-end; }
+}
+/* Permite seleccionar una copia manteniendo visible el foco del control. */
+.copias-subir { display: inline-flex; align-items: center; min-height: 44px; padding: .65rem 1rem; border: 1px solid var(--color-border); border-radius: .7rem; background: var(--color-secondary-bg); color: var(--color-secondary-text); font-weight: 650; cursor: pointer; position: relative; overflow: hidden; }
+.copias-subir input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.copias-subir:focus-within { outline: 3px solid var(--color-primary); outline-offset: 3px; }

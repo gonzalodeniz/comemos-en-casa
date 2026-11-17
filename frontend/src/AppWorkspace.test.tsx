@@ -44,10 +44,24 @@ describe("AppWorkspace", () => {
     expect(markup).not.toContain("Food catalog content");
   });
 
+  it("shows the backup view in the sidebar and renders its selected content", () => {
+    const markup = renderToStaticMarkup(<AppWorkspace {...{
+      view: "backups",
+      onViewChange: vi.fn(),
+      disabled: false,
+      mealPlanning: <section>Weekly calendar content</section>,
+      userManagement: <section>User management content</section>,
+      backups: <section>Backup management content</section>,
+    }} />);
+
+    expect(markup).toMatch(/aria-current="page"[\s\S]*?<span>Copias de seguridad<\/span>/);
+    expect(markup).toContain("Backup management content");
+  });
+
   it("disables navigation while an account operation is pending", () => {
     const markup = renderToStaticMarkup(workspace("users", true));
 
-    expect(markup.match(/disabled=""/g)).toHaveLength(6);
+    expect(markup.match(/disabled=""/g)).toHaveLength(7);
   });
 
   it("provides branded navigation, a working skip-link target and only supported views", () => {
@@ -56,7 +70,7 @@ describe("AppWorkspace", () => {
     expect(markup).toContain("Comemos en casa");
     expect(markup).toContain('href="#workspace-content"');
     expect(markup).toContain('id="workspace-content" tabindex="-1"');
-    expect(markup.match(/<button/g)).toHaveLength(7);
+    expect(markup.match(/<button/g)).toHaveLength(8);
     expect(markup).toContain('aria-expanded="false"');
     expect(markup).toContain("Recetas");
     expect(markup).toContain("Lista de la compra");

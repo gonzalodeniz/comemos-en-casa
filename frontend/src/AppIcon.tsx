@@ -1,7 +1,10 @@
 // Presenta los iconos utilizados por las vistas de la aplicación.
-type IconName = "calendar" | "repeat" | "users" | "chevron-left" | "chevron-right" | "chevron-up" | "chevron-down" | "plus" | "logout" | "utensils" | "menu" | "edit" | "trash" | "eye" | "shopping-cart" | "check" | "undo" | "clear-list" | "store" | "arrow-left" | "close";
+type IconName = "database" | "download" | "settings" | "calendar" | "repeat" | "users" | "chevron-left" | "chevron-right" | "chevron-up" | "chevron-down" | "plus" | "logout" | "utensils" | "menu" | "edit" | "trash" | "eye" | "shopping-cart" | "check" | "undo" | "clear-list" | "store" | "arrow-left" | "close";
 
 const paths: Record<IconName, string> = {
+  database: "M4 6c0-4 16-4 16 0s-16 4-16 0Zm0 0v12c0 4 16 4 16 0V6M4 12c0 4 16 4 16 0",
+  download: "M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5",
+  settings: "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM9 3h6l1 3 3 1 2 5-2 5-3 1-1 3H9l-1-3-3-1-2-5 2-5 3-1 1-3Z",
   check: "M5 12l4 4L19 6",
   undo: "M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-2",
   "shopping-cart": "M3 3h2l2 11h10l3-8H6M9 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm8 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z",

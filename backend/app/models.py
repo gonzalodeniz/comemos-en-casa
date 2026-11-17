@@ -9,8 +9,8 @@ from uuid import UUID, uuid4
 import unicodedata
 
 from sqlalchemy import (
-    CheckConstraint,
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
@@ -267,3 +267,18 @@ class MealAssignment(Base):
     label_id: Mapped[UUID] = mapped_column(
         ForeignKey("food_labels.id", ondelete="RESTRICT"), nullable=False
     )
+
+
+class BackupSchedule(Base):
+    """Persiste la configuración global de copias automáticas del servidor."""
+    __tablename__ = "backup_schedule"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_backup_schedule_singleton"),
+        CheckConstraint("frequency IN ('daily', 'weekly')", name="ck_backup_schedule_frequency"),
+        CheckConstraint("maximum >= 1", name="ck_backup_schedule_maximum"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    frequency: Mapped[str] = mapped_column(String(16), nullable=False)
+    maximum: Mapped[int] = mapped_column(Integer, nullable=False)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

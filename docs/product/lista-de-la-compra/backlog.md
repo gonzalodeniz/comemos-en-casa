@@ -12,7 +12,7 @@ Estados: `Pendiente`, `En curso`, `Hecha`.
 
 Las historias pendientes están ordenadas de mayor a menor prioridad para disponer cuanto antes de una lista básica y funcional. Los números identifican las historias y no indican su prioridad.
 
-- **#9 · Pendiente** — Como usuario, quiero añadir imágenes a productos y categorías, para identificarlos visualmente. [Historia y criterios aprobados](../../historias-usuarios/HIT-001-lista-compra/HU-009-imagenes-productos-categorias.md).
+No hay historias pendientes registradas.
 
 ## Completadas
 
@@ -23,4 +23,5 @@ Las historias pendientes están ordenadas de mayor a menor prioridad para dispon
 - **#5 · Hecha** — Como usuario, quiero añadir los ingredientes de una receta a una sección independiente de la lista de compra, conservando el nombre, el texto y el orden originales, para gestionar su compra sin alterar los productos manuales. [Historia y criterios verificados](../../historias-usuarios/HIT-001-lista-compra/HU-005-recetas-lista-compra.md).
 - **#7 · Hecha** — Como usuario, quiero crear categorías desde la interfaz, para organizar el catálogo de categorías y productos.
 - **#8 · Hecha** — Como usuario, quiero crear productos dentro de una categoría desde la interfaz, para que todos podamos añadirlos a la compra.
+- **#9 · Hecha** — Como usuario, quiero añadir imágenes a productos y categorías, para identificarlos visualmente. [Historia implementada y verificada](../../historias-usuarios/HIT-001-lista-compra/HU-009-imagenes-productos-categorias.md).
 

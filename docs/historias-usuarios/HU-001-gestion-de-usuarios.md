@@ -2,7 +2,8 @@
 
 **Épica:** Administración y acceso a la aplicación  
 **Prioridad:** Alta  
-**Estado:** Especificación aprobada; implementación pendiente  
+**Estado:** Finalizada, según confirmación del usuario. La evidencia histórica de tareas se conserva en [TASKS](../../odd/tasks/hu-001-gestion-de-usuarios.md).
+
 **Módulo:** Usuarios
 
 ## 1. Descripción

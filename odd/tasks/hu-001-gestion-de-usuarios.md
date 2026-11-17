@@ -2,7 +2,9 @@
 
 **Objetivo:** ejecutar, cuando se autorice, el [plan aprobado de HU-001](../../docs/planes/hu-001-gestion-de-usuarios.md) sobre la base existente, preservando la [especificación funcional](../../docs/historias-usuarios/HU-001-gestion-de-usuarios.md).
 
-**Estado:** plan y tareas aprobados. T1, T2, T3 y T5 completadas; T4, T6, T7 y T8 pendientes. La implementación autorizada sigue sin incluir commit, publicación ni PR.
+**Estado de la historia:** finalizada, según confirmación del usuario. Los marcadores y la evidencia siguientes son históricos y no acreditan pruebas adicionales.
+
+**Estado histórico de las tareas:** plan y tareas aprobados; T1, T2, T3 y T5 completadas; T4, T6, T7 y T8 pendientes en el último registro. La implementación autorizada no incluía commit, publicación ni PR.
 
 ## Especificaciones y límites
 
@@ -55,7 +57,7 @@ Los escenarios 1–13 se ejecutarán y registrarán individualmente en T8, junto
 L1. El usuario aprobó el plan y pidió este fichero: «aprueba el plan y genera el fichero TASKS».
 L2. El usuario aprobó el plan y las tareas y autorizó el commit de la documentación: «aprueba el plan y tarea y haz commit».
 L3. El usuario autorizó iniciar la implementación y confirmó los contratos de T1, con longitud de contraseña de 8–128 caracteres.
-L4. T1, T2, T3 y T5 completadas; T4, T6, T7 y T8 pendientes. No se afirma HU-001 completa.
+L4. En el registro histórico, T1, T2, T3 y T5 constaban completadas y T4, T6, T7 y T8 pendientes; posteriormente el usuario confirmó la historia como finalizada.
 L5. En PostgreSQL nuevo y aislado, `docker compose -p cec-hu001-check-1792799847-2819093 exec -T backend python -m alembic upgrade head` aplicó `0001_baseline` y `0002_user_auth`; `docker compose -p cec-hu001-check-1792799847-2819093 exec -T -e RUN_DB_INTEGRATION=1 backend python -m pytest -q -rs tests/test_database_integration.py` pasó 2 pruebas, incluida unicidad concurrente. La suite backend completa pasó 9 pruebas: `docker compose -p cec-hu001-full-1792799951-2820687 exec -T -e RUN_DB_INTEGRATION=1 backend python -m pytest -q -rs`; omitió dos pruebas de configuración que requieren el CLI Compose dentro del contenedor y emitió un aviso deprecado de `TestClient`/`httpx`.
 L6. El intento local `cd backend && ../.venv/bin/python -m pytest -q -p no:cacheprovider tests` emitió `..ss` y se interrumpió manualmente tras aproximadamente 90 s. La suite aislada de Compose se ejecutó después e incluyó las pruebas de PostgreSQL.
 L7. La suite completa en PostgreSQL aislado, `docker compose -p cec-hu001-auth-1792801663-2835565 exec -T -e RUN_DB_INTEGRATION=1 backend python -m pytest -q -rs`, pasó: 18 passed, 2 skipped (CLI Compose no disponible dentro del contenedor) y un aviso deprecado de `TestClient`/`httpx`. Incluyó registro inicial concurrente (201/409), incremento concurrente de bucket de acceso con ocho sesiones y pruebas de autenticación/CSRF/sesiones/límites.

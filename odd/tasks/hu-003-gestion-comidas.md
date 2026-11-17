@@ -2,7 +2,9 @@
 
 **Objetivo:** desglosar el [plan aprobado de HU-003](../../docs/planes/hu-003-gestion-comidas.md), preservando la [historia de usuario](../../docs/historias-usuarios/HU-003-gestion-comidas.md) y la planificación existente.
 
-**Estado (2026-10-29):** plan y TASKS aprobados expresamente por el usuario; implementación iniciada por petición explícita. Sin autorización para ejecución remota, commit ni publicación.
+**Estado de la historia:** finalizada, según confirmación del usuario. Los marcadores y la evidencia siguientes son históricos y no acreditan pruebas adicionales.
+
+**Estado histórico (2026-10-29):** plan y TASKS aprobados expresamente por el usuario; implementación iniciada por petición explícita. Sin autorización para ejecución remota, commit ni publicación.
 
 ## Especificaciones y límites
 

@@ -1,5 +1,7 @@
 # HU-003 — Gestión de comidas
 
+**Estado:** Finalizada, según confirmación del usuario. La evidencia histórica de tareas se conserva en [TASKS](../../odd/tasks/hu-003-gestion-comidas.md).
+
 ## Historia de usuario
 
 **Como** usuario autenticado,  

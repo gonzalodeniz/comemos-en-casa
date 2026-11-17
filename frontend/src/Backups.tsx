@@ -87,6 +87,18 @@ export default function Backups({ csrfToken, onSessionExpired }: Props) {
       setError(accion === "restaurar" ? "La restauración no se ha completado. Puede ser necesaria una recuperación manual; no continúes modificando datos hasta comprobar su estado." : accion === "crear" ? "No se pudo crear la copia de seguridad." : accion === "eliminar" ? "No se pudo eliminar la copia de seguridad." : "No se pudo guardar la automatización.");
     } finally { bloqueo.current = false; setOcupacion(""); }
   }
+  // Sube el archivo seleccionado sin iniciar una restauración.
+  async function subir(archivo: File) {
+    if (bloqueo.current) return;
+    bloqueo.current = true; setOcupacion("subir"); setError(""); setMensaje("");
+    try {
+      await apiRequest(`/backups/upload?filename=${encodeURIComponent(archivo.name)}`, { method: "POST", csrfToken, body: archivo });
+      setMensaje(`Copia subida: ${archivo.name}`); await cargarCopias();
+    } catch (causa) {
+      comprobarSesion(causa);
+      setError(causa instanceof ApiError && causa.status === 413 ? "La copia supera el tamaño permitido por el servidor." : causa instanceof ApiError && [400, 409].includes(causa.status) && causa.message !== "Request failed" ? causa.message : "No se pudo subir la copia de seguridad. Comprueba el archivo y vuelve a intentarlo.");
+    } finally { bloqueo.current = false; setOcupacion(""); }
+  }
   const ocupado = !!ocupacion;
   const valido = /^\d+$/.test(maximo) && Number.isSafeInteger(Number(maximo)) && Number(maximo) >= 1 && Number(maximo) <= 2147483647;
   const cambios = !configuracion?.enabled || frecuencia !== configuracion.frequency || Number(maximo) !== configuracion.maximum;
@@ -97,7 +109,7 @@ export default function Backups({ csrfToken, onSessionExpired }: Props) {
       <article><AppIcon name="repeat" /><div><span>Automatización</span><strong>{errorConfiguracion ? "No disponible" : !configuracion ? "Cargando…" : configuracion.enabled ? `${configuracion.frequency === "daily" ? "Diaria" : "Semanal"} · Máx. ${configuracion.maximum} copias` : "Desactivada"}</strong></div></article>
       <article><AppIcon name="database" /><div><span>Almacenamiento</span><strong>{cargando ? "Cargando…" : errorLista ? "No disponible" : `${tamano(copias.reduce((total, copia) => total + copia.size, 0))} (${copias.length} copias)`}</strong></div></article>
     </div>
-    <h3>Acciones rápidas</h3><div className="copias-acciones"><Button disabled={ocupado} onClick={() => void ejecutar("crear")}><AppIcon name="plus" />{ocupacion === "crear" ? "Creando copia…" : "Crear copia ahora"}</Button><Button variant="secondary" disabled={ocupado || !configuracion} onClick={() => abrir("automatizacion")}><AppIcon name="settings" />Configurar automatización</Button></div>
+    <h3>Acciones rápidas</h3><div className="copias-acciones"><Button disabled={ocupado} onClick={() => void ejecutar("crear")}><AppIcon name="plus" />{ocupacion === "crear" ? "Creando copia…" : "Crear copia ahora"}</Button><label className="copias-subir">{ocupacion === "subir" ? "Subiendo copia…" : "Subir copia"}<input type="file" accept=".zip,application/zip" disabled={ocupado} onChange={(evento) => { const archivo = evento.currentTarget.files?.[0]; evento.currentTarget.value = ""; if (archivo) void subir(archivo); }} /></label><Button variant="secondary" disabled={ocupado || !configuracion} onClick={() => abrir("automatizacion")}><AppIcon name="settings" />Configurar automatización</Button></div>
     {errorConfiguracion && <Message tone="error">{errorConfiguracion} <button className="link-button" onClick={() => void cargarConfiguracion()}>Reintentar</button></Message>}
     {mensaje && <ToastMessage key={mensaje} kind="success" onClose={() => setMensaje("")}>{mensaje}</ToastMessage>}
     {error && !dialogo && <Message tone="error">{error}</Message>}

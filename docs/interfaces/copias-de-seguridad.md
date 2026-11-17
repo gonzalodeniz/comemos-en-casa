@@ -16,3 +16,7 @@ Las imágenes de recetas, comidas y productos se incluyen siempre. Solo se permi
 La eliminación y restauración requieren confirmación explícita. Las operaciones de la vista se serializan para evitar envíos duplicados. Un fallo de consulta nunca se presenta como una lista vacía ni almacenamiento cero.
 
 La restauración conserva sus mecanismos existentes: la base de datos y las imágenes no cuentan con una reversión conjunta. Un error permanece visible y advierte de la posible necesidad de recuperación manual. No se realizan restauraciones ni eliminaciones de datos reales como validación de la interfaz.
+
+## Subir una copia
+
+Se puede seleccionar desde el navegador un ZIP descargado anteriormente, conservando su nombre original `backup-YYYYMMDDTHHMMSSZ.zip`. La subida requiere sesión y CSRF, admite hasta 1 GiB, comprueba que sea un ZIP legible con `database.sql` y rechaza nombres duplicados sin sobrescribir. La subida no restaura datos: la restauración sigue siendo una acción separada y requiere confirmación. La validación completa del contenido se realiza durante la restauración. El proxy Nginx del proyecto permite hasta 1 GiB exclusivamente para esta ruta; otros proxies intermedios pueden imponer un límite inferior. Tras cambiar la configuración es necesario recargar o recrear el proxy.

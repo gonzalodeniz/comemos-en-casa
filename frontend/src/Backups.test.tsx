@@ -85,3 +85,20 @@ it("bloquea creaciones duplicadas mientras el servidor responde", async () => {
   confirmar(new Response(JSON.stringify({ filename: copia.filename })));
   expect((await screen.findByRole("status")).textContent).toContain("Copia creada");
 });
+
+it("sube una copia seleccionada sin restaurarla y actualiza la lista", async () => {
+  await iniciar();
+  const archivo = new File(["contenido"], "backup-20261116T100000Z.zip", { type: "application/zip" });
+  fireEvent.change(screen.getByLabelText("Subir copia"), { target: { files: [archivo] } });
+  expect((await screen.findByRole("status")).textContent).toContain("Copia subida");
+  expect(llamadas.some((valor) => valor.includes("/backups/upload?filename="))).toBe(true);
+  expect(llamadas.some((valor) => valor.includes("/restore"))).toBe(false);
+});
+
+it("explica el rechazo del proxy cuando el archivo es demasiado grande", async () => {
+  await iniciar();
+  vi.mocked(fetch).mockResolvedValueOnce(new Response("Payload Too Large", { status: 413 }));
+  const archivo = new File(["contenido"], "backup-20261116T100000Z.zip", { type: "application/zip" });
+  fireEvent.change(screen.getByLabelText("Subir copia"), { target: { files: [archivo] } });
+  expect((await screen.findByRole("alert")).textContent).toContain("tamaño permitido");
+});

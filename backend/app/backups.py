@@ -92,6 +92,39 @@ async def restore_backup(filename: str, request: Request, active_session: Active
         raise HTTPException(status_code=500, detail="La restauración falló; la recuperación debe realizarse manualmente") from error
 
 
+@router.post("/backups/upload", status_code=status.HTTP_201_CREATED)
+async def subir_copia(request: Request, filename: str, active_session: ActiveSession = Depends(get_active_session)):
+    """Recibe una copia limitada y no sobrescribe archivos existentes."""
+    require_csrf(request, active_session)
+    if not re.fullmatch(r"backup-\d{8}T\d{6}Z\.zip", filename):
+        raise HTTPException(status_code=400, detail="El nombre debe conservar el formato original de la copia.")
+    BACKUP_ROOT.mkdir(mode=0o700, parents=True, exist_ok=True)
+    temporal = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=BACKUP_ROOT, delete=False) as archivo:
+            temporal = Path(archivo.name)
+            total = 0
+            async for bloque in request.stream():
+                total += len(bloque)
+                if total > 1024 * 1024 * 1024:
+                    raise HTTPException(status_code=413, detail="La copia supera el límite de 1 GB.")
+                archivo.write(bloque)
+        try:
+            with zipfile.ZipFile(temporal) as zip_copia:
+                if "database.sql" not in zip_copia.namelist() or zip_copia.testzip() is not None:
+                    raise ValueError("Copia inválida")
+        except (zipfile.BadZipFile, ValueError, RuntimeError):
+            raise HTTPException(status_code=400, detail="El archivo no es una copia ZIP válida.")
+        try:
+            os.link(temporal, BACKUP_ROOT / filename)
+        except FileExistsError:
+            raise HTTPException(status_code=409, detail="Ya existe una copia con ese nombre.")
+        return {"filename": filename}
+    finally:
+        if temporal is not None:
+            temporal.unlink(missing_ok=True)
+
+
 @router.post("/backups/schedule")
 async def save_backup_schedule(request: Request, settings: BackupScheduleRequest, active_session: ActiveSession = Depends(get_active_session), db: Session = Depends(get_database_session)):
     """Guarda o actualiza la única configuración global de copias automáticas."""

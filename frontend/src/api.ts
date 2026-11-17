@@ -24,14 +24,14 @@ export class ApiError extends Error {
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   // Todas las llamadas comparten cookies de sesión y traducen errores del servidor a ApiError.
   const headers = new Headers();
-  if (options.body !== undefined) headers.set("Content-Type", "application/json");
+  if (options.body !== undefined && !(options.body instanceof Blob)) headers.set("Content-Type", "application/json");
   if (options.csrfToken) headers.set("X-CSRF-Token", options.csrfToken);
 
   const response = await fetch(`${API_BASE_URL}/api/v1${path}`, {
     method: options.method ?? "GET",
     credentials: "include",
     headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    body: options.body === undefined ? undefined : options.body instanceof Blob ? options.body : JSON.stringify(options.body),
   });
 
   if (response.status === 204) return null as T;

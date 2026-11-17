@@ -268,3 +268,31 @@ def test_consultar_automatizacion_ausente_y_guardada(meal_database):
     assert response.json() == {"enabled": False, "frequency": None, "maximum": None}
     api_post("/api/v1/backups/schedule", payload={"frequency": "weekly", "maximum": 5}, cookies=cookies, csrf_token=cookies["csrf_token"])
     assert api_get("/api/v1/backups/schedule", cookies=cookies).json() == {"enabled": True, "frequency": "weekly", "maximum": 5}
+
+
+def test_subir_copia_valida_y_rechaza_duplicados(meal_database, tmp_path, monkeypatch):
+    """Admite ZIP sin restaurar y nunca reemplaza una copia existente."""
+    import asyncio
+    import io
+    import zipfile
+    from httpx import ASGITransport, AsyncClient
+    import app.backups as backups
+    from app.main import app
+
+    monkeypatch.setattr(backups, "BACKUP_ROOT", tmp_path)
+    cookies = authenticate(meal_database)
+    contenido = io.BytesIO()
+    with zipfile.ZipFile(contenido, "w") as archivo:
+        archivo.writestr("database.sql", "SELECT 1;")
+
+    async def enviar(datos, nombre="backup-20261117T100000Z.zip", sesion=True):
+        """Envía bytes directamente sin acceder a datos reales."""
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://testserver", cookies=cookies if sesion else None) as cliente:
+            return await cliente.post("/api/v1/backups/upload", params={"filename": nombre}, content=datos, headers={"Origin": "http://localhost:5173", "X-CSRF-Token": cookies["csrf_token"]})
+
+    assert asyncio.run(enviar(contenido.getvalue(), sesion=False)).status_code == 401
+    assert asyncio.run(enviar(b"invalido")).status_code == 400
+    assert asyncio.run(enviar(contenido.getvalue(), "../backup.zip")).status_code == 400
+    assert asyncio.run(enviar(contenido.getvalue())).status_code == 201
+    assert asyncio.run(enviar(contenido.getvalue())).status_code == 409
+    assert (tmp_path / "backup-20261117T100000Z.zip").read_bytes() == contenido.getvalue()

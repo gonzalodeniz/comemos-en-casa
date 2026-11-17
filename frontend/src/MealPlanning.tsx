@@ -353,9 +353,6 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
       action: "delete", labelId: current.label.id, intervalWeeks: "0",
       endDate: annualMaximumEndDate(date),
     };
-    const operation: MealPlanningOperation = {
-      action: "delete", start_date: date, slot, label_id: current.label.id, repeat: null,
-    };
     const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     openerRef.current = active;
     setSearch("");
@@ -367,12 +364,6 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
     setForceReconfirmation(false);
     setError("");
     setNotice("");
-    const snapshot = snapshotOperation(operation);
-    void runExclusive(async () => {
-      const result = await previewMealPlanning(snapshot, csrfToken);
-      previewOperationRef.current = snapshot;
-      setPreview(result);
-    });
   }
 
   function closeEditor() {
@@ -583,7 +574,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
             onKeyDown={handleDrawerKeyDown} role="dialog" aria-modal="true" aria-labelledby="meal-editor-title" aria-describedby="meal-editor-subtitle">
             <div className="meal-editor-heading">
               <div>
-                <h3 id="meal-editor-title">Asignar comida</h3>
+                <h3 id="meal-editor-title">{draft.action === "delete" ? "Borrar comida" : "Asignar comida"}</h3>
                 <p id="meal-editor-subtitle">{formatDateLabel(editorDate, { dateStyle: "full" })} · {SLOT_LABELS[editorSlot]}</p>
               </div>
               <button type="button" className="drawer-close secondary" onClick={requestClose} disabled={busy} aria-label="Cerrar editor">×</button>
@@ -607,13 +598,14 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
                 </div>
               ) : <fieldset className="drawer-edit-fields" disabled={busy}>
                 <div className="repeat-panel">
-                  <label className="repeat-toggle"><AppIcon name="repeat" /><strong>Repetir</strong><input type="checkbox" role="switch" checked={Number(draft.intervalWeeks) > 0} onChange={(event) => { setDraft({ ...draft, intervalWeeks: event.target.checked ? "1" : "0" }); setPreview(null); }} /></label>
+                  <label className="repeat-toggle"><AppIcon name="repeat" /><strong>Repetir</strong><input type="checkbox" role="switch" checked={draft.intervalWeeks !== "0"} onChange={(event) => { setDraft({ ...draft, intervalWeeks: event.target.checked ? "1" : "0" }); setPreview(null); }} /></label>
                   <div className="repeat-fields">
-                    <label>Cada<input type="number" min={1} step={1} aria-label="Intervalo en semanas" value={Number(draft.intervalWeeks) > 0 ? draft.intervalWeeks : ""} disabled={Number(draft.intervalWeeks) <= 0} onChange={(event) => { setDraft({ ...draft, intervalWeeks: Number(event.target.value) > 0 ? event.target.value : "1" }); setPreview(null); }} required={Number(draft.intervalWeeks) > 0} /><span>semanas</span></label>
-                    <label>Hasta<input type="date" aria-label="Fecha final" min={editorDate} max={annualMaximumEndDate(editorDate)} value={draft.endDate} disabled={Number(draft.intervalWeeks) <= 0} onChange={(event) => { setDraft({ ...draft, endDate: event.target.value }); setPreview(null); }} required={Number(draft.intervalWeeks) > 0} /></label>
+                    <label>Cada<input type="number" min={1} step={1} aria-label="Intervalo en semanas" value={draft.intervalWeeks !== "0" ? draft.intervalWeeks : ""} disabled={draft.intervalWeeks === "0"} onChange={(event) => { setDraft({ ...draft, intervalWeeks: event.target.value }); setPreview(null); }} required={draft.intervalWeeks !== "0"} /><span>semanas</span></label>
+                    <label>Hasta<input type="date" aria-label="Fecha final" min={editorDate} max={annualMaximumEndDate(editorDate)} value={draft.endDate} disabled={draft.intervalWeeks === "0"} onChange={(event) => { setDraft({ ...draft, endDate: event.target.value }); setPreview(null); }} required={draft.intervalWeeks !== "0"} /></label>
                   </div>
-                  <p className="repeat-summary">{Number(draft.intervalWeeks) > 0 ? `Se repetirá cada ${draft.intervalWeeks} semana${Number(draft.intervalWeeks) === 1 ? "" : "s"}${draft.endDate ? ` hasta el ${formatDateLabel(draft.endDate, { dateStyle: "long" })}` : ""}.` : "No se repetirá esta comida."}</p>
+                  <p className="repeat-summary">{draft.intervalWeeks !== "0" ? `${draft.action === "delete" ? "Se borrará" : "Se repetirá"} cada ${draft.intervalWeeks} semana${Number(draft.intervalWeeks) === 1 ? "" : "s"}${draft.endDate ? ` hasta el ${formatDateLabel(draft.endDate, { dateStyle: "long" })}` : ""}.` : draft.action === "delete" ? "Solo se borrará esta comida." : "No se repetirá esta comida."}</p>
                 </div>
+                {draft.action === "assign" && <>
                 <label className="dish-search">
                   <span className="visually-hidden">Buscar plato</span>
                   <span><input type="search" placeholder="Buscar plato..." value={search} onChange={(event) => setSearch(event.target.value)} /></span>
@@ -631,9 +623,14 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
                     ))}
                   </div>}
                 </fieldset>
+                </>}
               </fieldset>}
+              {!preview && draft.action === "delete" && <div className="drawer-actions">
+                <button type="button" className="secondary" onClick={requestClose} disabled={busy}>Cancelar</button>
+                <button type="submit" disabled={busy}>{busy ? "Borrando…" : "Borrar"}</button>
+              </div>}
             </div>
-            <div className="drawer-actions">
+            {(preview || draft.action === "assign") && <div className="drawer-actions">
               {preview ? <>
                 <button type="button" className="secondary" disabled={busy} onClick={() => setPreview(null)}>Volver a editar</button>
                 <button type="button" disabled={busy} onClick={saveOperation}>{busy ? "Guardando…" : "Confirmar y guardar"}</button>
@@ -641,7 +638,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
                 <button type="button" className="secondary" onClick={requestClose} disabled={busy}>Cancelar</button>
                 <button type="submit" disabled={busy || labels.length === 0}>{busy ? "Guardando…" : "Guardar"}</button>
               </>}
-            </div>
+            </div>}
           </form>
         </div>
       )}

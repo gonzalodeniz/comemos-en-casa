@@ -188,7 +188,7 @@ def build_preview(
             else:
                 change = "replace"
                 requires_confirmation = True
-        elif current is not None and current.label_id == operation.label_id:
+        elif current is not None and (operation.repeat is not None or current.label_id == operation.label_id):
             change = "delete"
             requires_confirmation = True
         else:
@@ -541,7 +541,7 @@ async def apply_meal_planning_operation(
                     elif current.label_id != label_id:
                         current.label_id = label_id
                         changed_dates.append(occurrence.isoformat())
-                elif current is not None and current.label_id == label_id:
+                elif current is not None and (operation.repeat is not None or current.label_id == label_id):
                     db.delete(current)
                     changed_dates.append(occurrence.isoformat())
             db.commit()

@@ -1,6 +1,7 @@
 """Crea copias conjuntas de la base de datos y los archivos de usuario."""
 import asyncio
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -9,6 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import FileResponse
 
 from app.auth import ActiveSession, get_active_session, require_csrf
 from app.meal_planning_api import DATA_ROOT
@@ -16,6 +18,25 @@ from app.meal_planning_api import DATA_ROOT
 router = APIRouter(prefix="/api/v1", tags=["backups"])
 BACKUP_ROOT = Path(os.getenv("APP_BACKUP_ROOT", "/app/data/backups"))
 _WRITE_LOCK = asyncio.Lock()
+
+
+@router.get("/backups")
+async def list_backups(active_session: ActiveSession = Depends(get_active_session)):
+    """Lista únicamente archivos ZIP de copias almacenados en el servidor."""
+    BACKUP_ROOT.mkdir(mode=0o700, parents=True, exist_ok=True)
+    files = sorted((path for path in BACKUP_ROOT.glob("backup-*.zip") if path.is_file() and not path.is_symlink()), key=lambda path: path.name, reverse=True)
+    return {"backups": [{"filename": path.name, "size": path.stat().st_size} for path in files]}
+
+
+@router.get("/backups/{filename}")
+async def download_backup(filename: str, active_session: ActiveSession = Depends(get_active_session)):
+    """Entrega una copia existente que cumpla el formato de nombre generado."""
+    if not re.fullmatch(r"backup-\d{8}T\d{6}Z\.zip", filename):
+        raise HTTPException(status_code=404, detail="Backup not found")
+    path = BACKUP_ROOT / filename
+    if path.is_symlink() or not path.is_file():
+        raise HTTPException(status_code=404, detail="Backup not found")
+    return FileResponse(path, media_type="application/zip", filename=filename)
 
 
 def create_database_dump(target: Path) -> None:

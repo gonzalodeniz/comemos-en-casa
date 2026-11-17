@@ -7,7 +7,7 @@
 1. Abre la dirección de la aplicación que te haya proporcionado quien la instaló.
 2. Si aún no hay cuentas, aparecerá **Crear la primera cuenta**. Introduce nombre, correo y contraseña (8–128 caracteres). Tras crearla, inicia sesión: el registro inicial no inicia sesión automáticamente.
 3. En adelante, inicia sesión con correo y contraseña. Usa **¿Olvidaste tu contraseña?** para solicitar un enlace; el sistema muestra el mismo aviso exista o no la cuenta. Si el correo está configurado y la cuenta existe, recibirás un enlace de un solo uso que caduca a los 30 minutos.
-4. Para salir, pulsa **Cerrar sesión**. Una sesión también caduca tras 30 minutos de inactividad o 8 horas como máximo.
+4. Para salir, pulsa **Cerrar sesión**. Una sesión nueva caduca una semana después de iniciar sesión, incluso si se cierra el navegador.
 
 Al iniciar sesión se abre **Plan semanal**. Usa el menú lateral izquierdo para alternar entre **Plan semanal** y **Gestión de usuarios**, que se muestran como vistas independientes. En pantallas pequeñas, el menú aparece encima del contenido.
 

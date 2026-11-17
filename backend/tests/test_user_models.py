@@ -13,7 +13,21 @@ from sqlalchemy import UniqueConstraint, create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models import Base, FoodLabel, MealAssignment
+from app.models import Base, FoodLabel, MealAssignment, User
+
+
+def test_user_last_view_is_persisted():
+    """Comprueba que la última vista pertenece al usuario y se conserva."""
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        user = User(name="Persona", email="p@example.test", email_canonical="p@example.test", password_hash="hash", ultima_vista="backups")
+        session.add(user)
+        session.commit()
+        user_id = user.id
+    with Session(engine) as session:
+        assert session.get(User, user_id).ultima_vista == "backups"
+    engine.dispose()
 
 
 def test_user_auth_tables_are_in_metadata():
@@ -55,7 +69,8 @@ def test_food_catalog_migration_follows_meal_planning_and_auth_migrations():
     root = Path(__file__).resolve().parents[1]
     script = ScriptDirectory(dir=str(root / "migrations"))
 
-    assert script.get_heads() == ["0020_backup_schedule"]
+    assert script.get_heads() == ["0021_user_last_view"]
+    assert script.get_revision("0021_user_last_view").down_revision == "0020_backup_schedule"
     assert script.get_revision("0020_backup_schedule").down_revision == "0019_product_name_unique"
     assert script.get_revision("0019_product_name_unique").down_revision == "0018_shopping_item_observation"
     assert script.get_revision("0018_shopping_item_observation").down_revision == "0017_shopping_default_categories"

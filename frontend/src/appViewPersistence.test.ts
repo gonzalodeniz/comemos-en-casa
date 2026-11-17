@@ -16,6 +16,14 @@ function storageWith(value: string | null = null): Storage {
 }
 
 describe("workspace view persistence", () => {
+  // Comprueba que la vista de copias se recupera al volver a cargar la aplicación.
+  it("restores the backups view after a page reload", () => {
+    const storage = storageWith();
+    persistAppView("backups", storage);
+
+    expect(restoreAppView(storage)).toBe("backups");
+  });
+
   it("restores the saved food catalog view", () => {
     expect(restoreAppView(storageWith("food-catalog"))).toBe("food-catalog");
   });

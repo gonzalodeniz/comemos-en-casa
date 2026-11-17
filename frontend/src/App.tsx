@@ -1,7 +1,7 @@
 // Presenta los flujos de acceso y administración de cuentas.
 // Coordina la sesión, formularios, recuperación de contraseña y operaciones de usuario con la API, manteniendo los estados de carga y error.
 
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { apiRequest, ApiError, type User, type UserResponse } from "./api";
 import MealPlanning from "./MealPlanning";
 import FoodCatalog from "./FoodCatalog";
@@ -14,11 +14,11 @@ import { getShoppingCategories, createShoppingCategory, updateShoppingCategoryIm
 import AppWorkspace, { type AppView } from "./AppWorkspace";
 import AppBrand from "./AppBrand";
 import AppIcon from "./AppIcon";
-import { persistAppView, restoreAppView } from "./appViewPersistence";
+import { isAppView, persistAppView, restoreAppView } from "./appViewPersistence";
 import "./App.css";
 
 type Screen = "loading" | "register" | "login" | "reset-request" | "reset-confirm" | "app";
-type SessionResponse = { user: Omit<User, "is_active">; csrf_token: string };
+type SessionResponse = { user: Omit<User, "is_active">; csrf_token: string; ultima_vista: string | null };
 
 function field(form: FormData, name: string): string {
   const value = form.get(name);
@@ -28,6 +28,7 @@ function field(form: FormData, name: string): string {
 export default function App() {
   const [screen, setScreen] = useState<Screen>("loading");
   const [view, setView] = useState<AppView>(restoreAppView);
+  const colaVistas = useRef<Promise<void>>(Promise.resolve());
   const [recipeFoodId, setRecipeFoodId] = useState<string | null>(null);
   const [recipeListReset, setRecipeListReset] = useState(0);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -41,6 +42,15 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+
+  // Actualiza la vista y ordena las escrituras para conservar la última selección.
+  function cambiarVista(siguiente: AppView) {
+    setView(siguiente);
+    persistAppView(siguiente);
+    colaVistas.current = colaVistas.current.then(async () => {
+      await apiRequest<null>("/auth/last-view", { method: "PUT", csrfToken, body: { vista: siguiente } });
+    }).catch(() => { setError("No se pudo guardar la última vista."); });
+  }
 
   const mealSessionExpired = useCallback(() => {
     setCurrentUser(null);
@@ -59,6 +69,7 @@ export default function App() {
   const refreshSession = useCallback(async () => {
     // Recupera también el token CSRF de la sesión antes de cargar recursos autenticados.
     const session = await apiRequest<SessionResponse>("/auth/session");
+    setView(isAppView(session.ultima_vista) ? session.ultima_vista : "meal-planning");
     setCurrentUser({ ...session.user, is_active: true });
     setCsrfToken(session.csrf_token);
     setScreen("app");
@@ -328,16 +339,16 @@ export default function App() {
       {screen === "app" && currentUser && (
         <AppWorkspace
           view={view}
-          onViewChange={(nextView) => { setView(nextView); if (nextView === "recipes") { setRecipeFoodId(null); setRecipeListReset((value) => value + 1); } persistAppView(nextView); setError(""); setNotice(""); }}
+          onViewChange={(nextView) => { cambiarVista(nextView); if (nextView === "recipes") { setRecipeFoodId(null); setRecipeListReset((value) => value + 1); } setError(""); setNotice(""); }}
           disabled={loading}
           backups={<Backups csrfToken={csrfToken} onSessionExpired={mealSessionExpired} />}
           sessionTools={<div className="session-tools"><div className="session-identity"><span className="session-avatar" aria-hidden="true">{currentUser.name.trim().charAt(0).toLocaleUpperCase("es")}</span><div><small>Tu cuenta</small><strong>{currentUser.name}</strong></div></div><button type="button" className="secondary sign-out" disabled={loading} onClick={() => void perform(signOut)}><AppIcon name="logout" />Cerrar sesión</button></div>}
           notifications={<>{error && <p className="message error" role="alert">{error}</p>}{notice && <p className="message success" role="status">{notice}</p>}</>}
-          mealPlanning={<MealPlanning csrfToken={csrfToken} onSessionExpired={mealSessionExpired} onOpenRecipes={(foodId) => { setRecipeFoodId(foodId); setView("recipes"); persistAppView("recipes"); }} />}
-          foodCatalog={<FoodCatalog csrfToken={csrfToken} onSessionExpired={mealSessionExpired} onOpenRecipes={(foodId) => { setRecipeFoodId(foodId); setView("recipes"); persistAppView("recipes"); }} />}
+          mealPlanning={<MealPlanning csrfToken={csrfToken} onSessionExpired={mealSessionExpired} onOpenRecipes={(foodId) => { setRecipeFoodId(foodId); cambiarVista("recipes"); }} />}
+          foodCatalog={<FoodCatalog csrfToken={csrfToken} onSessionExpired={mealSessionExpired} onOpenRecipes={(foodId) => { setRecipeFoodId(foodId); cambiarVista("recipes"); }} />}
           recipes={<Recipes key={recipeListReset} csrfToken={csrfToken} onSessionExpired={mealSessionExpired} initialFoodId={recipeFoodId} />}
           productCatalog={<ProductCatalog onSessionExpired={mealSessionExpired} categories={shoppingCategories} cargandoCategorias={cargandoCategorias} errorCategorias={errorCategorias} onReintentarCategorias={() => setRevisionCategorias((actual) => actual + 1)} onCreateCategory={async (name, token) => { const category = await createShoppingCategory(name, csrfToken, token); setShoppingCategories((current) => [...current, category]); }} onCreateProduct={(id, name, token) => createShoppingProduct(id, name, csrfToken, token)} onGetProducts={async (id) => (await getShoppingProducts(id)).products} onUpdateCategoryImage={async (id, change) => { const updated = await updateShoppingCategoryImage(id, csrfToken, change); setShoppingCategories((current) => current.map((category) => category.id === id ? updated : category)); return updated; }} onUpdateProductImage={(categoryId, id, change) => updateShoppingProductImage(categoryId, id, csrfToken, change)} onImportImage={async (url) => (await apiRequest<{ data_url: string }>("/food-labels/images/import-url", { method: "POST", csrfToken, body: { url } })).data_url} onPrepareImage={async (dataUrl, crop) => (await apiRequest<{ image_token: string }>("/food-labels/images/prepare", { method: "POST", csrfToken, body: { data_url: dataUrl, crop } })).image_token} />}
-          shoppingList={<ShoppingList mostrarAdministracion={false} onAbrirCatalogo={() => { setView("product-catalog"); persistAppView("product-catalog"); }} categories={shoppingCategories} onGetProducts={async (categoryId) => (await getShoppingProducts(categoryId)).products} onCreateProduct={(categoryId, name, imageToken) => createShoppingProduct(categoryId, name, csrfToken, imageToken)} onUpdateCategoryImage={async (categoryId, change) => { const updated = await updateShoppingCategoryImage(categoryId, csrfToken, change); setShoppingCategories((current) => current.map((category) => category.id === categoryId ? updated : category)); return updated; }} onUpdateProductImage={(categoryId, productId, change) => updateShoppingProductImage(categoryId, productId, csrfToken, change)} onImportImage={async (url) => (await apiRequest<{ data_url: string }>("/food-labels/images/import-url", { method: "POST", csrfToken, body: { url } })).data_url} onPrepareImage={async (dataUrl, crop) => (await apiRequest<{ image_token: string }>("/food-labels/images/prepare", { method: "POST", csrfToken, body: { data_url: dataUrl, crop } })).image_token} onAddToShoppingList={(productoId, cantidad, unidad, texto, observacion) => agregarProductoListaCompra(productoId, cantidad, unidad, csrfToken, texto, observacion)} onUpdateShoppingItem={(id, cambio) => actualizarCantidadCompra(id, cambio, csrfToken)} onGetShoppingList={obtenerListaCompra} onMarkRecipeIngredient={(id) => marcarIngredienteReceta(id, csrfToken)} onUnmarkRecipeIngredient={(id) => desmarcarIngredienteReceta(id, csrfToken)} onDeleteRecipeIngredient={(id) => eliminarIngredienteReceta(id, csrfToken)} onDeleteRecipeSection={(id) => eliminarSeccionReceta(id, csrfToken)} onMarkPurchased={(itemId) => marcarProductoComprado(itemId, csrfToken)} onUnmarkPurchased={(itemId) => desmarcarProductoComprado(itemId, csrfToken)} onDeleteItem={(itemId) => eliminarEntradaListaCompra(itemId, csrfToken)} onCreateCategory={async (name, imageToken) => {
+          shoppingList={<ShoppingList mostrarAdministracion={false} onAbrirCatalogo={() => { cambiarVista("product-catalog"); }} categories={shoppingCategories} onGetProducts={async (categoryId) => (await getShoppingProducts(categoryId)).products} onCreateProduct={(categoryId, name, imageToken) => createShoppingProduct(categoryId, name, csrfToken, imageToken)} onUpdateCategoryImage={async (categoryId, change) => { const updated = await updateShoppingCategoryImage(categoryId, csrfToken, change); setShoppingCategories((current) => current.map((category) => category.id === categoryId ? updated : category)); return updated; }} onUpdateProductImage={(categoryId, productId, change) => updateShoppingProductImage(categoryId, productId, csrfToken, change)} onImportImage={async (url) => (await apiRequest<{ data_url: string }>("/food-labels/images/import-url", { method: "POST", csrfToken, body: { url } })).data_url} onPrepareImage={async (dataUrl, crop) => (await apiRequest<{ image_token: string }>("/food-labels/images/prepare", { method: "POST", csrfToken, body: { data_url: dataUrl, crop } })).image_token} onAddToShoppingList={(productoId, cantidad, unidad, texto, observacion) => agregarProductoListaCompra(productoId, cantidad, unidad, csrfToken, texto, observacion)} onUpdateShoppingItem={(id, cambio) => actualizarCantidadCompra(id, cambio, csrfToken)} onGetShoppingList={obtenerListaCompra} onMarkRecipeIngredient={(id) => marcarIngredienteReceta(id, csrfToken)} onUnmarkRecipeIngredient={(id) => desmarcarIngredienteReceta(id, csrfToken)} onDeleteRecipeIngredient={(id) => eliminarIngredienteReceta(id, csrfToken)} onDeleteRecipeSection={(id) => eliminarSeccionReceta(id, csrfToken)} onMarkPurchased={(itemId) => marcarProductoComprado(itemId, csrfToken)} onUnmarkPurchased={(itemId) => desmarcarProductoComprado(itemId, csrfToken)} onDeleteItem={(itemId) => eliminarEntradaListaCompra(itemId, csrfToken)} onCreateCategory={async (name, imageToken) => {
             try {
               const category = await createShoppingCategory(name, csrfToken, imageToken);
               setShoppingCategories((current) => [...current, category]);

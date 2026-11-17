@@ -120,6 +120,10 @@ def test_database_schema_contains_shopping_categories(tmp_path, monkeypatch):
     database = tmp_path / "migrations.sqlite"
     monkeypatch.setenv("DATABASE_URL", f"sqlite+pysqlite:///{database}")
     config = Config("alembic.ini")
+    # La revisión marcada presupone que la tabla de usuarios ya existe.
+    import sqlite3
+    with sqlite3.connect(database) as conexion:
+        conexion.execute("CREATE TABLE users (id TEXT PRIMARY KEY)")
     command.stamp(config, "0007_recipes")
     command.upgrade(config, "head")
 

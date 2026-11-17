@@ -46,8 +46,8 @@ router = APIRouter(prefix="/api/v1", tags=["authentication"])
 
 SESSION_COOKIE = "session"
 CSRF_COOKIE = "csrf_token"
-SESSION_IDLE_TIMEOUT = timedelta(minutes=30)
-SESSION_ABSOLUTE_TIMEOUT = timedelta(hours=8)
+SESSION_IDLE_TIMEOUT = timedelta(days=7)
+SESSION_ABSOLUTE_TIMEOUT = timedelta(days=7)
 LOGIN_WINDOW = timedelta(minutes=15)
 LOGIN_LOCK_DURATION = timedelta(minutes=15)
 LOGIN_FAILURE_LIMIT = 5
@@ -77,6 +77,11 @@ class UserCredentials(BaseModel):
 class LoginCredentials(BaseModel):
     email: str = Field(min_length=1, max_length=320)
     password: str = Field(min_length=1, max_length=4096)
+
+
+class UltimaVista(BaseModel):
+    """Valida la vista que se desea guardar para la cuenta."""
+    vista: str = Field(min_length=1, max_length=32)
 
 
 class UserUpdate(BaseModel):
@@ -467,6 +472,7 @@ def issue_session(
         secure=secure,
         samesite="lax",
         path="/",
+        max_age=int(SESSION_ABSOLUTE_TIMEOUT.total_seconds()),
     )
     response.set_cookie(
         CSRF_COOKIE,
@@ -475,6 +481,7 @@ def issue_session(
         secure=secure,
         samesite="lax",
         path="/",
+        max_age=int(SESSION_ABSOLUTE_TIMEOUT.total_seconds()),
     )
 
 
@@ -607,7 +614,21 @@ async def current_session(
     if digest_token(csrf_token) != active_session.session.csrf_token_digest:
         csrf_token = ""
     response.headers["Cache-Control"] = "no-store"
-    return {"user": public_user(active_session.user), "csrf_token": csrf_token}
+    return {"user": public_user(active_session.user), "csrf_token": csrf_token, "ultima_vista": active_session.user.ultima_vista}
+
+
+@router.put("/auth/last-view", status_code=status.HTTP_204_NO_CONTENT)
+async def guardar_ultima_vista(
+    datos: UltimaVista,
+    request: Request,
+    active_session: ActiveSession = Depends(get_active_session),
+    db: Session = Depends(get_database_session),
+) -> Response:
+    """Guarda la última vista de la cuenta autenticada."""
+    require_csrf(request, active_session)
+    active_session.user.ultima_vista = datos.vista
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT)

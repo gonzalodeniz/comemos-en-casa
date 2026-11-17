@@ -513,7 +513,6 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
         </div>
       </div>
       <div className="calendar-context">
-        <p className="meal-date-context">Tu menú, día a día <span aria-hidden="true">·</span> <span>Atlantic/Canary</span></p>
         <button type="button" className={`secondary today-button${view === "week" ? " today-button-fixed" : ""}`} disabled={calendarLoading || busy} onClick={returnToToday}>Volver a hoy</button>
       </div>
       {view === "week" && <div className="week-meal-headings">

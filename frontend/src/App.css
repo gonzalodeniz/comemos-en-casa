@@ -110,8 +110,6 @@ h2 { font-size: clamp(1.5rem, 2.2vw, 2.35rem); letter-spacing: -.035em; }
 .meal-view-switch button[aria-pressed="true"] { color: white; background: #007c46; box-shadow: 0 2px 4px rgb(0 87 49 / 10%); }
 .meal-view-switch button:hover:not(:disabled):not([aria-pressed="true"]) { background: #e0ede9; }
 .calendar-context { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: 1.4rem; }
-.meal-date-context { margin: 0; color: #648391; font-size: .75rem; }
-.meal-date-context > span:first-child { margin: 0 .4rem; }
 button.today-button { min-height: 36px; padding: .3rem .7rem; color: #684f00; background: #fff4c7; border-color: #f0d98a; box-shadow: 0 2px 5px rgb(104 79 0 / 18%); font-size: .8rem; }
 button.today-button:hover:not(:disabled), button.today-button-fixed:hover:not(:disabled) { background: #ffec9e; }
 .week-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); align-items: stretch; gap: .55rem; }
@@ -226,7 +224,6 @@ button.today-button:hover:not(:disabled), button.today-button-fixed:hover:not(:d
   .calendar-navigation h3 { flex: 1; min-width: 0; font-size: .8rem; }
   .meal-view-switch button { padding: .5rem .85rem; }
   .calendar-context { margin-top: .8rem; margin-bottom: 1rem; }
-  .meal-date-context { font-size: .68rem; }
   .week-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
   .calendar-day { padding: .85rem; }
   .calendar-day h4 { min-height: 0; margin: .1rem .15rem 1rem; }
@@ -248,9 +245,6 @@ button.today-button:hover:not(:disabled), button.today-button-fixed:hover:not(:d
   .meal-view-switch { width: 100%; }
   .meal-view-switch button { flex: 1; }
   .calendar-context { align-items: flex-start; }
-  .meal-date-context { max-width: 150px; line-height: 1.8; }
-  .meal-date-context > span:last-child { display: block; }
-  .meal-date-context > span:first-child { display: none; }
   .week-grid { grid-template-columns: minmax(0, 1fr); }
   .week-grid .day-meals { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; }
   .week-grid .calendar-day h4 { flex-direction: row; justify-content: space-between; align-items: center; }

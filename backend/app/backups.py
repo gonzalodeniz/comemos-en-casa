@@ -53,6 +53,19 @@ async def download_backup(filename: str, active_session: ActiveSession = Depends
     return FileResponse(path, media_type="application/zip", filename=filename)
 
 
+@router.delete("/backups/{filename}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_backup(filename: str, request: Request, active_session: ActiveSession = Depends(get_active_session)):
+    """Elimina una copia existente tras comprobar sesión y protección CSRF."""
+    require_csrf(request, active_session)
+    if not re.fullmatch(r"backup-\d{8}T\d{6}Z\.zip", filename):
+        raise HTTPException(status_code=404, detail="Backup not found")
+    path = BACKUP_ROOT / filename
+    if path.is_symlink() or not path.is_file():
+        raise HTTPException(status_code=404, detail="Backup not found")
+    path.unlink()
+    return None
+
+
 @router.post("/backups/{filename}/restore")
 async def restore_backup(filename: str, request: Request, active_session: ActiveSession = Depends(get_active_session)):
     """Valida la sesión y la protección CSRF antes de restaurar una copia."""
@@ -95,11 +108,21 @@ def create_backup_archive() -> str:
         create_database_dump(dump)
         with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             archive.write(dump, "database.sql")
-            if DATA_ROOT.exists():
-                for file in DATA_ROOT.rglob("*"):
-                    if file.is_file() and not file.is_symlink():
-                        archive.write(file, str(Path("images") / file.relative_to(DATA_ROOT)))
+            add_backup_files(archive)
     return filename
+
+
+def add_backup_files(archive: zipfile.ZipFile) -> None:
+    """Incluye exclusivamente los directorios de imágenes incluidos en el alcance."""
+    if not DATA_ROOT.exists():
+        return
+    for folder in ("comidas", "productos", "recetas"):
+        source = DATA_ROOT / folder
+        if source.is_symlink() or not source.is_dir():
+            continue
+        for file in source.rglob("*"):
+            if file.is_file() and not file.is_symlink():
+                archive.write(file, str(Path("images") / file.relative_to(DATA_ROOT)))
 
 
 async def run_scheduled_backup(now: datetime | None = None, session_factory=SessionFactory) -> bool:
@@ -142,17 +165,25 @@ def create_database_dump(target: Path) -> None:
 
 
 def restore_database_dump(source: Path) -> None:
-    """Aplica un volcado SQL en una única transacción PostgreSQL."""
+    """Aplica un volcado en una transacción, omitiendo SET no disponible en PostgreSQL 16."""
     from sqlalchemy.engine import make_url
     url = os.getenv("DATABASE_URL")
     parsed = make_url(url) if url else None
     env = {**os.environ, "PGPASSWORD": (parsed.password if parsed else os.getenv("DB_PASSWORD", "")) or ""}
-    args = ["psql", "--no-psqlrc", "--set", "ON_ERROR_STOP=1", "--single-transaction", "--host", parsed.host if parsed else os.getenv("DB_HOST", "localhost"), "--port", str(parsed.port if parsed else 5432), "--username", parsed.username if parsed else os.getenv("DB_USER", "comemos"), "--dbname", parsed.database if parsed else os.getenv("DB_NAME", "comemos"), "--file", str(source)]
-    subprocess.run(args, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, timeout=600)
+    compatible_source = source.with_name("database-compatible.sql")
+    try:
+        with source.open(encoding="utf-8") as original, compatible_source.open("w", encoding="utf-8") as compatible:
+            for line in original:
+                if not line.lstrip().lower().startswith("set transaction_timeout"):
+                    compatible.write(line)
+        args = ["psql", "--no-psqlrc", "--set", "ON_ERROR_STOP=1", "--single-transaction", "--host", parsed.host if parsed else os.getenv("DB_HOST", "localhost"), "--port", str(parsed.port if parsed else 5432), "--username", parsed.username if parsed else os.getenv("DB_USER", "comemos"), "--dbname", parsed.database if parsed else os.getenv("DB_NAME", "comemos"), "--file", str(compatible_source)]
+        subprocess.run(args, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, timeout=600)
+    finally:
+        compatible_source.unlink(missing_ok=True)
 
 
 def restore_backup_contents(source: Path) -> None:
-    """Valida el ZIP, restaura PostgreSQL y sustituye las imágenes almacenadas."""
+    """Valida el ZIP, restaura PostgreSQL y sustituye solo las tres carpetas de imágenes."""
     with tempfile.TemporaryDirectory(dir=BACKUP_ROOT) as temporary:
         stage = Path(temporary)
         with zipfile.ZipFile(source) as archive:
@@ -160,19 +191,28 @@ def restore_backup_contents(source: Path) -> None:
             if "database.sql" not in names or any(name.startswith("/") or ".." in Path(name).parts for name in names):
                 raise ValueError("Invalid backup contents")
             for member in archive.infolist():
-                if member.filename.startswith("images/"):
+                parts = Path(member.filename).parts
+                if member.filename == "database.sql":
+                    continue
+                if len(parts) >= 3 and parts[0] == "images" and parts[1] in {"comidas", "productos", "recetas"}:
                     if (member.external_attr >> 16) & 0o170000 == 0o120000:
                         raise ValueError("Symbolic links are not allowed")
                     archive.extract(member, stage)
+                else:
+                    raise ValueError("Unexpected backup contents")
             archive.extract("database.sql", stage)
         restore_database_dump(stage / "database.sql")
-        replacement = stage / "images"
         DATA_ROOT.parent.mkdir(parents=True, exist_ok=True)
-        previous = stage / "previous-images"
-        if DATA_ROOT.exists():
-            DATA_ROOT.rename(previous)
-        if replacement.exists():
-            replacement.rename(DATA_ROOT)
+        for folder in ("comidas", "productos", "recetas"):
+            destination = DATA_ROOT / folder
+            replacement = stage / "images" / folder
+            if destination.is_symlink():
+                raise ValueError("Unsafe image directory")
+            if destination.exists():
+                shutil.rmtree(destination)
+            if replacement.exists():
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                replacement.rename(destination)
 
 
 @router.post("/backups", status_code=status.HTTP_201_CREATED)
@@ -190,10 +230,7 @@ async def create_backup(request: Request, active_session: ActiveSession = Depend
                 await asyncio.to_thread(create_database_dump, dump)
                 with zipfile.ZipFile(destination, "w", compression=zipfile.ZIP_DEFLATED) as archive:
                     archive.write(dump, "database.sql")
-                    if DATA_ROOT.exists():
-                        for file in DATA_ROOT.rglob("*"):
-                            if file.is_file() and not file.is_symlink():
-                                archive.write(file, str(Path("images") / file.relative_to(DATA_ROOT)))
+                    add_backup_files(archive)
         return {"status": "created", "filename": filename}
     except Exception as error:
         destination.unlink(missing_ok=True)

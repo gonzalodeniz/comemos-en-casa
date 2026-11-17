@@ -1,11 +1,30 @@
 """Verifica la creación de copias de seguridad desde la API."""
-from meal_planning_test_support import api_get, api_post, authenticate, meal_database
+from meal_planning_test_support import api_delete, api_get, api_post, authenticate, meal_database
 
 
 def test_backup_endpoint_requires_authenticated_user(meal_database):
     response = api_post("/api/v1/backups", payload={})
 
     assert response.status_code == 401
+
+
+def test_backup_excludes_nested_backup_and_temporary_directories(tmp_path, monkeypatch):
+    """Evita que la copia se incluya a sí misma o incorpore archivos temporales."""
+    import zipfile
+    import app.backups as backups
+
+    monkeypatch.setattr(backups, "DATA_ROOT", tmp_path / "data")
+    monkeypatch.setattr(backups, "BACKUP_ROOT", backups.DATA_ROOT / "backups")
+    monkeypatch.setattr(backups, "create_database_dump", lambda target: target.write_bytes(b"database"))
+    (backups.DATA_ROOT / "comidas").mkdir(parents=True)
+    (backups.DATA_ROOT / "comidas" / "image.webp").write_bytes(b"image")
+    (backups.DATA_ROOT / ".tmp").mkdir()
+    (backups.DATA_ROOT / ".tmp" / "temporary").write_bytes(b"temporary")
+    (backups.DATA_ROOT / "other").mkdir()
+    (backups.DATA_ROOT / "other" / "keep.txt").write_bytes(b"other")
+    filename = backups.create_backup_archive()
+    with zipfile.ZipFile(backups.BACKUP_ROOT / filename) as archive:
+        assert set(archive.namelist()) == {"database.sql", "images/comidas/image.webp"}
 
 
 def test_backup_endpoint_creates_database_and_images_snapshot(meal_database, tmp_path, monkeypatch):
@@ -45,6 +64,27 @@ def test_backup_list_returns_available_archives(meal_database, tmp_path, monkeyp
 
     assert response.status_code == 200
     assert response.json() == {"backups": [{"filename": "backup-20261117T100000Z.zip", "size": 7}]}
+
+
+def test_backup_delete_requires_authenticated_user(meal_database):
+    response = api_delete("/api/v1/backups/backup-20261117T100000Z.zip")
+
+    assert response.status_code == 401
+
+
+def test_backup_delete_removes_selected_archive(meal_database, tmp_path, monkeypatch):
+    import app.backups as backups
+
+    monkeypatch.setattr(backups, "BACKUP_ROOT", tmp_path / "backups")
+    backups.BACKUP_ROOT.mkdir()
+    archive = backups.BACKUP_ROOT / "backup-20261117T100000Z.zip"
+    archive.write_bytes(b"archive")
+    cookies = authenticate(meal_database)
+
+    response = api_delete(f"/api/v1/backups/{archive.name}", cookies=cookies)
+
+    assert response.status_code == 204
+    assert not archive.exists()
 
 
 def test_backup_download_returns_selected_archive(meal_database, tmp_path, monkeypatch):
@@ -123,6 +163,10 @@ def test_restore_service_applies_database_and_restores_image_files(tmp_path, mon
     monkeypatch.setattr(backups, "BACKUP_ROOT", tmp_path / "backups")
     monkeypatch.setattr(backups, "DATA_ROOT", tmp_path / "data")
     backups.BACKUP_ROOT.mkdir()
+    (backups.DATA_ROOT / "backups").mkdir(parents=True)
+    (backups.DATA_ROOT / "backups" / "keep.zip").write_bytes(b"keep")
+    (backups.DATA_ROOT / "other").mkdir()
+    (backups.DATA_ROOT / "other" / "keep.txt").write_bytes(b"keep")
     archive = backups.BACKUP_ROOT / "backup-20261117T100000Z.zip"
     with zipfile.ZipFile(archive, "w") as package:
         package.writestr("database.sql", "-- dump")
@@ -134,6 +178,28 @@ def test_restore_service_applies_database_and_restores_image_files(tmp_path, mon
 
     assert executed == ["-- dump"]
     assert (backups.DATA_ROOT / "comidas/new.webp").read_bytes() == b"new image"
+    assert (backups.DATA_ROOT / "backups/keep.zip").read_bytes() == b"keep"
+    assert (backups.DATA_ROOT / "other/keep.txt").read_bytes() == b"keep"
+
+
+def test_restore_removes_postgres_17_setting_unsupported_by_postgres_16(tmp_path, monkeypatch):
+    from pathlib import Path
+    import app.backups as backups
+
+    dump = tmp_path / "database.sql"
+    dump.write_text("SET statement_timeout = 0;\nSET transaction_timeout = 0;\nSELECT 1;\n")
+    command = []
+
+    def run(args, **kwargs):
+        command.extend(args)
+        assert "SET transaction_timeout" not in Path(args[-1]).read_text()
+
+    monkeypatch.setattr(backups.subprocess, "run", run)
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://user:pass@localhost:5432/db")
+
+    backups.restore_database_dump(dump)
+
+    assert "--single-transaction" in command
 
 
 def test_backup_schedule_requires_authenticated_user(meal_database):

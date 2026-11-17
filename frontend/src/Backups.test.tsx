@@ -23,11 +23,20 @@ describe("Backups", () => {
   });
 
   it("lists archives with a direct download link", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ backups: [{ filename: "backup-20261117T100000Z.zip", size: 42 }] })));
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ backups: [{ filename: "backup-20261117T100000Z.zip", size: 1048576 }] })));
     render(<Backups csrfToken="csrf" onSessionExpired={vi.fn()} />);
     const link = await screen.findByRole("link", { name: "Descargar" });
     expect(link.getAttribute("href")).toBe("/comemos/api/v1/backups/backup-20261117T100000Z.zip");
     expect(link.getAttribute("download")).toBe("backup-20261117T100000Z.zip");
+    expect(screen.getByText(/1\.00 MB/)).toBeTruthy();
+  });
+
+  it("deletes a backup and removes it from the list", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(new Response(JSON.stringify({ backups: [{ filename: "backup-20261117T100000Z.zip", size: 12 }] }))).mockResolvedValueOnce(new Response(null, { status: 204 }));
+    render(<Backups csrfToken="csrf" onSessionExpired={vi.fn()} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Eliminar copia" }));
+    expect(await screen.findByRole("status")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Descargar" })).toBeNull();
   });
 
   it("shows a list error when the server cannot return archives", async () => {

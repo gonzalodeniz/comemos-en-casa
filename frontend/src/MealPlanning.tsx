@@ -58,6 +58,18 @@ export function weekLabel(start: CalendarDate): string {
 }
 
 export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipes = () => {} }: Props) {
+  // Recupera una preferencia visual válida sin depender de la disponibilidad del almacenamiento.
+  const [visibleSlot, setVisibleSlot] = useState<MealSlot | "both">(() => {
+    try {
+      const value = localStorage.getItem("meal-planning-visible-slot");
+      return value === "lunch" || value === "dinner" ? value : "both";
+    } catch { return "both"; }
+  });
+  // Conserva la elección sin afectar a las comidas guardadas.
+  function changeVisibleSlot(value: MealSlot | "both") {
+    setVisibleSlot(value);
+    try { localStorage.setItem("meal-planning-visible-slot", value); } catch { /* La vista sigue funcionando sin almacenamiento. */ }
+  }
   const [view, setView] = useState<CalendarView>("week");
   const [referenceDate, setReferenceDate] = useState<CalendarDate | null>(null);
   const queryDate = referenceDate ?? localToday();
@@ -474,7 +486,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
   const title = formatDateLabel(queryDate, { month: "long", year: "numeric" });
 
   return (
-    <section className="meal-planning" aria-labelledby="meal-planning-title">
+    <section className={`meal-planning${visibleSlot !== "both" ? " single-meal" : ""}`} aria-labelledby="meal-planning-title">
       <div className="planning-sticky-header">
       <div className="meal-heading">
         <div className="meal-title">
@@ -487,21 +499,27 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
             <h3 aria-live="polite">{title}</h3>
             <button type="button" className="secondary" aria-label="Mes siguiente" disabled={calendarLoading || busy} onClick={() => moveRange(1)}><AppIcon name="chevron-right" /></button>
           </div>}
+          <div className="planning-switches">
+            <div className="meal-view-switch meal-filter" role="group" aria-label="Comidas visibles">
+        <button type="button" aria-pressed={visibleSlot === "both"} onClick={() => changeVisibleSlot("both")}>Ambas</button>
+        <button type="button" aria-pressed={visibleSlot === "lunch"} onClick={() => changeVisibleSlot("lunch")}>☀️ Almuerzo</button>
+        <button type="button" aria-pressed={visibleSlot === "dinner"} onClick={() => changeVisibleSlot("dinner")}>🌙 Cena</button>
+      </div>
           <div className="meal-view-switch" role="group" aria-label="Vista del calendario">
             <button type="button" aria-pressed={view === "week"} disabled={calendarLoading || busy} onClick={() => changeView("week")}>Semana</button>
             <button type="button" aria-pressed={view === "month"} disabled={calendarLoading || busy} onClick={() => changeView("month")}>Mes</button>
           </div>
+          </div>
         </div>
       </div>
       <div className="calendar-context">
-        <p className="meal-date-context">Tu menú, día a día <span aria-hidden="true">·</span> <span>Atlantic/Canary</span></p>
         <button type="button" className={`secondary today-button${view === "week" ? " today-button-fixed" : ""}`} disabled={calendarLoading || busy} onClick={returnToToday}>Volver a hoy</button>
       </div>
       {view === "week" && <div className="week-meal-headings">
         <span className="week-heading-spacer" aria-hidden="true" />
         <div className="week-heading-meals">
-          <span><span aria-hidden="true">☀️</span><span className="week-heading-label" aria-hidden="true">Almuerzo</span><span className="visually-hidden">Almuerzo</span></span>
-          <span><span aria-hidden="true">🌙</span><span className="week-heading-label" aria-hidden="true">Cena</span><span className="visually-hidden">Cena</span></span>
+          {visibleSlot !== "dinner" && <span><span aria-hidden="true">☀️</span><span className="week-heading-label" aria-hidden="true">Almuerzo</span><span className="visually-hidden">Almuerzo</span></span>}
+          {visibleSlot !== "lunch" && <span><span aria-hidden="true">🌙</span><span className="week-heading-label" aria-hidden="true">Cena</span><span className="visually-hidden">Cena</span></span>}
         </div>
       </div>}
       </div>
@@ -520,7 +538,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
               <h3 className="week-separator">{weekLabel(start)}</h3>
               {visibleDateRange(start, "week").dates.map((date, index) => (
                 <CalendarDay key={date} date={date} weekday={WEEKDAY_LABELS[index]} today={date === today}
-                  assignments={assignmentMap} disabled={calendarLoading || mainLoadError || busy} onEdit={openEditor} onDelete={openDeletePreview} onOpenRecipes={onOpenRecipes} />
+                  visibleSlot={visibleSlot} assignments={assignmentMap} disabled={calendarLoading || mainLoadError || busy} onEdit={openEditor} onDelete={openDeletePreview} onOpenRecipes={onOpenRecipes} />
               ))}
             </section>
           ))}
@@ -558,6 +576,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
               today={date === today}
               outsideMonth={parseCalendarDate(date).getMonth() !== parseCalendarDate(queryDate).getMonth()}
               compact
+              visibleSlot={visibleSlot}
               assignments={assignmentMap}
               disabled={calendarLoading || mainLoadError || busy}
               onEdit={openEditor}

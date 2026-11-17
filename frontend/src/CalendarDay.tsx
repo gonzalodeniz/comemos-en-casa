@@ -40,12 +40,13 @@ function MealThumbnail({ name, imageUrl, onOpen }: { name: string; imageUrl?: st
   return <span className="meal-thumbnail" ref={ref} role={onOpen ? "button" : undefined} tabIndex={onOpen ? 0 : undefined} onClick={onOpen} onKeyDown={onOpen ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(); } } : undefined} aria-label={onOpen ? `Ver recetas de ${name}` : undefined}>{imageUrl ? <img src={`${import.meta.env.VITE_API_BASE_URL || "/comemos"}/api/v1${imageUrl}`} alt="" /> : <AppIcon name="utensils" />}</span>;
 }
 
-export default function CalendarDay({ date, weekday, today, outsideMonth = false, compact = false, assignments, disabled, onEdit, onDelete, onOpenRecipes = () => {} }: {
+export default function CalendarDay({ date, weekday, today, outsideMonth = false, compact = false, visibleSlot = "both", assignments, disabled, onEdit, onDelete, onOpenRecipes = () => {} }: {
   date: CalendarDate;
   weekday: string;
   today: boolean;
   outsideMonth?: boolean;
   compact?: boolean;
+  visibleSlot?: MealSlot | "both";
   assignments: Map<string, MealAssignment>;
   disabled: boolean;
   onEdit: (date: CalendarDate, slot: MealSlot) => void;
@@ -57,7 +58,7 @@ export default function CalendarDay({ date, weekday, today, outsideMonth = false
     <article className={`calendar-day${today ? " is-today" : ""}${outsideMonth ? " outside-month" : ""}${compact ? " compact-day" : ""}`} aria-current={today ? "date" : undefined}>
       <h4><span>{compact ? weekday : weekday.slice(0, 3)}</span><time dateTime={date}>{formatDateLabel(date, { day: "numeric", month: compact ? undefined : "short" })}</time>{today && <span className="visually-hidden">Hoy</span>}</h4>
       <div className="day-meals">
-        {(Object.keys(SLOT_LABELS) as MealSlot[]).map((slot) => {
+        {(Object.keys(SLOT_LABELS) as MealSlot[]).filter((slot) => visibleSlot === "both" || visibleSlot === slot).map((slot) => {
           const assignment = assignments.get(`${date}:${slot}`);
           return (
             <div className={`meal-card${assignment ? " assigned" : ""}`} key={slot}>

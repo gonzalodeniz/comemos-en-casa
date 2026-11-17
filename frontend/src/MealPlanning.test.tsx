@@ -22,7 +22,8 @@ describe("MealPlanning presentation", () => {
     const fixedHeader = markup.slice(markup.indexOf('class="planning-sticky-header"'), markup.indexOf('class="week-scroll-content"'));
     expect(fixedHeader).toContain("Planificación de comidas");
     expect(fixedHeader).toContain('aria-label="Vista del calendario"');
-    expect(fixedHeader).toContain("Tu menú, día a día");
+    expect(fixedHeader).not.toContain("Tu menú, día a día");
+    expect(fixedHeader).not.toContain("Atlantic/Canary");
     expect(fixedHeader).toContain('class="week-meal-headings"');
     expect(fixedHeader).toContain("Almuerzo");
     expect(fixedHeader).toContain("Cena");

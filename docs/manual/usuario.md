@@ -28,7 +28,9 @@ En la pantalla autenticada, la planificación abre por defecto la semana actual 
 
 Selecciona una franja para abrir el editor. Puedes asignar o sustituir una etiqueta del catálogo, o elegir eliminar la etiqueta actual. La repetición está desactivada inicialmente. Si la activas, indica un intervalo entero positivo en semanas y una fecha final válida; la operación afecta únicamente a las fechas calculadas desde la fecha inicial. El final se incluye solo si coincide con una repetición. También se admiten fechas pasadas.
 
-Antes de modificar franjas ocupadas o eliminar asignaciones, revisa la previsualización y confirma para guardar. Cancelar la previsualización o la confirmación no guarda cambios. Cada fecha se guarda como asignación independiente; modificar una copia no cambia las demás. El borrado repetido solo elimina la misma etiqueta. La planificación es compartida: otro usuario activo verá los cambios al volver a consultar o actualizar la vista; no hay actualización en tiempo real.
+Para borrar, usa el botón de eliminar de la franja y, si quieres repetir el borrado, indica cada cuántas semanas y hasta qué fecha. Se eliminan las asignaciones de esa franja desde la fecha seleccionada, aunque tengan platos diferentes; las fechas anteriores y la otra franja no se modifican.
+
+Antes de modificar franjas ocupadas o eliminar asignaciones, revisa la previsualización y confirma para guardar. Cancelar la previsualización o la confirmación no guarda cambios. Cada fecha se guarda como asignación independiente; modificar una copia no cambia las demás. La planificación es compartida: otro usuario activo verá los cambios al volver a consultar o actualizar la vista; no hay actualización en tiempo real.
 
 Estos flujos se recorrieron en Chrome contra la API real en un entorno local efímero con SQLite. Esta comprobación no sustituye la validación PostgreSQL ni cierra la verificación general; consulta los límites y la matriz del [estado de HU-002](../../odd/tasks/hu-002-planificacion-de-comidas.md).
 

@@ -235,7 +235,8 @@ def test_stale_preview_returns_fresh_confirmation_without_overwriting(
     with meal_database() as db:
         assert db.scalar(select(MealAssignment.label_id)) == pescado.id
 
-def test_delete_only_removes_exact_matching_label_and_requires_confirmation(
+# Comprueba que el borrado repetido incluye platos diferentes y exige confirmación.
+def test_delete_repeatedly_removes_different_labels_and_requires_confirmation(
     meal_database,
 ):
     cookies = authenticate(meal_database)
@@ -256,7 +257,7 @@ def test_delete_only_removes_exact_matching_label_and_requires_confirmation(
         "repeat": {"interval_weeks": 1, "end_date": "2026-11-09"},
     }
     preview = post_with_session("/api/v1/meal-planning/preview", payload, cookies).json()
-    assert [entry["change"] for entry in preview["dates"]] == ["delete", "no_op"]
+    assert [entry["change"] for entry in preview["dates"]] == ["delete", "delete"]
     assert preview["requires_confirmation"] is True
 
     unconfirmed = post_with_session("/api/v1/meal-planning/operations", payload, cookies)
@@ -264,12 +265,27 @@ def test_delete_only_removes_exact_matching_label_and_requires_confirmation(
     operation = {**payload, "confirmed": True, "preview_token": preview["preview_token"]}
     response = post_with_session("/api/v1/meal-planning/operations", operation, cookies)
     assert response.status_code == 200
-    assert response.json()["changed_dates"] == ["2026-11-02"]
+    assert response.json()["changed_dates"] == ["2026-11-02", "2026-11-09"]
     with meal_database() as db:
         remaining = db.scalars(select(MealAssignment)).all()
-        assert len(remaining) == 1
-        assert remaining[0].date == date(2026, 11, 9)
-        assert remaining[0].label_id == arroz.id
+        assert len(remaining) == 0
+
+# Comprueba los límites temporales y que se conserva la otra franja.
+def test_repeated_delete_preserves_other_dates_and_slot(meal_database):
+    cookies = authenticate(meal_database)
+    pescado, arroz = seed_labels(meal_database)
+    with meal_database() as db:
+        for dia, franja in [(26, "lunch"), (2, "lunch"), (9, "lunch"), (16, "lunch"), (23, "lunch"), (16, "dinner")]:
+            mes = 10 if dia == 26 else 11
+            db.add(MealAssignment(date=date(2026, mes, dia), slot=franja, label_id=arroz.id))
+        db.commit()
+    payload = {"action": "delete", "start_date": "2026-11-02", "slot": "lunch", "label_id": str(pescado.id), "repeat": {"interval_weeks": 2, "end_date": "2026-11-16"}}
+    preview = post_with_session("/api/v1/meal-planning/preview", payload, cookies).json()
+    response = post_with_session("/api/v1/meal-planning/operations", {**payload, "confirmed": True, "preview_token": preview["preview_token"]}, cookies)
+    assert response.json()["changed_dates"] == ["2026-11-02", "2026-11-16"]
+    with meal_database() as db:
+        restantes = {(fila.date.isoformat(), fila.slot) for fila in db.scalars(select(MealAssignment))}
+    assert restantes == {("2026-10-26", "lunch"), ("2026-11-09", "lunch"), ("2026-11-23", "lunch"), ("2026-11-16", "dinner")}
 
 def test_invalid_operations_reject_bad_dates_interval_slot_and_label(meal_database):
     cookies = authenticate(meal_database)

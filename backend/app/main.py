@@ -16,6 +16,7 @@ from app.meal_planning_api import router as meal_planning_router
 from app.recipes_api import router as recipes_router
 from app.shopping_catalog_api import router as shopping_catalog_router
 from app.shopping_list_api import router as shopping_list_router
+from app.backups import router as backups_router, _WRITE_LOCK
 from app.food_images import cleanup_expired_temporary
 from app.meal_planning_api import DATA_ROOT
 from app.settings import allowed_origins
@@ -50,6 +51,16 @@ app.include_router(meal_planning_router)
 app.include_router(recipes_router)
 app.include_router(shopping_catalog_router)
 app.include_router(shopping_list_router)
+app.include_router(backups_router)
+
+
+@app.middleware("http")
+async def serialize_writes_during_backup(request, call_next):
+    """Serializa las escrituras para que una copia capture un estado consistente."""
+    if request.method in {"POST", "PATCH", "DELETE"} and request.url.path != "/api/v1/backups":
+        async with _WRITE_LOCK:
+            return await call_next(request)
+    return await call_next(request)
 
 
 def database_is_ready() -> bool:

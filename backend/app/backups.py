@@ -42,6 +42,15 @@ async def list_backups(active_session: ActiveSession = Depends(get_active_sessio
     return {"backups": [{"filename": path.name, "size": path.stat().st_size} for path in files]}
 
 
+@router.get("/backups/schedule")
+async def consultar_automatizacion(active_session: ActiveSession = Depends(get_active_session), db: Session = Depends(get_database_session)):
+    """Consulta la configuración global sin activar copias ni modificarla."""
+    configuracion = db.get(BackupSchedule, 1)
+    if configuracion is None:
+        return {"enabled": False, "frequency": None, "maximum": None}
+    return {"enabled": True, "frequency": configuracion.frequency, "maximum": configuracion.maximum}
+
+
 @router.get("/backups/{filename}")
 async def download_backup(filename: str, active_session: ActiveSession = Depends(get_active_session)):
     """Entrega una copia existente que cumpla el formato de nombre generado."""

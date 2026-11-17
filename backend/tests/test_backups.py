@@ -254,3 +254,17 @@ def test_backup_retention_removes_oldest_when_limit_is_reached(meal_database, tm
     asyncio.run(backups.run_scheduled_backup(now=datetime(2026, 11, 12, 2, tzinfo=timezone.utc), session_factory=meal_database))
 
     assert sorted(path.name for path in backups.BACKUP_ROOT.glob("backup-*.zip")) == ["backup-20261111T020000Z.zip", "backup-20261112T020000Z.zip"]
+
+
+def test_consultar_automatizacion_requiere_sesion(meal_database):
+    """Protege también la lectura de configuración global."""
+    assert api_get("/api/v1/backups/schedule").status_code == 401
+
+
+def test_consultar_automatizacion_ausente_y_guardada(meal_database):
+    """Distingue la ausencia de programación y devuelve los valores persistidos."""
+    cookies = authenticate(meal_database)
+    response = api_get("/api/v1/backups/schedule", cookies=cookies)
+    assert response.json() == {"enabled": False, "frequency": None, "maximum": None}
+    api_post("/api/v1/backups/schedule", payload={"frequency": "weekly", "maximum": 5}, cookies=cookies, csrf_token=cookies["csrf_token"])
+    assert api_get("/api/v1/backups/schedule", cookies=cookies).json() == {"enabled": True, "frequency": "weekly", "maximum": 5}

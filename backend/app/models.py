@@ -41,6 +41,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), nullable=False)
     email_canonical: Mapped[str] = mapped_column(String(320), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(512), nullable=False)
+    ultima_vista: Mapped[str | None] = mapped_column(String(32), nullable=True)
     is_active: Mapped[bool] = mapped_column(
         default=True, server_default="true", nullable=False
     )

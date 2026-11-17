@@ -2,7 +2,7 @@
 import type { AppView } from "./AppWorkspace";
 
 const STORAGE_KEY = "comemos-en-casa:workspace-view";
-const APP_VIEWS: readonly AppView[] = ["meal-planning", "food-catalog", "recipes", "shopping-list", "product-catalog", "users"];
+const APP_VIEWS: readonly AppView[] = ["meal-planning", "food-catalog", "recipes", "shopping-list", "product-catalog", "backups", "users"];
 
 function getSessionStorage(): Storage | undefined {
   try {
@@ -12,7 +12,8 @@ function getSessionStorage(): Storage | undefined {
   }
 }
 
-function isAppView(value: string | null): value is AppView {
+// Verifica que la vista recibida sigue estando disponible.
+export function isAppView(value: string | null): value is AppView {
   return value !== null && APP_VIEWS.includes(value as AppView);
 }
 

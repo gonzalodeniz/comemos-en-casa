@@ -66,6 +66,52 @@ def login(client, email="person@example.test", password="correct horse"):
     )
 
 
+def test_last_view_is_restored_after_signing_in_again(auth_client):
+    """Comprueba que una nueva sesión recupera la vista guardada del usuario."""
+    client, _ = auth_client
+    register(client)
+    login(client)
+    response = client.put(
+        "/api/v1/auth/last-view",
+        headers={"Origin": "http://localhost:5173", "X-CSRF-Token": client.cookies[CSRF_COOKIE]},
+        json={"vista": "backups"},
+    )
+    assert response.status_code == 204
+    client.cookies.clear()
+    login(client)
+    assert client.get("/api/v1/auth/session").json()["ultima_vista"] == "backups"
+
+
+def test_last_view_is_independent_for_each_user(auth_client):
+    """Comprueba que cada cuenta recupera su propia vista."""
+    client, _ = auth_client
+    authenticated_user(client)
+    create_family_user(client)
+    headers = {"Origin": "http://localhost:5173", "X-CSRF-Token": client.cookies[CSRF_COOKIE]}
+    assert client.put("/api/v1/auth/last-view", headers=headers, json={"vista": "backups"}).status_code == 204
+    client.cookies.clear()
+    assert login(client, "other@example.test", "another secret").status_code == 200
+    assert client.get("/api/v1/auth/session").json()["ultima_vista"] is None
+    headers["X-CSRF-Token"] = client.cookies[CSRF_COOKIE]
+    assert client.put("/api/v1/auth/last-view", headers=headers, json={"vista": "recipes"}).status_code == 204
+    client.cookies.clear()
+    assert login(client).status_code == 200
+    assert client.get("/api/v1/auth/session").json()["ultima_vista"] == "backups"
+    client.cookies.clear()
+    assert login(client, "other@example.test", "another secret").status_code == 200
+    assert client.get("/api/v1/auth/session").json()["ultima_vista"] == "recipes"
+
+
+def test_last_view_update_requires_session_and_csrf(auth_client):
+    """Impide modificar la vista sin sesión o sin protección CSRF."""
+    client, _ = auth_client
+    assert client.put("/api/v1/auth/last-view", json={"vista": "recipes"}).status_code == 401
+    register(client)
+    login(client)
+    assert client.put("/api/v1/auth/last-view", headers={"Origin": "http://localhost:5173"}, json={"vista": "recipes"}).status_code == 403
+    assert client.get("/api/v1/auth/session").json()["ultima_vista"] is None
+
+
 def test_first_account_closes_bootstrap_without_automatic_login(auth_client):
     client, _ = auth_client
     assert client.get("/api/v1/auth/bootstrap").json() == {"initial_account_required": True}

@@ -621,6 +621,7 @@ describe("shopping list integration", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/auth/last-view")) return new Response(null, { status: 204 });
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Fruta", image_url: "/category-image.webp" }] }), { status: 200 });
       if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [{ id: "product-1", name: "Manzanas", image_url: "/product-image.webp" }] }), { status: 200 });
@@ -641,6 +642,7 @@ describe("shopping list integration", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/auth/last-view")) return new Response(null, { status: 204 });
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Fruta" }] }), { status: 200 });
       if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [] }), { status: 200 });
@@ -665,6 +667,7 @@ describe("shopping list integration", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/auth/last-view")) return new Response(null, { status: 204 });
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Fruta" }] }), { status: 200 });
       if (url.endsWith("/category-1/products") && _init?.method === "POST") return new Response(JSON.stringify({ id: "product-1", name: "Manzana" }), { status: 201 });
@@ -694,6 +697,7 @@ describe("shopping list integration", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/auth/last-view")) return new Response(null, { status: 204 });
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [] }), { status: 200 });
       if (url.endsWith("/shopping-list")) return new Response(JSON.stringify({ detail: "Unavailable" }), { status: 404 });
@@ -716,6 +720,7 @@ describe("shopping list integration", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/auth/last-view")) return new Response(null, { status: 204 });
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Fruta" }] }), { status: 200 });
       if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [{ id: "product-1", name: "Manzanas" }] }), { status: 200 });
@@ -750,6 +755,7 @@ describe("shopping list integration", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/auth/last-view")) return new Response(null, { status: 204 });
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Fruta" }] }), { status: 200 });
       if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [{ id: "product-1", name: "Manzanas" }] }), { status: 200 });
@@ -783,6 +789,7 @@ describe("shopping list integration", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/auth/last-view")) return new Response(null, { status: 204 });
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Fruta" }] }), { status: 200 });
       if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [{ id: "product-1", name: "Manzanas" }] }), { status: 200 });
@@ -812,6 +819,7 @@ describe("shopping list integration", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/auth/last-view")) return new Response(null, { status: 204 });
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Fruta" }] }), { status: 200 });
       if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [{ id: "product-1", name: "Manzanas" }] }), { status: 200 });
@@ -832,6 +840,7 @@ describe("shopping list integration", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/auth/last-view")) return new Response(null, { status: 204 });
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Fruta" }] }), { status: 200 });
       if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [{ id: "product-1", name: "Manzanas" }] }), { status: 200 });
@@ -861,6 +870,7 @@ describe("shopping list integration", () => {
       if (url.endsWith("/auth/session")) {
         return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
       }
+      if (url.endsWith("/auth/last-view")) return new Response(null, { status: 204 });
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Verduras" }] }), { status: 200 });
       if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [] }), { status: 200 });
@@ -881,6 +891,7 @@ describe("shopping list integration", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/auth/last-view")) return new Response(null, { status: 204 });
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories") && init?.method === "POST") return new Response(JSON.stringify({ id: "category-1", name: "Verduras" }), { status: 201 });
       if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [] }), { status: 200 });
@@ -908,6 +919,7 @@ describe("shopping list integration", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/auth/last-view")) return new Response(null, { status: 204 });
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories") && init?.method !== "POST") return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Verduras" }] }), { status: 200 });
       if (url.endsWith("/category-1/products") && init?.method !== "POST") return new Response(JSON.stringify({ products: [] }), { status: 200 });
@@ -936,6 +948,7 @@ describe("shopping list integration", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/auth/last-view")) return new Response(null, { status: 204 });
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Verduras" }] }), { status: 200 });
       if (url.endsWith("/category-1/products") && init?.method === "POST") return new Response(JSON.stringify({ detail: "Database unavailable" }), { status: 500 });
@@ -964,6 +977,7 @@ describe("shopping list integration", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/auth/last-view")) return new Response(null, { status: 204 });
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Fruta" }] }), { status: 200 });
       if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [{ id: "product-1", name: "Manzanas" }] }), { status: 200 });
@@ -995,6 +1009,7 @@ describe("shopping list integration", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/auth/last-view")) return new Response(null, { status: 204 });
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Fruta" }] }), { status: 200 });
       if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [{ id: "product-1", name: "Manzanas" }] }), { status: 200 });
@@ -1067,6 +1082,7 @@ describe("shopping list integration", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/auth/last-view")) return new Response(null, { status: 204 });
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Fruta" }] }), { status: 200 });
       if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [{ id: "product-1", name: "Manzanas" }] }), { status: 200 });
@@ -1101,6 +1117,7 @@ describe("shopping list integration", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/auth/last-view")) return new Response(null, { status: 204 });
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Fruta" }] }), { status: 200 });
       if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [{ id: "product-1", name: "Manzanas" }] }), { status: 200 });
@@ -1133,6 +1150,7 @@ describe("shopping list integration", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/auth/last-view")) return new Response(null, { status: 204 });
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Fruta" }] }), { status: 200 });
       if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [{ id: "product-1", name: "Manzanas" }] }), { status: 200 });
@@ -1161,6 +1179,7 @@ describe("shopping list integration", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/auth/last-view")) return new Response(null, { status: 204 });
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Fruta" }] }), { status: 200 });
       if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [{ id: "product-1", name: "Manzanas" }] }), { status: 200 });
@@ -1187,6 +1206,7 @@ describe("shopping list integration", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/auth/last-view")) return new Response(null, { status: 204 });
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Verduras" }] }), { status: 200 });
       if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ detail: "Database unavailable" }), { status: 500 });
@@ -1210,6 +1230,7 @@ describe("shopping list integration", () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return new Response(JSON.stringify({ user: { id: "user-1", name: "Ada", email: "ada@example.test" }, csrf_token: "csrf-1" }), { status: 200 });
+      if (url.endsWith("/auth/last-view")) return new Response(null, { status: 204 });
       if (url.endsWith("/users")) return new Response(JSON.stringify({ users: [] }), { status: 200 });
       if (url.endsWith("/shopping-categories")) return new Response(JSON.stringify({ categories: [{ id: "category-1", name: "Fruta" }] }), { status: 200 });
       if (url.endsWith("/category-1/products")) return new Response(JSON.stringify({ products: [{ id: "product-1", name: "Manzanas" }] }), { status: 200 });

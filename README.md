@@ -21,6 +21,8 @@ Compose usa PostgreSQL 16. Para reutilizar un volumen con una base heredada inco
 
 La API usa `/api/v1`. Autenticación: `GET /auth/bootstrap`, `POST /auth/register-initial`, `POST /auth/login`, `GET /auth/session`, `POST /auth/logout` y `POST /users` (creación privada). HU-002 añade `GET /food-labels`, `GET /meal-planning`, `POST /meal-planning/preview` y `POST /meal-planning/operations`. Las escrituras requieren un `Origin` permitido; los POST de planificación requieren además el token CSRF de la sesión. El registro inicial no inicia sesión automáticamente. Consulta los manuales para detalles y el estado HU-002 para las limitaciones de verificación actuales.
 
+La última vista principal se guarda por usuario con `PUT /auth/last-view` (requiere sesión y CSRF) y se recupera mediante `GET /auth/session`, también desde otro dispositivo. Si no existe o ya no es válida, se abre Planificación. Requiere aplicar la migración `0021_user_last_view`.
+
 ## Pruebas
 
 Para probar la integración, usá un **proyecto Compose aislado** sobre una base nueva; no ejecutes estas comprobaciones contra datos que quieras conservar. Si ya tenés otra instancia ocupando los puertos 80, 443 o 5173, detenela primero o usa otro host/proyecto aislado. Desde la raíz:

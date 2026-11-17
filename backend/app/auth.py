@@ -79,6 +79,11 @@ class LoginCredentials(BaseModel):
     password: str = Field(min_length=1, max_length=4096)
 
 
+class UltimaVista(BaseModel):
+    """Valida la vista que se desea guardar para la cuenta."""
+    vista: str = Field(min_length=1, max_length=32)
+
+
 class UserUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=150)
     email: str | None = Field(default=None, min_length=3, max_length=320)
@@ -607,7 +612,21 @@ async def current_session(
     if digest_token(csrf_token) != active_session.session.csrf_token_digest:
         csrf_token = ""
     response.headers["Cache-Control"] = "no-store"
-    return {"user": public_user(active_session.user), "csrf_token": csrf_token}
+    return {"user": public_user(active_session.user), "csrf_token": csrf_token, "ultima_vista": active_session.user.ultima_vista}
+
+
+@router.put("/auth/last-view", status_code=status.HTTP_204_NO_CONTENT)
+async def guardar_ultima_vista(
+    datos: UltimaVista,
+    request: Request,
+    active_session: ActiveSession = Depends(get_active_session),
+    db: Session = Depends(get_database_session),
+) -> Response:
+    """Guarda la última vista de la cuenta autenticada."""
+    require_csrf(request, active_session)
+    active_session.user.ultima_vista = datos.vista
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT)

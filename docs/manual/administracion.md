@@ -171,7 +171,7 @@ Ambas deben indicar `0005_meal_planning (head)` en una instalación que incluya 
 
 El alta inicial se cierra después de crear la primera cuenta. Después, cualquier usuario activo puede crear familiares, editar sus datos, activar/desactivar, cambiar contraseñas ajenas y eliminar cuentas. No hay consola/API privilegiada reservada a operadores. No se puede desactivar o eliminar la última cuenta activa, ni desactivar la propia; las desactivaciones y cambios de contraseña revocan las sesiones afectadas. El borrado es permanente.
 
-La aplicación aplica contraseñas de 8–128 caracteres, Argon2id, cookies de sesión revocables (30 minutos de inactividad, 8 horas absolutas), CSRF y verificación de origen para escrituras; limita intentos de inicio de sesión y recuperación. Uvicorn no confía en cabeceras de proxy por defecto. No configures un proxy confiable sin un diseño explícito: la detección de IP afecta a los límites de intentos. La longitud mínima de contraseña y la falta de MFA requieren una evaluación de riesgo antes de uso público.
+La aplicación aplica contraseñas de 8–128 caracteres, Argon2id, cookies de sesión persistentes y revocables con una duración máxima de una semana, CSRF y verificación de origen para escrituras; limita intentos de inicio de sesión y recuperación. Las sesiones emitidas antes del cambio conservan su vencimiento original. Una duración mayor aumenta la exposición si se roba una sesión o se comparte el dispositivo. Uvicorn no confía en cabeceras de proxy por defecto. No configures un proxy confiable sin un diseño explícito: la detección de IP afecta a los límites de intentos. La longitud mínima de contraseña y la falta de MFA requieren una evaluación de riesgo antes de uso público.
 
 ## Planificación de comidas
 

@@ -46,8 +46,8 @@ router = APIRouter(prefix="/api/v1", tags=["authentication"])
 
 SESSION_COOKIE = "session"
 CSRF_COOKIE = "csrf_token"
-SESSION_IDLE_TIMEOUT = timedelta(minutes=30)
-SESSION_ABSOLUTE_TIMEOUT = timedelta(hours=8)
+SESSION_IDLE_TIMEOUT = timedelta(days=7)
+SESSION_ABSOLUTE_TIMEOUT = timedelta(days=7)
 LOGIN_WINDOW = timedelta(minutes=15)
 LOGIN_LOCK_DURATION = timedelta(minutes=15)
 LOGIN_FAILURE_LIMIT = 5
@@ -472,6 +472,7 @@ def issue_session(
         secure=secure,
         samesite="lax",
         path="/",
+        max_age=int(SESSION_ABSOLUTE_TIMEOUT.total_seconds()),
     )
     response.set_cookie(
         CSRF_COOKIE,
@@ -480,6 +481,7 @@ def issue_session(
         secure=secure,
         samesite="lax",
         path="/",
+        max_age=int(SESSION_ABSOLUTE_TIMEOUT.total_seconds()),
     )
 
 

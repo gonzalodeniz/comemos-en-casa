@@ -57,7 +57,7 @@ app.include_router(backups_router)
 @app.middleware("http")
 async def serialize_writes_during_backup(request, call_next):
     """Serializa las escrituras para que una copia capture un estado consistente."""
-    if request.method in {"POST", "PATCH", "DELETE"} and request.url.path != "/api/v1/backups":
+    if request.method in {"POST", "PATCH", "DELETE"} and request.url.path != "/api/v1/backups" and not request.url.path.endswith("/restore"):
         async with _WRITE_LOCK:
             return await call_next(request)
     return await call_next(request)

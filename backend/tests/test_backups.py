@@ -73,3 +73,64 @@ def test_backup_download_rejects_unknown_filename(meal_database, tmp_path, monke
     response = api_get("/api/v1/backups/../../secret.zip", cookies=cookies)
 
     assert response.status_code == 404
+
+
+def test_backup_restore_requires_authenticated_user(meal_database):
+    response = api_post("/api/v1/backups/backup-20261117T100000Z.zip/restore", payload={})
+
+    assert response.status_code == 401
+
+
+def test_backup_restore_replaces_database_and_images_from_archive(meal_database, tmp_path, monkeypatch):
+    import zipfile
+    import app.backups as backups
+
+    monkeypatch.setattr(backups, "BACKUP_ROOT", tmp_path / "backups")
+    backups.BACKUP_ROOT.mkdir()
+    archive = backups.BACKUP_ROOT / "backup-20261117T100000Z.zip"
+    with zipfile.ZipFile(archive, "w") as package:
+        package.writestr("database.sql", "-- valid dump")
+        package.writestr("images/comidas/item.webp", b"image")
+    restored = []
+    monkeypatch.setattr(backups, "restore_backup_contents", lambda source: restored.append(source))
+    cookies = authenticate(meal_database)
+
+    response = api_post(f"/api/v1/backups/{archive.name}/restore", payload={}, cookies=cookies, csrf_token=cookies["csrf_token"])
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "restored"}
+    assert restored == [archive]
+
+
+def test_backup_restore_rejects_invalid_archive_and_reports_manual_recovery(meal_database, tmp_path, monkeypatch):
+    import app.backups as backups
+
+    monkeypatch.setattr(backups, "BACKUP_ROOT", tmp_path / "backups")
+    backups.BACKUP_ROOT.mkdir()
+    (backups.BACKUP_ROOT / "backup-20261117T100000Z.zip").write_bytes(b"not a zip")
+    cookies = authenticate(meal_database)
+
+    response = api_post("/api/v1/backups/backup-20261117T100000Z.zip/restore", payload={}, cookies=cookies, csrf_token=cookies["csrf_token"])
+
+    assert response.status_code == 500
+    assert "recuperación debe realizarse manualmente" in response.json()["detail"]
+
+
+def test_restore_service_applies_database_and_restores_image_files(tmp_path, monkeypatch):
+    import zipfile
+    import app.backups as backups
+
+    monkeypatch.setattr(backups, "BACKUP_ROOT", tmp_path / "backups")
+    monkeypatch.setattr(backups, "DATA_ROOT", tmp_path / "data")
+    backups.BACKUP_ROOT.mkdir()
+    archive = backups.BACKUP_ROOT / "backup-20261117T100000Z.zip"
+    with zipfile.ZipFile(archive, "w") as package:
+        package.writestr("database.sql", "-- dump")
+        package.writestr("images/comidas/new.webp", b"new image")
+    executed = []
+    monkeypatch.setattr(backups, "restore_database_dump", lambda source: executed.append(source.read_text()))
+
+    backups.restore_backup_contents(archive)
+
+    assert executed == ["-- dump"]
+    assert (backups.DATA_ROOT / "comidas/new.webp").read_bytes() == b"new image"

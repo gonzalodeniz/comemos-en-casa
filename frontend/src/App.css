@@ -530,6 +530,11 @@ span.meal-thumbnail[role="button"]:focus-visible { outline:3px solid #00854a; ou
 .catalogo-editor { max-width: 42rem; margin-top: 2rem; padding: 1.5rem; border: 1px solid #d8e5eb; border-radius: 1rem; background: #fff; }
 .catalogo-editor h3 { margin-top: 0; }
 .catalogo-editor > button { margin: 1rem .75rem 0 0; }
+.catalogo-acciones-producto { display: flex; align-items: center; gap: .75rem; margin-top: 1rem; }
+.catalogo-acciones-producto button { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; }
+.catalogo-confirmar-borrado { justify-content: center; gap: 2rem; }
+.catalogo-acciones-producto .catalogo-borrar-producto { margin-left: auto; background: transparent; color: #b42329; }
+.catalogo-acciones-producto .catalogo-borrar-producto:hover:not(:disabled) { background: #fce8e8; }
 /* Limita el tamaño del modal y permite desplazar su contenido en pantallas pequeñas. */
 .catalogo-modal { width: min(42rem, calc(100% - 2rem)); max-height: calc(100vh - 2rem); overflow: auto; border: 1px solid #d8e5eb; border-radius: 1rem; padding: 1.5rem; }
 .catalogo-modal::backdrop { background: rgb(16 54 66 / 45%); }

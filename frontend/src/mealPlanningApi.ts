@@ -20,6 +20,11 @@ export function obtenerListaCompra(): Promise<{ items: ShoppingListItem[]; purch
   return apiRequest("/shopping-list");
 }
 
+/** Elimina un producto del catálogo y sus entradas de compra. */
+export function borrarProductoCatalogo(categoriaId: string, productoId: string, csrfToken: string): Promise<null> {
+  return apiRequest(`/shopping-categories/${categoriaId}/products/${productoId}`, { method: "DELETE", csrfToken });
+}
+
 /** Cambia el estado de compra de un ingrediente de receta. */
 export function marcarIngredienteReceta(id: string, csrfToken: string): Promise<unknown> {
   return apiRequest(`/shopping-list/recipe-ingredients/${id}/purchase`, { method: "POST", csrfToken });

@@ -145,6 +145,6 @@ export default function ProductCatalog({ categories, cargandoCategorias, errorCa
       <ImagenCatalogo key={versionEditor} importar={importar} cambiar={(datos, area, ocupado) => { setImagen(datos); setRecorte(area); setLeyendo(ocupado); if (datos || ocupado) setQuitar(false); }} />
       {editor.imagen && <label><input type="checkbox" checked={quitar} onChange={(evento) => { setQuitar(evento.target.checked); if (evento.target.checked) { setImagen(""); setRecorte(null); setLeyendo(false); setVersionEditor((actual) => actual + 1); } }} />Quitar imagen actual</label>}
       <button type="submit" disabled={guardando || leyendo}>{guardando ? "Guardando…" : "Guardar"}</button><button type="button" disabled={guardando} onClick={() => abrirEditor(null)}>Cancelar</button>
-    </form>; return editor.id && editor.tipo === "producto" ? <ModalProducto titulo={"Producto " + editor.nombre} cerrar={() => abrirEditor(null)} ocupado={guardando}>{formulario}</ModalProducto> : formulario; })()}
+    </form>; return editor.id && editor.tipo === "producto" ? <ModalProducto titulo={"Producto " + editor.nombre} cerrar={() => abrirEditor(null)} ocupado={guardando}>{formulario}</ModalProducto> : editor.id && editor.tipo === "categoria" ? <ModalProducto titulo={"Categoría " + editor.nombre} cerrar={() => abrirEditor(null)} ocupado={guardando}>{formulario}</ModalProducto> : formulario; })()}
   </section>;
 }

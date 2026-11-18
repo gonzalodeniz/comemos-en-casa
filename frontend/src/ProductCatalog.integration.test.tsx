@@ -51,6 +51,14 @@ it("renombra una categoría desde el catálogo", async () => {
   expect(actualizar).toHaveBeenCalledWith("1", { name: "Fruta fresca" });
 });
 
+// Comprueba que la edición de categoría se presenta como ventana modal.
+it("abre la edición de categoría en un diálogo modal", async () => {
+  const usuario = userEvent.setup();
+  render(<ProductCatalog categories={[{ id: "1", name: "Frutas", image_url: "/imagen" }]} onGetProducts={vi.fn()} onCreateCategory={vi.fn()} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} onUpdateCategoryImage={vi.fn()} onUpdateProductImage={vi.fn()} onImportImage={vi.fn()} onPrepareImage={vi.fn()} />);
+  await usuario.click(screen.getByRole("button", { name: "Editar categoría Frutas" }));
+  expect(screen.getByRole("dialog", { name: "Categoría Frutas" })).toBeTruthy();
+});
+
 // Comprueba que el error de duplicidad se muestra sin cerrar el editor.
 it("avisa al intentar renombrar una categoría con un nombre duplicado", async () => {
   const usuario = userEvent.setup();

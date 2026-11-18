@@ -57,6 +57,8 @@ async def create_category(
         db.commit()
     except IntegrityError as error:
         db.rollback()
+        if image_path:
+            images._remove_food_image(image_path, "productos")
         raise HTTPException(status_code=409, detail="Category already exists") from error
     db.refresh(category)
     return {"id": str(category.id), "name": category.name, "image_url": f"/shopping-categories/{category.id}/image?v={hashlib.sha256(category.image_path.encode('utf-8')).hexdigest()}"} if category.image_path else {"id": str(category.id), "name": category.name}
@@ -79,21 +81,32 @@ async def get_category_image(category_id: UUID,
 @images.serialized_image_publication
 async def update_category_image(category_id: UUID, payload: dict[str, object], request: Request,
     session: ActiveSession = Depends(get_active_session), db: Session = Depends(get_database_session)):
-    """Sustituye o elimina la imagen de una categoría."""
+    """Modifica el nombre o la imagen de una categoría."""
     require_csrf(request, session)
-    if set(payload) not in ({"image_token"}, {"remove_image"}) or ("remove_image" in payload and payload["remove_image"] is not True):
+    if not payload or set(payload) - {"name", "image_token", "remove_image"} or ("image_token" in payload and "remove_image" in payload) or ("remove_image" in payload and payload["remove_image"] is not True):
         raise HTTPException(status_code=422, detail="Invalid image update")
+    if "name" in payload and (not isinstance(payload["name"], str) or not payload["name"].strip() or len(payload["name"].strip()) > 100):
+        raise HTTPException(status_code=422, detail="Invalid category name")
     if "image_token" in payload and not isinstance(payload["image_token"], str):
         raise HTTPException(status_code=422, detail="Invalid image token")
     category = db.get(ShoppingCategory, category_id)
     if category is None:
         raise HTTPException(status_code=404, detail="Category not found")
     old_path = category.image_path
-    new_path = None if payload.get("remove_image") else publish_temporary(images.DATA_ROOT, session.session.id, payload["image_token"], category="productos")
-    if not payload.get("remove_image") and new_path is None:
+    new_path = None if payload.get("remove_image") else publish_temporary(images.DATA_ROOT, session.session.id, payload["image_token"], category="productos") if "image_token" in payload else old_path
+    if "image_token" in payload and new_path is None:
         raise HTTPException(status_code=422, detail="Prepared image expired")
+    if "name" in payload:
+        category.name = payload["name"].strip()
+        category.name_canonical = unicodedata.normalize("NFC", category.name).casefold()
     category.image_path = new_path
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as error:
+        db.rollback()
+        if new_path and new_path != old_path:
+            images._remove_food_image(new_path, "productos")
+        raise HTTPException(status_code=409, detail="Category already exists") from error
     if old_path and old_path != new_path:
         images._remove_food_image(old_path, "productos")
     return {"id": str(category.id), "name": category.name, "image_url": f"/shopping-categories/{category.id}/image?v={hashlib.sha256(new_path.encode('utf-8')).hexdigest()}" if new_path else None}

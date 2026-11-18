@@ -6,7 +6,7 @@ import AppIcon from "./AppIcon";
 import type { ShoppingCategory, ShoppingProduct } from "./mealPlanningApi";
 
 // Describe una actualización de la imagen de un elemento existente.
-type CambioImagen = { image_token: string } | { remove_image: true };
+type CambioImagen = { name?: string; image_token?: string; remove_image?: true };
 // Describe una modificación del nombre y, opcionalmente, de la imagen del producto.
 type CambioProducto = { name?: string; image_token?: string; remove_image?: true };
 // Define los servicios existentes y el estado de carga del catálogo.
@@ -70,7 +70,7 @@ export default function ProductCatalog({ categories, cargandoCategorias, errorCa
   /** Abre un editor nuevo sin conservar imágenes de otro formulario. */
   function abrirEditor(valor: Editor) {
     setEditor(valor); setImagen(""); setRecorte(null); setLeyendo(false);
-    setQuitar(false); setError(""); setNombre(valor?.id && valor.tipo === "producto" ? valor.nombre : ""); setVersionEditor((actual) => actual + 1);
+    setQuitar(false); setError(""); setNombre(valor?.id ? valor.nombre : ""); setVersionEditor((actual) => actual + 1);
   }
 
   /** Importa una imagen y propaga los errores de sesión. */
@@ -83,11 +83,11 @@ export default function ProductCatalog({ categories, cargandoCategorias, errorCa
   async function guardar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     if (!editor || guardando) return;
-    if (((!editor.id || editor.tipo === "producto") && !nombre.trim()) || leyendo || (imagen && !recorte)) {
+    if (!nombre.trim() || leyendo || (imagen && !recorte)) {
       setError(leyendo || imagen ? "Espera a que la imagen esté lista antes de guardar." : "Indica un nombre.");
       return;
     }
-    if (editor.id && editor.tipo === "categoria" && !imagen && !quitar) { setError("Selecciona una imagen o indica que deseas quitarla."); return; }
+    if (editor.id && editor.tipo === "categoria" && nombre.trim() === editor.nombre && !imagen && !quitar) { abrirEditor(null); return; }
     setGuardando(true); setError("");
     try {
       const token = imagen && recorte ? await onPrepareImage(imagen, recorte) : undefined;
@@ -99,13 +99,13 @@ export default function ProductCatalog({ categories, cargandoCategorias, errorCa
         try { setProductos(await onGetProducts(categoria.id)); }
         catch (causa) { informar(causa, "Producto creado; no se pudo actualizar su imagen."); }
       } else if (editor.tipo === "categoria") {
-        await onUpdateCategoryImage(editor.id, token ? { image_token: token } : { remove_image: true });
+        await onUpdateCategoryImage(editor.id, { ...(nombre.trim() !== editor.nombre ? { name: nombre.trim() } : {}), ...(token ? { image_token: token } : quitar ? { remove_image: true as const } : {}) });
       } else if (categoria) {
         const actualizado = await onUpdateProductImage(categoria.id, editor.id, { name: nombre.trim(), ...(token ? { image_token: token } : quitar ? { remove_image: true as const } : {}) });
         setProductos((actuales) => actuales.map((item) => item.id === editor.id ? actualizado : item));
       }
       setEditor(null); setImagen(""); setRecorte(null); setNombre("");
-    } catch (causa) { informar(causa, causa instanceof ApiError && causa.status === 409 ? "Ya existe un producto con ese nombre." : "No se pudo guardar. Inténtalo de nuevo."); }
+    } catch (causa) { informar(causa, causa instanceof ApiError && causa.status === 409 ? (editor.tipo === "categoria" ? "Ya existe una categoría con ese nombre." : "Ya existe un producto con ese nombre.") : "No se pudo guardar. Inténtalo de nuevo."); }
     finally { setGuardando(false); }
   }
 
@@ -134,17 +134,17 @@ export default function ProductCatalog({ categories, cargandoCategorias, errorCa
       <button className="catalogo-crear" type="button" disabled={guardando || cargandoCategorias || !!errorCategorias} onClick={() => abrirEditor({ tipo: "categoria", id: "", nombre: "", imagen: false })}><AppIcon name="plus" />Nueva categoría</button></div>
       {cargandoCategorias ? <p role="status">Cargando categorías…</p> : errorCategorias ? <div role="alert">{errorCategorias} <button type="button" onClick={onReintentarCategorias}>Reintentar</button></div> : categories.length === 0 ? <p>No hay categorías disponibles.</p> : <div className="catalogo-productos-grid">{[...categories].sort((a, b) => a.name.localeCompare(b.name, "es")).map((elemento) => <article className="catalogo-productos-tarjeta" key={elemento.id}>
         <button className="catalogo-tarjeta-contenido" type="button" disabled={guardando} onClick={() => void abrirCategoria(elemento)}>{elemento.image_url ? <img src={urlImagen(elemento.image_url)} alt="" /> : <span className="catalogo-productos-imagen" aria-hidden="true"><AppIcon name="utensils" /></span>}<strong>{elemento.name}</strong></button>
-        <button className="catalogo-accion" type="button" aria-label={"Gestionar imagen de " + elemento.name} title="Gestionar imagen" disabled={guardando} onClick={() => abrirEditor({ tipo: "categoria", id: elemento.id, nombre: elemento.name, imagen: !!elemento.image_url })}><span aria-hidden="true">⋮</span></button>
+        <button className="catalogo-accion" type="button" aria-label={"Editar categoría " + elemento.name} title="Editar categoría" disabled={guardando} onClick={() => abrirEditor({ tipo: "categoria", id: elemento.id, nombre: elemento.name, imagen: !!elemento.image_url })}><span aria-hidden="true">⋮</span></button>
       </article>)}</div>}
     </>}
     {error && !(editor?.tipo === "producto" && editor.id) && <p role="alert">{error}</p>}
-    {editor && (() => { const formulario = <form className="catalogo-editor" onSubmit={(evento) => void guardar(evento)} aria-label={editor.id && editor.tipo === "producto" ? "Producto " + editor.nombre : editor.id ? "Imagen de " + editor.nombre : editor.tipo === "categoria" ? "Nueva categoría" : "Nuevo producto"}>
-      {!(editor.id && editor.tipo === "producto") && <h3>{editor.id ? "Imagen de " + editor.nombre : editor.tipo === "categoria" ? "Nueva categoría" : "Nuevo producto"}</h3>}
+    {editor && (() => { const formulario = <form className="catalogo-editor" onSubmit={(evento) => void guardar(evento)} aria-label={editor.id && editor.tipo === "producto" ? "Producto " + editor.nombre : editor.id ? "Categoría " + editor.nombre : editor.tipo === "categoria" ? "Nueva categoría" : "Nuevo producto"}>
+      {!(editor.id && editor.tipo === "producto") && <h3>{editor.id ? "Categoría " + editor.nombre : editor.tipo === "categoria" ? "Nueva categoría" : "Nuevo producto"}</h3>}
       {editor.id && editor.tipo === "producto" && error && <p role="alert">{error}</p>}
-      {(!editor.id || editor.tipo === "producto") && <label>{editor.tipo === "categoria" ? "Nombre de la categoría" : "Nombre del producto"}<input value={nombre} onChange={(evento) => setNombre(evento.target.value)} maxLength={100} required /></label>}
+      <label>{editor.tipo === "categoria" ? "Nombre de la categoría" : "Nombre del producto"}<input value={nombre} onChange={(evento) => setNombre(evento.target.value)} maxLength={100} required /></label>
       <ImagenCatalogo key={versionEditor} importar={importar} cambiar={(datos, area, ocupado) => { setImagen(datos); setRecorte(area); setLeyendo(ocupado); if (datos || ocupado) setQuitar(false); }} />
       {editor.imagen && <label><input type="checkbox" checked={quitar} onChange={(evento) => { setQuitar(evento.target.checked); if (evento.target.checked) { setImagen(""); setRecorte(null); setLeyendo(false); setVersionEditor((actual) => actual + 1); } }} />Quitar imagen actual</label>}
       <button type="submit" disabled={guardando || leyendo}>{guardando ? "Guardando…" : "Guardar"}</button><button type="button" disabled={guardando} onClick={() => abrirEditor(null)}>Cancelar</button>
-    </form>; return editor.id && editor.tipo === "producto" ? <ModalProducto titulo={"Producto " + editor.nombre} cerrar={() => abrirEditor(null)} ocupado={guardando}>{formulario}</ModalProducto> : formulario; })()}
+    </form>; return editor.id && editor.tipo === "producto" ? <ModalProducto titulo={"Producto " + editor.nombre} cerrar={() => abrirEditor(null)} ocupado={guardando}>{formulario}</ModalProducto> : editor.id && editor.tipo === "categoria" ? <ModalProducto titulo={"Categoría " + editor.nombre} cerrar={() => abrirEditor(null)} ocupado={guardando}>{formulario}</ModalProducto> : formulario; })()}
   </section>;
 }

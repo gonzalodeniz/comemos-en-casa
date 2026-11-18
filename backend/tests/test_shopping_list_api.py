@@ -10,6 +10,82 @@ from meal_planning_test_support import (
 )
 
 
+def test_renombrar_categoria_conserva_productos_e_imagen(meal_database):
+    """Comprueba que renombrar una categoría no altera sus productos ni su imagen."""
+    from meal_planning_test_support import api_patch
+
+    cookies = authenticate(meal_database)
+    with meal_database() as db:
+        categoria = ShoppingCategory(name="Fruta", image_path="productos/fruta.webp")
+        db.add(categoria)
+        db.flush()
+        db.add(ShoppingProduct(category_id=categoria.id, name="Pera"))
+        db.commit()
+        categoria_id = str(categoria.id)
+
+    ruta = f"/api/v1/shopping-categories/{categoria_id}"
+    respuesta = api_patch(ruta, payload={"name": "Frutas"}, cookies=cookies, csrf_token=cookies["csrf_token"])
+
+    assert respuesta.status_code == 200
+    assert respuesta.json()["name"] == "Frutas"
+    categoria_guardada = next(c for c in api_get("/api/v1/shopping-categories", cookies=cookies).json()["categories"] if c["id"] == categoria_id)
+    assert categoria_guardada["name"] == "Frutas"
+    assert categoria_guardada["image_url"].startswith(f"/shopping-categories/{categoria_id}/image?")
+    assert [p["name"] for p in api_get(f"{ruta}/products", cookies=cookies).json()["products"]] == ["Pera"]
+
+
+def test_categorias_rechazan_nombres_duplicados_al_crear_y_renombrar(meal_database):
+    """Comprueba la unicidad de nombres al crear y modificar categorías."""
+    from meal_planning_test_support import api_patch
+
+    cookies = authenticate(meal_database)
+    primera = post_with_session("/api/v1/shopping-categories", {"name": "Frutas"}, cookies).json()
+    segunda = post_with_session("/api/v1/shopping-categories", {"name": "Verduras"}, cookies).json()
+    duplicada = post_with_session("/api/v1/shopping-categories", {"name": "  FRUTAS  "}, cookies)
+    cambio = api_patch(f"/api/v1/shopping-categories/{segunda['id']}", payload={"name": " frutas "}, cookies=cookies, csrf_token=cookies["csrf_token"])
+    assert duplicada.status_code == 409
+    assert cambio.status_code == 409
+    categorias = api_get("/api/v1/shopping-categories", cookies=cookies).json()["categories"]
+    assert {c["id"]: c["name"] for c in categorias} == {primera["id"]: "Frutas", segunda["id"]: "Verduras"}
+
+
+def test_renombrar_categoria_y_quitar_imagen_en_una_operacion(meal_database):
+    """Comprueba que nombre e imagen pueden modificarse simultáneamente."""
+    from meal_planning_test_support import api_patch
+
+    cookies = authenticate(meal_database)
+    with meal_database() as db:
+        categoria = ShoppingCategory(name="Fruta", image_path="productos/fruta.webp")
+        db.add(categoria)
+        db.commit()
+        identificador = str(categoria.id)
+    respuesta = api_patch(f"/api/v1/shopping-categories/{identificador}", payload={"name": "Frutas", "remove_image": True}, cookies=cookies, csrf_token=cookies["csrf_token"])
+    assert respuesta.status_code == 200
+    assert respuesta.json()["name"] == "Frutas"
+    assert respuesta.json()["image_url"] is None
+
+
+def test_migracion_categorias_rechaza_colisiones_sin_modificar_datos(tmp_path, monkeypatch):
+    """Comprueba que la migración se detiene antes de alterar categorías duplicadas."""
+    import sqlite3
+    import pytest
+    from alembic import command
+    from alembic.config import Config
+
+    database = tmp_path / "categorias.sqlite"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite+pysqlite:///{database}")
+    with sqlite3.connect(database) as conexion:
+        conexion.execute("CREATE TABLE shopping_categories (id TEXT PRIMARY KEY, name TEXT NOT NULL, image_path TEXT)")
+        conexion.executemany("INSERT INTO shopping_categories (id, name) VALUES (?, ?)", [("1", "Frutas"), ("2", " frutas ")])
+    config = Config("alembic.ini")
+    command.stamp(config, "0021_user_last_view")
+    with pytest.raises(RuntimeError, match="Categorías con nombres duplicados"):
+        command.upgrade(config, "head")
+    with sqlite3.connect(database) as conexion:
+        assert conexion.execute("SELECT name FROM shopping_categories ORDER BY id").fetchall() == [("Frutas",), (" frutas ",)]
+        assert "name_canonical" not in [columna[1] for columna in conexion.execute("PRAGMA table_info(shopping_categories)")]
+
+
 def test_list_shows_recipe_sections_with_ordered_ingredients(meal_database):
     """Comprueba que la lista muestra las secciones y sus ingredientes ordenados."""
     cookies = authenticate(meal_database)

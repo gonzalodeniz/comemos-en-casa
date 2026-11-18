@@ -64,7 +64,7 @@ export function createShoppingCategory(name: string, csrfToken: string, imageTok
 }
 
 /** Actualiza la imagen de una categoría existente. */
-export function updateShoppingCategoryImage(categoryId: string, csrfToken: string, change: { image_token: string } | { remove_image: true }): Promise<ShoppingCategory> {
+export function updateShoppingCategoryImage(categoryId: string, csrfToken: string, change: { name?: string; image_token?: string; remove_image?: true }): Promise<ShoppingCategory> {
   return apiRequest(`/shopping-categories/${categoryId}`, { method: "PATCH", csrfToken, body: change });
 }
 

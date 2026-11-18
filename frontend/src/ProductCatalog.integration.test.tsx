@@ -37,6 +37,45 @@ it("renombra un producto sin modificar su imagen", async () => {
   expect(await screen.findByText("Pera conferencia")).toBeTruthy();
 });
 
+// Comprueba la edición del nombre de una categoría sin modificar su imagen.
+it("renombra una categoría desde el catálogo", async () => {
+  const usuario = userEvent.setup();
+  const actualizar = vi.fn().mockResolvedValue({ id: "1", name: "Fruta fresca", image_url: "/imagen" });
+  render(<ProductCatalog categories={[{ id: "1", name: "Frutas", image_url: "/imagen" }]} onGetProducts={vi.fn()} onCreateCategory={vi.fn()} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} onUpdateCategoryImage={actualizar} onUpdateProductImage={vi.fn()} onImportImage={vi.fn()} onPrepareImage={vi.fn()} />);
+  await usuario.click(screen.getByRole("button", { name: "Editar categoría Frutas" }));
+  const nombre = screen.getByLabelText("Nombre de la categoría");
+  expect((nombre as HTMLInputElement).value).toBe("Frutas");
+  await usuario.clear(nombre);
+  await usuario.type(nombre, "Fruta fresca");
+  await usuario.click(screen.getByRole("button", { name: "Guardar" }));
+  expect(actualizar).toHaveBeenCalledWith("1", { name: "Fruta fresca" });
+});
+
+// Comprueba que el error de duplicidad se muestra sin cerrar el editor.
+it("avisa al intentar renombrar una categoría con un nombre duplicado", async () => {
+  const usuario = userEvent.setup();
+  render(<ProductCatalog categories={[{ id: "1", name: "Frutas" }]} onGetProducts={vi.fn()} onCreateCategory={vi.fn()} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} onUpdateCategoryImage={vi.fn().mockRejectedValue(new ApiError(409, "Duplicate"))} onUpdateProductImage={vi.fn()} onImportImage={vi.fn()} onPrepareImage={vi.fn()} />);
+  await usuario.click(screen.getByRole("button", { name: "Editar categoría Frutas" }));
+  await usuario.clear(screen.getByLabelText("Nombre de la categoría"));
+  await usuario.type(screen.getByLabelText("Nombre de la categoría"), "Verduras");
+  await usuario.click(screen.getByRole("button", { name: "Guardar" }));
+  expect((await screen.findByRole("alert")).textContent).toBe("Ya existe una categoría con ese nombre.");
+  expect((screen.getByLabelText("Nombre de la categoría") as HTMLInputElement).value).toBe("Verduras");
+});
+
+// Comprueba que cancelar descarta el nombre escrito.
+it("cancela la edición del nombre de una categoría", async () => {
+  const usuario = userEvent.setup();
+  const actualizar = vi.fn();
+  render(<ProductCatalog categories={[{ id: "1", name: "Frutas" }]} onGetProducts={vi.fn()} onCreateCategory={vi.fn()} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} onUpdateCategoryImage={actualizar} onUpdateProductImage={vi.fn()} onImportImage={vi.fn()} onPrepareImage={vi.fn()} />);
+  await usuario.click(screen.getByRole("button", { name: "Editar categoría Frutas" }));
+  await usuario.clear(screen.getByLabelText("Nombre de la categoría"));
+  await usuario.type(screen.getByLabelText("Nombre de la categoría"), "Verduras");
+  await usuario.click(screen.getByRole("button", { name: "Cancelar" }));
+  expect(actualizar).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "Frutas" })).toBeTruthy();
+});
+
 it("notifica la expiración de la sesión al fallar la consulta de productos", async () => {
   const usuario = userEvent.setup();
   const expiracion = vi.fn();
@@ -67,7 +106,7 @@ it("quita la imagen de una categoría solo al guardar", async () => {
   const usuario = userEvent.setup();
   const actualizar = vi.fn().mockResolvedValue({ id: "1", name: "Frutas" });
   render(<ProductCatalog categories={[{ id: "1", name: "Frutas", image_url: "/imagen" }]} onGetProducts={vi.fn()} onCreateCategory={vi.fn()} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} onUpdateCategoryImage={actualizar} onUpdateProductImage={vi.fn()} onImportImage={vi.fn()} onPrepareImage={vi.fn()} />);
-  await usuario.click(screen.getByRole("button", { name: "Gestionar imagen de Frutas" }));
+  await usuario.click(screen.getByRole("button", { name: "Editar categoría Frutas" }));
   await usuario.click(screen.getByLabelText("Quitar imagen actual"));
   expect(actualizar).not.toHaveBeenCalled();
   await usuario.click(screen.getByRole("button", { name: "Guardar" }));
@@ -104,7 +143,7 @@ it("conserva la imagen anterior si falla la preparación de la nueva", async () 
   const usuario = userEvent.setup();
   const actualizar = vi.fn();
   render(<ProductCatalog categories={[{ id: "1", name: "Frutas", image_url: "/imagen" }]} onGetProducts={vi.fn()} onCreateCategory={vi.fn()} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} onUpdateCategoryImage={actualizar} onUpdateProductImage={vi.fn()} onImportImage={vi.fn().mockResolvedValue("data:image/png;base64,YQ==")} onPrepareImage={vi.fn().mockRejectedValue(new Error("fallo"))} />);
-  await usuario.click(screen.getByRole("button", { name: "Gestionar imagen de Frutas" }));
+  await usuario.click(screen.getByRole("button", { name: "Editar categoría Frutas" }));
   await usuario.type(screen.getByLabelText("URL de imagen"), "https://example.com/imagen.png");
   await usuario.click(screen.getByRole("button", { name: "Importar imagen" }));
   await usuario.click(await screen.findByRole("button", { name: "Confirmar recorte" }));
@@ -118,7 +157,7 @@ it("permite quitar la imagen después de cancelar una importación pendiente", a
   const usuario = userEvent.setup();
   const actualizar = vi.fn().mockResolvedValue({ id: "1", name: "Frutas" });
   render(<ProductCatalog categories={[{ id: "1", name: "Frutas", image_url: "/imagen" }]} onGetProducts={vi.fn()} onCreateCategory={vi.fn()} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} onUpdateCategoryImage={actualizar} onUpdateProductImage={vi.fn()} onImportImage={() => new Promise(() => {})} onPrepareImage={vi.fn()} />);
-  await usuario.click(screen.getByRole("button", { name: "Gestionar imagen de Frutas" }));
+  await usuario.click(screen.getByRole("button", { name: "Editar categoría Frutas" }));
   await usuario.type(screen.getByLabelText("URL de imagen"), "https://example.com/imagen.png");
   await usuario.click(screen.getByRole("button", { name: "Importar imagen" }));
   await usuario.click(screen.getByLabelText("Quitar imagen actual"));

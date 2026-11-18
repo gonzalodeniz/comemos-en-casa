@@ -23,6 +23,8 @@ La API usa `/api/v1`. Autenticación: `GET /auth/bootstrap`, `POST /auth/registe
 
 La última vista principal se guarda por usuario con `PUT /auth/last-view` (requiere sesión y CSRF) y se recupera mediante `GET /auth/session`, también desde otro dispositivo. Si no existe o ya no es válida, se abre Planificación. Requiere aplicar la migración `0021_user_last_view`.
 
+El catálogo permite renombrar categorías y exige nombres únicos sin distinguir mayúsculas ni espacios en los extremos, como para los productos. Aplica la migración `0022_category_name_unique` antes de usar esta versión. Si ya hay categorías con nombres coincidentes, la migración se detiene para que se revisen y corrijan los duplicados sin perder productos.
+
 ## Pruebas
 
 Para probar la integración, usá un **proyecto Compose aislado** sobre una base nueva; no ejecutes estas comprobaciones contra datos que quieras conservar. Si ya tenés otra instancia ocupando los puertos 80, 443 o 5173, detenela primero o usa otro host/proyecto aislado. Desde la raíz:

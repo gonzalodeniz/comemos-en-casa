@@ -28,7 +28,7 @@ Este documento recoge el comportamiento acordado durante el refinamiento. Comple
 - Al solicitar el borrado de una categoría, pedir confirmación y permitir elegir entre:
   - Eliminar también los productos asociados.
   - Conservar esos productos y moverlos a **Sin categoría**.
-- Eliminar productos del catálogo no elimina sus entradas en listas de la compra existentes, también cuando se eliminan junto con su categoría.
+- Al eliminar una categoría junto con sus productos, se conservan las entradas existentes en las listas de la compra.
 
 ### Sin categoría
 
@@ -42,7 +42,7 @@ Este documento recoge el comportamiento acordado durante el refinamiento. Comple
 - Dentro de una categoría se pueden crear, editar y eliminar productos.
 - Cada producto tiene nombre e imagen opcional; si no tiene imagen, mostrar una imagen predeterminada.
 - Al editar un producto también se puede cambiar su categoría, incluida **Sin categoría**.
-- Eliminar un producto lo retira del catálogo, pero conserva sus entradas en listas de la compra existentes.
+- Al borrar un producto se solicita confirmación y se indica si está en la lista de la compra. Si se confirma, se eliminan también sus entradas pendientes y compradas; los ingredientes de recetas se conservan.
 - Los cambios en productos son visibles para los demás usuarios.
 
 ## Imágenes
@@ -51,7 +51,7 @@ Reutilizar el comportamiento existente definido en [HU-009 — Imágenes de prod
 
 ## Restricciones y verificación pendiente
 
-- No crear nuevas llamadas a la API; reutilizar las actuales.
+- Para el borrado individual de productos se incorpora una operación de API autenticada y protegida contra CSRF.
 - Las API existentes no permiten renombrar ni borrar categorías o productos, cambiar un producto de categoría ni implementar la categoría especial. Su implementación queda pospuesta por decisión del usuario.
 - El borrado físico de productos también eliminaría sus entradas de compra por la relación en cascada; preservar dichas entradas requiere adaptar la persistencia.
 - En la interfaz actual se permite consultar y crear categorías y productos, y gestionar sus imágenes; no se muestran acciones que la API no admite.

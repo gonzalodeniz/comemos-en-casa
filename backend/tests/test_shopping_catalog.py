@@ -132,3 +132,39 @@ def test_database_schema_contains_shopping_categories(tmp_path, monkeypatch):
         assert "shopping_categories" in inspect(engine).get_table_names()
     finally:
         engine.dispose()
+
+
+def test_borrar_producto_elimina_entradas_y_conserva_recetas(meal_database):
+    """Verifica el borrado de entradas pendientes y compradas sin alterar recetas."""
+    from app.models import Recipe, ShoppingCategory, ShoppingListItem, ShoppingProduct
+    from meal_planning_test_support import api_delete
+    cookies = authenticate(meal_database)
+    with meal_database() as db:
+        categoria = ShoppingCategory(name="Fruta")
+        db.add(categoria)
+        db.flush()
+        producto = ShoppingProduct(category_id=categoria.id, name="Pera")
+        db.add(producto)
+        db.flush()
+        db.add_all([ShoppingListItem(product_id=producto.id, quantity=1, unit="unit", purchased=False), ShoppingListItem(product_id=producto.id, quantity=1, unit="unit", purchased=True), Recipe(title="Postre", title_canonical="postre", ingredients="Pera")])
+        db.commit()
+        ruta = f"/api/v1/shopping-categories/{categoria.id}/products/{producto.id}"
+    assert api_delete(ruta, cookies=cookies).status_code == 204
+    assert api_get(ruta.rsplit('/', 1)[0], cookies=cookies).json()["products"] == []
+    lista = api_get("/api/v1/shopping-list", cookies=cookies).json()
+    assert lista["items"] == [] and lista["purchased_items"] == []
+    with meal_database() as db:
+        assert db.scalar(select(Recipe)).ingredients == "Pera"
+
+
+def test_borrar_producto_exige_sesion_y_csrf(meal_database):
+    """Protege el borrado frente a peticiones sin sesión o sin token CSRF."""
+    from meal_planning_test_support import api_delete
+    cookies = authenticate(meal_database)
+    categoria = post_with_session("/api/v1/shopping-categories", {"name": "Fruta"}, cookies).json()
+    base = f"/api/v1/shopping-categories/{categoria['id']}/products"
+    producto = post_with_session(base, {"name": "Pera"}, cookies).json()
+    ruta = f"{base}/{producto['id']}"
+    assert api_delete(ruta).status_code == 401
+    assert api_delete(ruta, cookies={"session": cookies["session"]}).status_code == 403
+    assert api_get(base, cookies=cookies).json()["products"] == [producto]

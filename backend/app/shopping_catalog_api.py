@@ -6,17 +6,34 @@ from uuid import UUID
 import hashlib
 import unicodedata
 from fastapi.responses import FileResponse
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.auth import ActiveSession, get_active_session, require_csrf
 from app.database import get_database_session
-from app.models import ShoppingCategory, ShoppingProduct
+from app.models import ShoppingCategory, ShoppingListItem, ShoppingProduct
 from app import meal_planning_api as images
 from app.food_images import publish_temporary
 
 router = APIRouter(prefix="/api/v1/shopping-categories", tags=["shopping-catalog"])
+
+
+@router.delete("/{category_id}/products/{product_id}", status_code=204)
+@images.serialized_image_publication
+async def delete_product(category_id: UUID, product_id: UUID, request: Request,
+    session: ActiveSession = Depends(get_active_session), db: Session = Depends(get_database_session)):
+    """Elimina un producto y sus entradas de compra, preservando las recetas."""
+    require_csrf(request, session)
+    product = db.get(ShoppingProduct, product_id)
+    if product is None or product.category_id != category_id:
+        raise HTTPException(status_code=404, detail="Product not found")
+    image_path = product.image_path
+    db.execute(delete(ShoppingListItem).where(ShoppingListItem.product_id == product_id))
+    db.delete(product)
+    db.commit()
+    if image_path:
+        images._remove_food_image(image_path, "productos")
 
 
 def _product_image_url(product: ShoppingProduct) -> str:

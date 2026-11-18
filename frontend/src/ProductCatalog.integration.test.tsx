@@ -172,3 +172,75 @@ it("permite quitar la imagen después de cancelar una importación pendiente", a
   await usuario.click(screen.getByRole("button", { name: "Guardar" }));
   expect(actualizar).toHaveBeenCalledWith("1", { remove_image: true });
 });
+
+// Comprueba el aviso cuando el producto aparece en la lista de compra.
+it("avisa en la confirmación cuando el producto está en la lista", async () => {
+  const usuario = userEvent.setup();
+  render(<ProductCatalog categories={[{ id: "1", name: "Frutas" }]} onGetProducts={async () => [{ id: "p", name: "Pera" }]} onCreateCategory={vi.fn()} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} onUpdateCategoryImage={vi.fn()} onUpdateProductImage={vi.fn()} onImportImage={vi.fn()} onPrepareImage={vi.fn()} onConsultarUso={async () => true} />);
+  await usuario.click(screen.getByRole("button", { name: "Frutas" }));
+  await usuario.click(await screen.findByRole("button", { name: "Gestionar imagen de Pera" }));
+  await usuario.click(screen.getByRole("button", { name: "Borrar producto" }));
+  expect(await screen.findByText(/está en la lista de la compra/i)).toBeTruthy();
+});
+
+// Comprueba el aviso cuando el producto no aparece en la lista.
+it("avisa en la confirmación cuando el producto no está en la lista", async () => {
+  const usuario = userEvent.setup();
+  render(<ProductCatalog categories={[{ id: "1", name: "Frutas" }]} onGetProducts={async () => [{ id: "p", name: "Pera" }]} onCreateCategory={vi.fn()} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} onUpdateCategoryImage={vi.fn()} onUpdateProductImage={vi.fn()} onImportImage={vi.fn()} onPrepareImage={vi.fn()} onConsultarUso={async () => false} />);
+  await usuario.click(screen.getByRole("button", { name: "Frutas" }));
+  await usuario.click(await screen.findByRole("button", { name: "Gestionar imagen de Pera" }));
+  await usuario.click(screen.getByRole("button", { name: "Borrar producto" }));
+  expect(await screen.findByText(/no está en la lista de la compra/i)).toBeTruthy();
+});
+
+// Comprueba que cancelar la confirmación no elimina el producto.
+it("cancela el borrado sin modificar el catálogo", async () => {
+  const usuario = userEvent.setup();
+  const borrar = vi.fn();
+  render(<ProductCatalog categories={[{ id: "1", name: "Frutas" }]} onGetProducts={async () => [{ id: "p", name: "Pera" }]} onCreateCategory={vi.fn()} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} onUpdateCategoryImage={vi.fn()} onUpdateProductImage={vi.fn()} onImportImage={vi.fn()} onPrepareImage={vi.fn()} onConsultarUso={async () => true} onBorrarProducto={borrar} />);
+  await usuario.click(screen.getByRole("button", { name: "Frutas" }));
+  await usuario.click(await screen.findByRole("button", { name: "Gestionar imagen de Pera" }));
+  await usuario.click(screen.getByRole("button", { name: "Borrar producto" }));
+  await usuario.click(await screen.findByRole("button", { name: "No borrar" }));
+  expect(borrar).not.toHaveBeenCalled();
+  expect(screen.getByRole("dialog", { name: "Producto Pera" })).toBeTruthy();
+});
+
+// Comprueba el borrado confirmado y la actualización del catálogo.
+it("confirma el borrado y actualiza el catálogo", async () => {
+  const usuario = userEvent.setup();
+  const borrar = vi.fn().mockResolvedValue(undefined);
+  render(<ProductCatalog categories={[{ id: "1", name: "Frutas" }]} onGetProducts={async () => [{ id: "p", name: "Pera" }]} onCreateCategory={vi.fn()} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} onUpdateCategoryImage={vi.fn()} onUpdateProductImage={vi.fn()} onImportImage={vi.fn()} onPrepareImage={vi.fn()} onConsultarUso={async () => true} onBorrarProducto={borrar} />);
+  await usuario.click(screen.getByRole("button", { name: "Frutas" }));
+  await usuario.click(await screen.findByRole("button", { name: "Gestionar imagen de Pera" }));
+  await usuario.click(screen.getByRole("button", { name: "Borrar producto" }));
+  await usuario.click(await screen.findByRole("button", { name: "Confirmar borrado" }));
+  expect(borrar).toHaveBeenCalledWith("1", "p");
+  expect(await screen.findByText("No hay productos en esta categoría.")).toBeTruthy();
+});
+
+// Comprueba que las acciones del editor de producto son iconos accesibles.
+it("muestra acciones con iconos en la edición de producto", async () => {
+  const usuario = userEvent.setup();
+  render(<ProductCatalog categories={[{ id: "1", name: "Frutas" }]} onGetProducts={async () => [{ id: "p", name: "Pera" }]} onCreateCategory={vi.fn()} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} onUpdateCategoryImage={vi.fn()} onUpdateProductImage={vi.fn()} onImportImage={vi.fn()} onPrepareImage={vi.fn()} onConsultarUso={async () => false} />);
+  await usuario.click(screen.getByRole("button", { name: "Frutas" }));
+  await usuario.click(await screen.findByRole("button", { name: "Gestionar imagen de Pera" }));
+  for (const nombre of ["Guardar", "Cancelar", "Borrar producto"]) {
+    const boton = screen.getByRole("button", { name: nombre });
+    expect(boton.querySelector("svg")).toBeTruthy();
+    expect(boton.textContent).toBe("");
+  }
+});
+
+// Comprueba las acciones iconográficas y su exclusividad durante la confirmación.
+it("sustituye temporalmente guardar y cancelar por iconos de confirmación", async () => {
+  const usuario = userEvent.setup();
+  render(<ProductCatalog categories={[{ id: "1", name: "Frutas" }]} onGetProducts={async () => [{ id: "p", name: "Pera" }]} onCreateCategory={vi.fn()} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} onUpdateCategoryImage={vi.fn()} onUpdateProductImage={vi.fn()} onImportImage={vi.fn()} onPrepareImage={vi.fn()} onConsultarUso={async () => false} />);
+  await usuario.click(screen.getByRole("button", { name: "Frutas" }));
+  await usuario.click(await screen.findByRole("button", { name: "Gestionar imagen de Pera" }));
+  await usuario.click(screen.getByRole("button", { name: "Borrar producto" }));
+  expect(screen.queryByRole("button", { name: "Guardar" })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Cancelar" })).toBeNull();
+  for (const nombre of ["Confirmar borrado", "No borrar"]) expect(screen.getByRole("button", { name: nombre }).querySelector("svg")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Confirmar borrado" }).parentElement).toBe(screen.getByRole("button", { name: "No borrar" }).parentElement);
+});

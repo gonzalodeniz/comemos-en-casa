@@ -11,6 +11,8 @@ type CambioImagen = { name?: string; image_token?: string; remove_image?: true }
 type CambioProducto = { name?: string; image_token?: string; remove_image?: true };
 // Define los servicios existentes y el estado de carga del catálogo.
 type Props = {
+  onConsultarUso?: (id: string) => Promise<boolean>;
+  onBorrarProducto?: (categoriaId: string, id: string) => Promise<void>;
   categories: ShoppingCategory[];
   cargandoCategorias?: boolean;
   errorCategorias?: string;
@@ -46,13 +48,14 @@ function urlImagen(url: string): string {
 }
 
 /** Muestra y gestiona categorías, productos y sus imágenes opcionales. */
-export default function ProductCatalog({ categories, cargandoCategorias, errorCategorias, onReintentarCategorias, onGetProducts, onCreateCategory, onCreateProduct, onUpdateCategoryImage, onUpdateProductImage, onImportImage, onPrepareImage, onSessionExpired }: Props) {
+export default function ProductCatalog({ categories, cargandoCategorias, errorCategorias, onReintentarCategorias, onGetProducts, onCreateCategory, onCreateProduct, onUpdateCategoryImage, onUpdateProductImage, onImportImage, onPrepareImage, onSessionExpired, onConsultarUso, onBorrarProducto }: Props) {
   const [categoria, setCategoria] = useState<ShoppingCategory | null>(null);
   const [productos, setProductos] = useState<ShoppingProduct[]>([]);
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);
   const [nombre, setNombre] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const [uso, setUso] = useState<boolean | null>(null);
   const [editor, setEditor] = useState<Editor>(null);
   const [imagen, setImagen] = useState("");
   const [recorte, setRecorte] = useState<RecorteCatalogo | null>(null);
@@ -69,8 +72,30 @@ export default function ProductCatalog({ categories, cargandoCategorias, errorCa
 
   /** Abre un editor nuevo sin conservar imágenes de otro formulario. */
   function abrirEditor(valor: Editor) {
+    setUso(null);
     setEditor(valor); setImagen(""); setRecorte(null); setLeyendo(false);
     setQuitar(false); setError(""); setNombre(valor?.id ? valor.nombre : ""); setVersionEditor((actual) => actual + 1);
+  }
+
+  /** Elimina el producto confirmado sin cerrar el editor si ocurre un error. */
+  async function borrarProducto() {
+    if (!editor || !categoria || !onBorrarProducto || guardando) return;
+    setGuardando(true);
+    try {
+      await onBorrarProducto(categoria.id, editor.id);
+      setProductos((actuales) => actuales.filter((producto) => producto.id !== editor.id));
+      abrirEditor(null);
+    } catch (causa) { informar(causa, "No se pudo borrar el producto. Inténtalo de nuevo."); }
+    finally { setGuardando(false); }
+  }
+
+  /** Consulta el impacto antes de permitir la confirmación del borrado. */
+  async function consultarBorrado(id: string) {
+    if (!onConsultarUso || guardando) return;
+    setGuardando(true); setError("");
+    try { setUso(await onConsultarUso(id)); }
+    catch (causa) { informar(causa, "No se pudo consultar la lista de la compra. Inténtalo de nuevo."); }
+    finally { setGuardando(false); }
   }
 
   /** Importa una imagen y propaga los errores de sesión. */
@@ -144,7 +169,15 @@ export default function ProductCatalog({ categories, cargandoCategorias, errorCa
       <label>{editor.tipo === "categoria" ? "Nombre de la categoría" : "Nombre del producto"}<input value={nombre} onChange={(evento) => setNombre(evento.target.value)} maxLength={100} required /></label>
       <ImagenCatalogo key={versionEditor} importar={importar} cambiar={(datos, area, ocupado) => { setImagen(datos); setRecorte(area); setLeyendo(ocupado); if (datos || ocupado) setQuitar(false); }} />
       {editor.imagen && <label><input type="checkbox" checked={quitar} onChange={(evento) => { setQuitar(evento.target.checked); if (evento.target.checked) { setImagen(""); setRecorte(null); setLeyendo(false); setVersionEditor((actual) => actual + 1); } }} />Quitar imagen actual</label>}
-      <button type="submit" disabled={guardando || leyendo}>{guardando ? "Guardando…" : "Guardar"}</button><button type="button" disabled={guardando} onClick={() => abrirEditor(null)}>Cancelar</button>
+      {uso !== null && <div role="group" aria-label="Confirmar borrado"><p>¿Quieres borrar {editor.nombre}?</p><p>{uso ? "El producto está en la lista de la compra. Sus entradas también se borrarán." : "El producto no está en la lista de la compra."}</p></div>}
+      {editor.tipo === "producto" && editor.id && uso !== null ? <div className="catalogo-acciones-producto catalogo-confirmar-borrado">
+        <button type="button" aria-label="Confirmar borrado" title="Confirmar borrado" disabled={guardando} onClick={() => void borrarProducto()}><AppIcon name="check" /></button>
+        <button type="button" aria-label="No borrar" title="No borrar" disabled={guardando} onClick={() => setUso(null)}><AppIcon name="close" /></button>
+      </div> : editor.tipo === "producto" && editor.id ? <div className="catalogo-acciones-producto">
+        <button type="submit" aria-label="Guardar" title="Guardar" disabled={guardando || leyendo}><AppIcon name="check" /></button>
+        <button type="button" aria-label="Cancelar" title="Cancelar" disabled={guardando} onClick={() => abrirEditor(null)}><AppIcon name="close" /></button>
+        <button className="catalogo-borrar-producto" type="button" aria-label="Borrar producto" title="Borrar producto" disabled={guardando} onClick={() => void consultarBorrado(editor.id)}><AppIcon name="trash" /></button>
+      </div> : <><button type="submit" disabled={guardando || leyendo}>{guardando ? "Guardando…" : "Guardar"}</button><button type="button" disabled={guardando} onClick={() => abrirEditor(null)}>Cancelar</button></>}
     </form>; return editor.id && editor.tipo === "producto" ? <ModalProducto titulo={"Producto " + editor.nombre} cerrar={() => abrirEditor(null)} ocupado={guardando}>{formulario}</ModalProducto> : editor.id && editor.tipo === "categoria" ? <ModalProducto titulo={"Categoría " + editor.nombre} cerrar={() => abrirEditor(null)} ocupado={guardando}>{formulario}</ModalProducto> : formulario; })()}
   </section>;
 }

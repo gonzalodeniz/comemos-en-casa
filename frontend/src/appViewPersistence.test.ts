@@ -32,6 +32,10 @@ describe("workspace view persistence", () => {
     expect(restoreAppView(storageWith("shopping-list"))).toBe("shopping-list");
   });
 
+  it("restores the saved kitchen tips view", () => {
+    expect(restoreAppView(storageWith("kitchen-tips"))).toBe("kitchen-tips");
+  });
+
   it("falls back to meal planning for an invalid stored value", () => {
     expect(restoreAppView(storageWith("unknown-view"))).toBe("meal-planning");
   });

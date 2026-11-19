@@ -17,7 +17,7 @@ Este documento recoge el comportamiento acordado durante el refinamiento. Comple
 - Usar como referencia visual el [prototipo de categorías](../../interfaces/prototipo-comemos-catalogo-categorias.png), con las diferencias indicadas en esta especificación.
 - Mostrar las categorías en tarjetas, ordenadas alfabéticamente por nombre.
 - Cada categoría tiene nombre e imagen opcional. Si no tiene imagen, mostrar una imagen predeterminada.
-- No mostrar descripciones, buscador ni filtros; tampoco los filtros «Alimentación», «Hogar» y «Otros» del prototipo.
+- No mostrar descripciones ni filtros; tampoco los filtros «Alimentación», «Hogar» y «Otros» del prototipo.
 - Ofrecer la acción **Nueva categoría**.
 - Al pulsar una categoría, abrir una pantalla con sus productos y las acciones para gestionarlos.
 - El menú de tres puntos de cada categoría permite **Editar** y **Borrar**, salvo la categoría especial descrita a continuación.
@@ -56,11 +56,11 @@ Reutilizar el comportamiento existente definido en [HU-009 — Imágenes de prod
 - El borrado físico de productos también eliminaría sus entradas de compra por la relación en cascada; preservar dichas entradas requiere adaptar la persistencia.
 - En la interfaz actual se permite consultar y crear categorías y productos, y gestionar sus imágenes; no se muestran acciones que la API no admite.
 - No modificar ni reabrir las historias completadas de creación de categorías y productos (HU-007 y HU-008) ni la historia de imágenes (HU-009) por documentar este alcance adicional.
-- No se ha definido un orden específico, buscador o filtros para la pantalla de productos; la ausencia de buscador y filtros confirmada se refiere a la vista de categorías.
+- El buscador está disponible desde el listado de categorías y desde una categoría abierta. A partir de tres caracteres busca por nombre en todo el catálogo y permite gestionar los productos encontrados. Al limpiar la búsqueda vuelve a mostrarse la vista anterior.
 
 ## Comprobaciones funcionales
 
-- La nueva entrada del menú abre las tarjetas de categorías en orden alfabético, sin descripciones, buscador ni filtros.
+- La nueva entrada del menú abre las tarjetas de categorías en orden alfabético, sin descripciones ni filtros, con un buscador global de productos.
 - Crear o editar una categoría o producto conserva su nombre y su imagen opcional; los elementos sin imagen muestran la predeterminada.
 - Abrir una categoría muestra sus productos y permite crearlos, editarlos, eliminarlos y cambiar su categoría.
 - Borrar una categoría solicita confirmación y permite eliminar sus productos o trasladarlos a **Sin categoría**.

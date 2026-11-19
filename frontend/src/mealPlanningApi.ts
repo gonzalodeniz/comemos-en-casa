@@ -78,8 +78,11 @@ export function getShoppingProducts(categoryId: string): Promise<{ products: Sho
   return apiRequest(`/shopping-categories/${categoryId}/products`);
 }
 
+// Identifica la categoría de origen para gestionar un resultado global.
+export type ResultadoBusquedaProducto = ShoppingProduct & { category_id: string };
+
 /** Busca productos del catálogo por nombre parcial. */
-export function searchShoppingProducts(query: string): Promise<{ products: ShoppingProduct[] }> {
+export function searchShoppingProducts(query: string): Promise<{ products: ResultadoBusquedaProducto[] }> {
   return apiRequest(`/shopping-products/search?q=${encodeURIComponent(query)}`);
 }
 

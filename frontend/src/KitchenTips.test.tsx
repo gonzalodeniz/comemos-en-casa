@@ -1,6 +1,6 @@
 // Comprueba que se muestran ambos trucos y su contenido seleccionable.
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { apiRequest } from "./api";
@@ -39,16 +39,33 @@ describe("KitchenTips", () => {
     await userEvent.type(contenido, "Contenido editado.");
     await userEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
     expect(await screen.findByRole("button", { name: "Título editado" })).toBeTruthy();
-    expect(screen.getByText("Contenido editado.")).toBeTruthy();
+    expect(within(screen.getByRole("article")).getByText("Contenido editado.")).toBeTruthy();
   });
 
   it("shows both tips and their selected instructions", async () => {
     render(<KitchenTips onSessionExpired={vi.fn()} />);
     expect(await screen.findByRole("button", { name: "Limpiar lechuga con Thermomix" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Limpiar una sartén de aluminio" })).toBeTruthy();
-    expect(screen.getByText("Lava y escurre las hojas.")).toBeTruthy();
+    expect(within(screen.getByRole("article")).getByText("Lava y escurre las hojas.")).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Limpiar una sartén de aluminio" }));
-    await waitFor(() => expect(screen.getByText("Usa detergente suave y una esponja.")).toBeTruthy());
+    await waitFor(() => expect(within(screen.getByRole("article")).getByText("Usa detergente suave y una esponja.")).toBeTruthy());
+  });
+
+  // Verifica la búsqueda local y la conservación del detalle seleccionado.
+  it("filters tips by title or content without changing the selected tip", async () => {
+    render(<KitchenTips onSessionExpired={vi.fn()} />);
+    await screen.findByRole("button", { name: "Limpiar lechuga con Thermomix" });
+    const buscador = screen.getByRole("searchbox", { name: "Buscar trucos" });
+    await userEvent.type(buscador, "SARTEN");
+    expect(screen.queryByRole("button", { name: "Limpiar lechuga con Thermomix" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Limpiar una sartén de aluminio" })).toBeTruthy();
+    expect(within(screen.getByRole("article")).getByRole("heading", { name: "Limpiar lechuga con Thermomix" })).toBeTruthy();
+    await userEvent.clear(buscador);
+    await userEvent.type(buscador, "detergente");
+    expect(screen.getByRole("button", { name: "Limpiar una sartén de aluminio" })).toBeTruthy();
+    await userEvent.type(buscador, " inexistente");
+    expect(screen.getByRole("status").textContent).toMatch(/No se encontraron trucos/);
+    expect(apiRequest).toHaveBeenCalledTimes(1);
   });
 
   it("shows edit and delete actions as accessible icon buttons", async () => {
@@ -89,7 +106,7 @@ describe("KitchenTips", () => {
     await userEvent.type(screen.getByLabelText("Contenido"), "Contenido nuevo.");
     await userEvent.click(screen.getByRole("button", { name: "Guardar truco" }));
     expect(await screen.findByRole("button", { name: "Nuevo truco" })).toBeTruthy();
-    expect(screen.getByText("Contenido nuevo.")).toBeTruthy();
+    expect(within(screen.getByRole("article")).getByText("Contenido nuevo.")).toBeTruthy();
   });
 
   it("shows which required field is blank without sending the request", async () => {
@@ -114,7 +131,7 @@ describe("KitchenTips", () => {
     render(<KitchenTips onSessionExpired={vi.fn()} />);
     await screen.findByRole("button", { name: "Limpiar lechuga con Thermomix" });
     await userEvent.click(screen.getByRole("button", { name: "Eliminar truco Limpiar lechuga con Thermomix" }));
-    expect(screen.getByText("Lava y escurre las hojas.")).toBeTruthy();
+    expect(within(screen.getByRole("article")).getByText("Lava y escurre las hojas.")).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Eliminar truco Limpiar lechuga con Thermomix" }));
     expect(await screen.findByRole("button", { name: "Limpiar una sartén de aluminio" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Limpiar lechuga con Thermomix" })).toBeNull();

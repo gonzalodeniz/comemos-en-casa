@@ -286,3 +286,12 @@ class BackupSchedule(Base):
     frequency: Mapped[str] = mapped_column(String(16), nullable=False)
     maximum: Mapped[int] = mapped_column(Integer, nullable=False)
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class KitchenTip(Base):
+    """Representa un truco de cocina consultable."""
+    __tablename__ = "kitchen_tips"
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)

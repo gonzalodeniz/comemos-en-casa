@@ -18,6 +18,7 @@ from app.recipes_api import router as recipes_router
 from app.shopping_catalog_api import router as shopping_catalog_router
 from app.shopping_list_api import router as shopping_list_router
 from app.backups import router as backups_router, _WRITE_LOCK, run_scheduled_backup
+from app.kitchen_tips_api import router as kitchen_tips_router
 from app.food_images import cleanup_expired_temporary
 from app.meal_planning_api import DATA_ROOT
 from app.settings import allowed_origins
@@ -69,6 +70,7 @@ app.include_router(recipes_router)
 app.include_router(shopping_catalog_router)
 app.include_router(shopping_list_router)
 app.include_router(backups_router)
+app.include_router(kitchen_tips_router)
 
 
 @app.middleware("http")

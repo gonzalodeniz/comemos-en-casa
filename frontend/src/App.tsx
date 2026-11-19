@@ -9,6 +9,7 @@ import Recipes from "./Recipes";
 import ShoppingList from "./ShoppingList";
 import ProductCatalog from "./ProductCatalog";
 import Backups from "./Backups";
+import KitchenTips from "./KitchenTips";
 // Conecta la vista de la compra con el catálogo compartido de categorías y productos.
 import { borrarProductoCatalogo, getShoppingCategories, createShoppingCategory, updateShoppingCategoryImage, getShoppingProducts, createShoppingProduct, updateShoppingProductImage, agregarProductoListaCompra, actualizarCantidadCompra, obtenerListaCompra, marcarProductoComprado, desmarcarProductoComprado, eliminarEntradaListaCompra, marcarIngredienteReceta, desmarcarIngredienteReceta, eliminarIngredienteReceta, eliminarSeccionReceta, type ShoppingCategory } from "./mealPlanningApi";
 import AppWorkspace, { type AppView } from "./AppWorkspace";
@@ -342,6 +343,7 @@ export default function App() {
           onViewChange={(nextView) => { cambiarVista(nextView); if (nextView === "recipes") { setRecipeFoodId(null); setRecipeListReset((value) => value + 1); } setError(""); setNotice(""); }}
           disabled={loading}
           backups={<Backups csrfToken={csrfToken} onSessionExpired={mealSessionExpired} />}
+          kitchenTips={<KitchenTips onSessionExpired={mealSessionExpired} />}
           sessionTools={<div className="session-tools"><div className="session-identity"><span className="session-avatar" aria-hidden="true">{currentUser.name.trim().charAt(0).toLocaleUpperCase("es")}</span><div><small>Tu cuenta</small><strong>{currentUser.name}</strong></div></div><button type="button" className="secondary sign-out" disabled={loading} onClick={() => void perform(signOut)}><AppIcon name="logout" />Cerrar sesión</button></div>}
           notifications={<>{error && <p className="message error" role="alert">{error}</p>}{notice && <p className="message success" role="status">{notice}</p>}</>}
           mealPlanning={<MealPlanning csrfToken={csrfToken} onSessionExpired={mealSessionExpired} onOpenRecipes={(foodId) => { setRecipeFoodId(foodId); cambiarVista("recipes"); }} />}

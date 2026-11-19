@@ -3,7 +3,7 @@ import { useState, type ReactNode } from "react";
 import AppBrand from "./AppBrand";
 import AppIcon from "./AppIcon";
 
-export type AppView = "meal-planning" | "food-catalog" | "recipes" | "shopping-list" | "product-catalog" | "backups" | "users";
+export type AppView = "meal-planning" | "food-catalog" | "recipes" | "shopping-list" | "product-catalog" | "backups" | "users" | "kitchen-tips";
 
 type Props = {
   view: AppView;
@@ -16,11 +16,12 @@ type Props = {
   shoppingList?: ReactNode;
   productCatalog?: ReactNode;
   backups?: ReactNode;
+  kitchenTips?: ReactNode;
   sessionTools?: ReactNode;
   notifications?: ReactNode;
 };
 
-export default function AppWorkspace({ view, onViewChange, disabled, mealPlanning, userManagement, foodCatalog, recipes, shoppingList, productCatalog, backups, sessionTools, notifications }: Props) {
+export default function AppWorkspace({ view, onViewChange, disabled, mealPlanning, userManagement, foodCatalog, recipes, shoppingList, productCatalog, backups, kitchenTips, sessionTools, notifications }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div className="app-workspace">
@@ -61,6 +62,9 @@ export default function AppWorkspace({ view, onViewChange, disabled, mealPlannin
         <button type="button" aria-current={view === "backups" ? "page" : undefined} disabled={disabled} onClick={() => { onViewChange("backups"); setMenuOpen(false); }}>
           <AppIcon name="database" /><span>Copias de seguridad</span>
         </button>
+        <button type="button" aria-current={view === "kitchen-tips" ? "page" : undefined} disabled={disabled} onClick={() => { onViewChange("kitchen-tips"); setMenuOpen(false); }}>
+          <AppIcon name="utensils" /><span>Trucos de cocina</span>
+        </button>
         <button
           type="button"
           aria-current={view === "users" ? "page" : undefined}
@@ -75,7 +79,7 @@ export default function AppWorkspace({ view, onViewChange, disabled, mealPlannin
       </aside>
       <div className="workspace-content" id="workspace-content" tabIndex={-1}>
         {notifications}
-        {view === "meal-planning" ? mealPlanning : view === "food-catalog" ? foodCatalog : view === "recipes" ? recipes : view === "shopping-list" ? shoppingList : view === "product-catalog" ? productCatalog : view === "backups" ? backups : userManagement}
+        {view === "meal-planning" ? mealPlanning : view === "food-catalog" ? foodCatalog : view === "recipes" ? recipes : view === "shopping-list" ? shoppingList : view === "product-catalog" ? productCatalog : view === "backups" ? backups : view === "kitchen-tips" ? kitchenTips : userManagement}
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 // Presenta el catálogo consultable de trucos de cocina.
 import { useEffect, useState } from "react";
 import { ApiError, apiRequest } from "./api";
+import AppIcon from "./AppIcon";
 
 type Truco = { id: string; title: string; content: string };
 type Props = { onSessionExpired: () => void };
@@ -69,7 +70,7 @@ export default function KitchenTips({ onSessionExpired }: Props) {
     }
   }
   return <main className="dashboard">
-    <section className="panel">
+    <section className="panel kitchen-tips-panel">
       <p className="eyebrow">Consejos prácticos</p>
       <h2>Trucos de cocina</h2>
       {error && <p className="message error" role="alert">{error}</p>}
@@ -79,13 +80,16 @@ export default function KitchenTips({ onSessionExpired }: Props) {
         <nav aria-label="Trucos disponibles">
           {trucos.map((truco) => <button key={truco.id} type="button" aria-current={seleccionado === truco.id ? "true" : undefined} onClick={() => setSeleccionado(truco.id)}>{truco.title}</button>)}
         </nav>
-        {trucoActual && <article aria-live="polite"><h3>{trucoActual.title}</h3><p>{trucoActual.content}</p><button type="button" onClick={() => { setEditando(trucoActual.id); setTitulo(trucoActual.title); setContenido(trucoActual.content); setErrorFormulario(""); }}>Editar truco</button><button type="button" onClick={() => void eliminarTruco()}>Eliminar truco</button></article>}
+        {trucoActual && <article aria-live="polite"><h3>{trucoActual.title}</h3><p>{trucoActual.content}</p><button type="button" aria-label={`Editar truco ${trucoActual.title}`} title={`Editar truco ${trucoActual.title}`} onClick={() => { setEditando(trucoActual.id); setTitulo(trucoActual.title); setContenido(trucoActual.content); setErrorFormulario(""); }}><AppIcon name="edit" /></button><button type="button" aria-label={`Eliminar truco ${trucoActual.title}`} title={`Eliminar truco ${trucoActual.title}`} onClick={() => void eliminarTruco()}><AppIcon name="trash" /></button></article>}
       </div>}
+    </section>
+    <section className="panel kitchen-tip-form-panel" aria-label={editando ? "Editar truco" : "Añadir truco"}>
+      <h2>{editando ? "Editar truco" : "Añadir un truco"}</h2>
       <form onSubmit={guardarTruco}>
         <label>Título<input value={titulo} onChange={(evento) => setTitulo(evento.target.value)} /></label>
         <label>Contenido<textarea value={contenido} onChange={(evento) => setContenido(evento.target.value)} /></label>
         {errorFormulario && <p role="alert">{errorFormulario}</p>}
-        <button type="submit">{editando ? "Guardar cambios" : "Guardar truco"}</button>
+        <button type="submit"><AppIcon name="check" />{editando ? "Guardar cambios" : "Guardar truco"}</button>
       </form>
     </section>
   </main>;

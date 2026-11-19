@@ -74,6 +74,19 @@ h2 { font-size: clamp(1.5rem, 2.2vw, 2.35rem); letter-spacing: -.035em; }
 .skip-link:focus { top: 1rem; }
 .dashboard { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr); align-items: start; gap: 1.4rem; }
 .dashboard .panel.narrow { width: 100%; margin: 0; }
+.kitchen-tips-panel, .kitchen-tip-form-panel { display: grid; align-content: start; gap: 1rem; }
+.kitchen-tips-panel h2, .kitchen-tip-form-panel h2 { margin: 0; }
+.kitchen-tips-panel .eyebrow { margin: 0; }
+.kitchen-tips { display: grid; gap: 1rem; }
+.kitchen-tips nav { display: grid; gap: .55rem; }
+.kitchen-tips nav button { min-height: 44px; padding: .7rem .85rem; border: 1px solid var(--color-border-subtle); border-radius: .65rem; background: #f8fbf9; text-align: left; }
+.kitchen-tips nav button[aria-current="true"] { border-color: #9bcbb4; color: #075c39; background: #eaf6ef; }
+.kitchen-tips article { display: grid; justify-items: start; gap: .75rem; padding: 1rem; border: 1px solid var(--color-border-subtle); border-radius: .8rem; background: #fcfefe; }
+.kitchen-tips article h3, .kitchen-tips article p { margin: 0; }
+.kitchen-tips article button { display: inline-grid; place-items: center; width: 42px; height: 42px; padding: .55rem; }
+.kitchen-tips article button .app-icon { width: 19px; height: 19px; }
+.kitchen-tip-form-panel form { display: grid; gap: .9rem; }
+.kitchen-tip-form-panel form > button { display: flex; align-items: center; justify-content: center; gap: .55rem; margin-top: 0; }
 .user-list { display: grid; gap: 1rem; }
 .user-card { min-width: 0; padding: 1rem; border: 1px solid var(--color-border-subtle); border-radius: .8rem; background: #fcfefe; }
 .user-card-heading { display: flex; justify-content: space-between; gap: .7rem; }

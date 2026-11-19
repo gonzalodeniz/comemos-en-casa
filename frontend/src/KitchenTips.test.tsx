@@ -28,7 +28,7 @@ describe("KitchenTips", () => {
     });
     render(<KitchenTips onSessionExpired={vi.fn()} />);
     await screen.findByRole("button", { name: "Lechuga" });
-    await userEvent.click(screen.getByRole("button", { name: "Editar truco" }));
+    await userEvent.click(screen.getByRole("button", { name: "Editar truco Lechuga" }));
     const titulo = screen.getByLabelText("Título") as HTMLInputElement;
     const contenido = screen.getByLabelText("Contenido") as HTMLTextAreaElement;
     expect(titulo.value).toBe("Lechuga");
@@ -49,6 +49,28 @@ describe("KitchenTips", () => {
     expect(screen.getByText("Lava y escurre las hojas.")).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Limpiar una sartén de aluminio" }));
     await waitFor(() => expect(screen.getByText("Usa detergente suave y una esponja.")).toBeTruthy());
+  });
+
+  it("shows edit and delete actions as accessible icon buttons", async () => {
+    render(<KitchenTips onSessionExpired={vi.fn()} />);
+    await screen.findByRole("button", { name: "Limpiar lechuga con Thermomix" });
+    for (const name of ["Editar truco Limpiar lechuga con Thermomix", "Eliminar truco Limpiar lechuga con Thermomix"]) {
+      const button = screen.getByRole("button", { name });
+      expect(button.querySelector("svg")).toBeTruthy();
+      expect(button.textContent).toBe("");
+    }
+  });
+
+  it("keeps the form fields and save action accessible when creating and editing", async () => {
+    render(<KitchenTips onSessionExpired={vi.fn()} />);
+    await screen.findByRole("button", { name: "Limpiar lechuga con Thermomix" });
+    expect(screen.getByRole("textbox", { name: "Título" })).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Contenido" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Guardar truco" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Editar truco Limpiar lechuga con Thermomix" }));
+    expect(screen.getByRole("textbox", { name: "Título" })).toBeTruthy();
+    expect(screen.getByRole("textbox", { name: "Contenido" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Guardar cambios" })).toBeTruthy();
   });
 
   it("creates a tip and displays it without reloading", async () => {
@@ -91,9 +113,9 @@ describe("KitchenTips", () => {
     });
     render(<KitchenTips onSessionExpired={vi.fn()} />);
     await screen.findByRole("button", { name: "Limpiar lechuga con Thermomix" });
-    await userEvent.click(screen.getByRole("button", { name: "Eliminar truco" }));
+    await userEvent.click(screen.getByRole("button", { name: "Eliminar truco Limpiar lechuga con Thermomix" }));
     expect(screen.getByText("Lava y escurre las hojas.")).toBeTruthy();
-    await userEvent.click(screen.getByRole("button", { name: "Eliminar truco" }));
+    await userEvent.click(screen.getByRole("button", { name: "Eliminar truco Limpiar lechuga con Thermomix" }));
     expect(await screen.findByRole("button", { name: "Limpiar una sartén de aluminio" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Limpiar lechuga con Thermomix" })).toBeNull();
   });
@@ -106,7 +128,7 @@ describe("KitchenTips", () => {
     vi.stubGlobal("confirm", vi.fn().mockReturnValue(true));
     render(<KitchenTips onSessionExpired={vi.fn()} />);
     await screen.findByRole("button", { name: "Lechuga" });
-    await userEvent.click(screen.getByRole("button", { name: "Eliminar truco" }));
+    await userEvent.click(screen.getByRole("button", { name: "Eliminar truco Lechuga" }));
     expect(await screen.findByText("No hay trucos de cocina todavía.")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Guardar truco" })).toBeTruthy();
   });

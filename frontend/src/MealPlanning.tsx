@@ -58,12 +58,15 @@ export function weekLabel(start: CalendarDate): string {
 }
 
 export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipes = () => {} }: Props) {
+  // Mantiene plegados los selectores móviles hasta que se soliciten.
+  const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
   // Recupera una preferencia visual válida sin depender de la disponibilidad del almacenamiento.
   const [visibleSlot, setVisibleSlot] = useState<MealSlot | "both">(() => {
+    const valorInicial = typeof window !== "undefined" && window.matchMedia?.("(max-width: 600px)").matches ? "lunch" : "both";
     try {
       const value = localStorage.getItem("meal-planning-visible-slot");
-      return value === "lunch" || value === "dinner" ? value : "both";
-    } catch { return "both"; }
+      return value === "lunch" || value === "dinner" || value === "both" ? value : valorInicial;
+    } catch { return valorInicial; }
   });
   // Conserva la elección sin afectar a las comidas guardadas.
   function changeVisibleSlot(value: MealSlot | "both") {
@@ -573,35 +576,27 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
       <div className="meal-heading">
         <div className="meal-title">
           <h2 id="meal-planning-title">Planificación<span className="titulo-planificacion-amplio"> de comidas</span></h2>
+          <button type="button" className="secondary alternar-filtros-planificacion"
+            aria-label="Filtros de planificación" aria-expanded={filtrosAbiertos} aria-controls="filtros-planificacion"
+            onClick={() => setFiltrosAbiertos((abiertos) => !abiertos)}><AppIcon name="filtros" /></button>
           {view === "month" && <p className="meal-subtitle">Vista mensual</p>}
         </div>
         <div className="calendar-toolbar">
-          <div className="selectores-planificacion-movil">
-            <select aria-label="Comidas visibles" value={visibleSlot} onChange={(event) => changeVisibleSlot(event.target.value as MealSlot | "both")}>
-              <option value="both">Ambas</option>
-              <option value="lunch">☀️ Almuerzo</option>
-              <option value="dinner">🌙 Cena</option>
-            </select>
-            <select aria-label="Vista del calendario" value={view} disabled={calendarLoading || busy} onChange={(event) => changeView(event.target.value as CalendarView)}>
-              <option value="week">Semana</option>
-              <option value="month">Mes</option>
-            </select>
-          </div>
           {view === "month" && <div className="calendar-navigation">
             <button type="button" className="secondary" aria-label="Mes anterior" disabled={calendarLoading || busy} onClick={() => moveRange(-1)}><AppIcon name="chevron-left" /></button>
             <h3 aria-live="polite">{title}</h3>
             <button type="button" className="secondary" aria-label="Mes siguiente" disabled={calendarLoading || busy} onClick={() => moveRange(1)}><AppIcon name="chevron-right" /></button>
           </div>}
-          <div className="planning-switches">
+          <div id="filtros-planificacion" className="planning-switches" data-abiertos={filtrosAbiertos}>
             <div className="meal-view-switch meal-filter" role="group" aria-label="Comidas visibles">
-        <button type="button" aria-pressed={visibleSlot === "both"} onClick={() => changeVisibleSlot("both")}>Ambas</button>
-        <button type="button" aria-pressed={visibleSlot === "lunch"} onClick={() => changeVisibleSlot("lunch")}>☀️ Almuerzo</button>
-        <button type="button" aria-pressed={visibleSlot === "dinner"} onClick={() => changeVisibleSlot("dinner")}>🌙 Cena</button>
-      </div>
-          <div className="meal-view-switch" role="group" aria-label="Vista del calendario">
-            <button type="button" aria-pressed={view === "week"} disabled={calendarLoading || busy} onClick={() => changeView("week")}>Semana</button>
-            <button type="button" aria-pressed={view === "month"} disabled={calendarLoading || busy} onClick={() => changeView("month")}>Mes</button>
-          </div>
+              <button type="button" aria-pressed={visibleSlot === "both"} onClick={() => changeVisibleSlot("both")}>Ambas</button>
+              <button type="button" aria-pressed={visibleSlot === "lunch"} onClick={() => changeVisibleSlot("lunch")}><span aria-hidden="true">☀️ </span>Almuerzo</button>
+              <button type="button" aria-pressed={visibleSlot === "dinner"} onClick={() => changeVisibleSlot("dinner")}><span aria-hidden="true">🌙 </span>Cena</button>
+            </div>
+            <div className="meal-view-switch" role="group" aria-label="Vista del calendario">
+              <button type="button" aria-pressed={view === "week"} disabled={calendarLoading || busy} onClick={() => changeView("week")}>Semana</button>
+              <button type="button" aria-pressed={view === "month"} disabled={calendarLoading || busy} onClick={() => changeView("month")}>Mes</button>
+            </div>
           </div>
         </div>
       </div>

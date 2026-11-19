@@ -1,5 +1,5 @@
 // Presenta los iconos utilizados por las vistas de la aplicación.
-type IconName = "database" | "download" | "settings" | "calendar" | "repeat" | "users" | "chevron-left" | "chevron-right" | "chevron-up" | "chevron-down" | "plus" | "logout" | "utensils" | "menu" | "edit" | "trash" | "eye" | "shopping-cart" | "check" | "undo" | "clear-list" | "store" | "arrow-left" | "close" | "diana";
+type IconName = "database" | "download" | "settings" | "calendar" | "repeat" | "users" | "chevron-left" | "chevron-right" | "chevron-up" | "chevron-down" | "plus" | "logout" | "utensils" | "menu" | "edit" | "trash" | "eye" | "shopping-cart" | "check" | "undo" | "clear-list" | "store" | "arrow-left" | "close" | "diana" | "filtros";
 
 const paths: Record<IconName, string> = {
   database: "M4 6c0-4 16-4 16 0s-16 4-16 0Zm0 0v12c0 4 16 4 16 0V6M4 12c0 4 16 4 16 0",
@@ -18,6 +18,8 @@ const paths: Record<IconName, string> = {
   "chevron-up": "m6 15 6-6 6 6",
   "chevron-down": "m6 9 6 6 6-6",
   "arrow-left": "M19 12H5m7 7-7-7 7-7",
+  // Representa los ajustes disponibles para filtrar el calendario.
+  filtros: "M3 7h6m6 0h6M3 17h2m6 0h10M9 7a3 3 0 1 0 6 0 3 3 0 0 0-6 0Zm-4 10a3 3 0 1 0 6 0 3 3 0 0 0-6 0Z",
   // Identifica el acceso a la fecha actual.
   diana: "M12 2v4m0 12v4M2 12h4m12 0h4M20 12a8 8 0 1 0-16 0 8 8 0 0 0 16 0Zm-5 0a3 3 0 1 0-6 0 3 3 0 0 0 6 0Z",
   close: "M6 6l12 12M18 6 6 18",

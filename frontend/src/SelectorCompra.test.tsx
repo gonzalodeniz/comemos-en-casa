@@ -7,6 +7,28 @@ import SelectorCompra from "./SelectorCompra";
 
 afterEach(cleanup);
 
+// Comprueba que los resultados conservan su imagen cuando está disponible.
+it("muestra la imagen del producto encontrado", async () => {
+  const usuario = userEvent.setup();
+  render(<SelectorCompra categorias={[]} consultar={vi.fn()} buscar={vi.fn().mockResolvedValue([{ id: "s", name: "Sal fina", image_url: "/sal.webp" }, { id: "g", name: "Sal gorda" }])} seleccionar={vi.fn()} />);
+  await usuario.type(screen.getByRole("textbox", { name: "Buscar productos" }), "sal");
+  const fina = await screen.findByRole("button", { name: "Sal fina" });
+  expect(fina.querySelector("img")?.getAttribute("src")).toContain("/api/v1/sal.webp");
+  expect(screen.getByRole("button", { name: "Sal gorda" }).querySelector("img")).toBeNull();
+});
+
+// Comprueba la ayuda del buscador y el retorno al catálogo al limpiarlo.
+it("muestra la ayuda y limpia la búsqueda", async () => {
+  const usuario = userEvent.setup();
+  render(<SelectorCompra categorias={[{ id: "f", name: "Fruta" }]} consultar={vi.fn()} buscar={vi.fn().mockResolvedValue([{ id: "s", name: "Sal" }])} seleccionar={vi.fn()} />);
+  const campo = screen.getByPlaceholderText("Busca tus productos") as HTMLInputElement;
+  await usuario.type(campo, "sal");
+  await screen.findByRole("button", { name: "Sal" });
+  await usuario.click(screen.getByRole("button", { name: "Limpiar búsqueda" }));
+  expect(campo.value).toBe("");
+  expect(screen.getByRole("button", { name: "Fruta" })).toBeTruthy();
+});
+
 // Comprueba que el umbral conserva la navegación y muestra resultados globales.
 it("mantiene categorías con menos de tres letras y busca en todo el catálogo desde tres", async () => {
   const usuario = userEvent.setup();

@@ -12,7 +12,7 @@ Estados: `Pendiente`, `En curso`, `Hecha`.
 
 Las historias pendientes están ordenadas de mayor a menor prioridad para disponer cuanto antes de una lista básica y funcional. Los números identifican las historias y no indican su prioridad.
 
-No hay historias pendientes registradas.
+- **HU-014 · Pendiente** — Como usuario, quiero buscar en todo el catálogo por nombre completo o parcial y añadir un resultado a la lista de la compra, para encontrar lo que necesito sin recorrer las categorías.
 
 ## Completadas
 

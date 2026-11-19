@@ -78,6 +78,11 @@ export function getShoppingProducts(categoryId: string): Promise<{ products: Sho
   return apiRequest(`/shopping-categories/${categoryId}/products`);
 }
 
+/** Busca productos del catálogo por nombre parcial. */
+export function searchShoppingProducts(query: string): Promise<{ products: ShoppingProduct[] }> {
+  return apiRequest(`/shopping-products/search?q=${encodeURIComponent(query)}`);
+}
+
 /** Crea un producto en la categoría usando la protección CSRF de la sesión. */
 export function createShoppingProduct(categoryId: string, name: string, csrfToken: string, imageToken?: string): Promise<ShoppingProduct> {
   return apiRequest(`/shopping-categories/${categoryId}/products`, { method: "POST", csrfToken, body: { name, ...(imageToken ? { image_token: imageToken } : {}) } });

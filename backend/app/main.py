@@ -15,7 +15,7 @@ from app.auth import router as auth_router
 from app.database import engine
 from app.meal_planning_api import router as meal_planning_router
 from app.recipes_api import router as recipes_router
-from app.shopping_catalog_api import router as shopping_catalog_router
+from app.shopping_catalog_api import router as shopping_catalog_router, search_router as shopping_product_search_router
 from app.shopping_list_api import router as shopping_list_router
 from app.backups import router as backups_router, _WRITE_LOCK, run_scheduled_backup
 from app.kitchen_tips_api import router as kitchen_tips_router
@@ -68,6 +68,7 @@ app.include_router(auth_router)
 app.include_router(meal_planning_router)
 app.include_router(recipes_router)
 app.include_router(shopping_catalog_router)
+app.include_router(shopping_product_search_router)
 app.include_router(shopping_list_router)
 app.include_router(backups_router)
 app.include_router(kitchen_tips_router)

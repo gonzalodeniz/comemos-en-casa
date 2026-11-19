@@ -7,6 +7,21 @@ import SelectorCompra from "./SelectorCompra";
 
 afterEach(cleanup);
 
+// Comprueba que el umbral conserva la navegación y muestra resultados globales.
+it("mantiene categorías con menos de tres letras y busca en todo el catálogo desde tres", async () => {
+  const usuario = userEvent.setup();
+  const buscar = vi.fn().mockResolvedValue([{ id: "s", name: "Sal fina" }, { id: "g", name: "Sal gorda" }]);
+  render(<SelectorCompra categorias={[{ id: "f", name: "Fruta" }]} consultar={vi.fn().mockResolvedValue([])} buscar={buscar} seleccionar={vi.fn()} />);
+  const campo = screen.getByRole("textbox", { name: "Buscar productos" });
+  await usuario.type(campo, "sa");
+  expect(screen.getByRole("button", { name: "Fruta" })).toBeTruthy();
+  expect(buscar).not.toHaveBeenCalled();
+  await usuario.type(campo, "l");
+  expect(await screen.findByRole("button", { name: "Sal fina" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Sal gorda" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Fruta" })).toBeNull();
+});
+
 // Comprueba que solo se consulta la categoría seleccionada y se puede volver.
 it("navega entre categorías y productos", async () => {
   const usuario = userEvent.setup();

@@ -30,6 +30,19 @@ def test_authenticated_user_can_create_category(meal_database):
     assert response.status_code == 201
     assert response.json()["name"] == "Verduras"
 
+def test_search_products_matches_partial_name_across_categories(meal_database):
+    """Busca productos por nombre parcial en todas las categorías."""
+    cookies = authenticate(meal_database)
+    fruta = post_with_session("/api/v1/shopping-categories", {"name": "Fruta"}, cookies).json()
+    limpieza = post_with_session("/api/v1/shopping-categories", {"name": "Limpieza"}, cookies).json()
+    fina = post_with_session(f"/api/v1/shopping-categories/{fruta['id']}/products", {"name": "Sal fina"}, cookies).json()
+    gorda = post_with_session(f"/api/v1/shopping-categories/{limpieza['id']}/products", {"name": "Sal gorda"}, cookies).json()
+
+    respuesta = api_get("/api/v1/shopping-products/search?q=sal", cookies=cookies)
+
+    assert respuesta.status_code == 200
+    assert respuesta.json()["products"] == [fina, gorda]
+
 def test_create_product_in_category(meal_database):
     """Comprueba la creación autenticada de un producto en una categoría."""
     cookies = authenticate(meal_database)

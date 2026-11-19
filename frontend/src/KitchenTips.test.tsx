@@ -79,4 +79,35 @@ describe("KitchenTips", () => {
     expect((await screen.findByRole("alert")).textContent).toBe("El título es obligatorio.");
     expect(apiRequest).toHaveBeenCalledTimes(1);
   });
+
+  it("confirms deletion, cancels without changes, then removes the selected tip", async () => {
+    vi.stubGlobal("confirm", vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true));
+    vi.mocked(apiRequest).mockImplementation(async (_path, opciones) => {
+      if ((opciones as { method?: string } | undefined)?.method === "DELETE") return undefined;
+      return { trucos: [
+        { id: "lechuga", title: "Limpiar lechuga con Thermomix", content: "Lava y escurre las hojas." },
+        { id: "sarten", title: "Limpiar una sartén de aluminio", content: "Usa detergente suave y una esponja." },
+      ] };
+    });
+    render(<KitchenTips onSessionExpired={vi.fn()} />);
+    await screen.findByRole("button", { name: "Limpiar lechuga con Thermomix" });
+    await userEvent.click(screen.getByRole("button", { name: "Eliminar truco" }));
+    expect(screen.getByText("Lava y escurre las hojas.")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Eliminar truco" }));
+    expect(await screen.findByRole("button", { name: "Limpiar una sartén de aluminio" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Limpiar lechuga con Thermomix" })).toBeNull();
+  });
+
+  it("shows an empty state and keeps the form available after deleting the last tip", async () => {
+    vi.mocked(apiRequest).mockImplementation(async (_path, opciones) => {
+      if ((opciones as { method?: string } | undefined)?.method === "DELETE") return undefined;
+      return { trucos: [{ id: "lechuga", title: "Lechuga", content: "Contenido." }] };
+    });
+    vi.stubGlobal("confirm", vi.fn().mockReturnValue(true));
+    render(<KitchenTips onSessionExpired={vi.fn()} />);
+    await screen.findByRole("button", { name: "Lechuga" });
+    await userEvent.click(screen.getByRole("button", { name: "Eliminar truco" }));
+    expect(await screen.findByText("No hay trucos de cocina todavía.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Guardar truco" })).toBeTruthy();
+  });
 });

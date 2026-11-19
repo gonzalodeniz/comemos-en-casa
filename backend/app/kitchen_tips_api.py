@@ -38,6 +38,16 @@ def editar_truco(truco_id: UUID, entrada: TrucoEntrada, _: ActiveSession = Depen
     return {"id": str(truco.id), "title": truco.title, "content": truco.content}
 
 
+@router.delete("/kitchen-tips/{truco_id}", status_code=status.HTTP_204_NO_CONTENT)
+def eliminar_truco(truco_id: UUID, _: ActiveSession = Depends(get_active_session), db: Session = Depends(get_database_session)):
+    """Elimina un truco del catálogo compartido."""
+    truco = db.get(KitchenTip, truco_id)
+    if truco is None:
+        raise HTTPException(status_code=404, detail="Truco no encontrado")
+    db.delete(truco)
+    db.commit()
+
+
 @router.post("/kitchen-tips", status_code=status.HTTP_201_CREATED)
 def crear_truco(entrada: TrucoEntrada, _: ActiveSession = Depends(get_active_session), db: Session = Depends(get_database_session)):
     """Guarda un truco para que lo consulten los usuarios autenticados."""

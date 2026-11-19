@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 from app.database import get_database_session
 from app.main import app
 from app.models import Base, KitchenTip
-from meal_planning_test_support import api_get, api_patch, api_post, authenticate
+from meal_planning_test_support import api_delete, api_get, api_patch, api_post, authenticate
 
 
 @pytest.fixture
@@ -107,3 +107,25 @@ def test_edit_kitchen_tip_rejects_blank_fields_without_changing_tip(trucos_db, p
         cookies=cookies, csrf_token=cookies["csrf_token"])
     assert response.status_code == 422
     assert next(t for t in api_get("/api/v1/kitchen-tips", cookies=cookies).json()["trucos"] if t["id"] == original["id"]) == original
+
+
+def test_delete_kitchen_tip_is_persisted_and_visible_to_another_authenticated_user(trucos_db):
+    """Comprueba que borrar un truco lo retira del catálogo compartido."""
+    cookies_usuario = authenticate(trucos_db)
+    cookies_otro_usuario = authenticate(trucos_db)
+    truco = api_get("/api/v1/kitchen-tips", cookies=cookies_usuario).json()["trucos"][0]
+
+    eliminado = api_delete(f"/api/v1/kitchen-tips/{truco['id']}", cookies=cookies_usuario)
+
+    assert eliminado.status_code == 204
+    trucos_visibles = api_get("/api/v1/kitchen-tips", cookies=cookies_otro_usuario).json()["trucos"]
+    assert all(elemento["id"] != truco["id"] for elemento in trucos_visibles)
+
+
+def test_delete_kitchen_tip_requires_authentication(trucos_db):
+    """Comprueba que solo una sesión autenticada puede borrar trucos."""
+    truco = api_get("/api/v1/kitchen-tips", cookies=authenticate(trucos_db)).json()["trucos"][0]
+
+    respuesta = api_delete(f"/api/v1/kitchen-tips/{truco['id']}")
+
+    assert respuesta.status_code == 401

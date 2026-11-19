@@ -7,6 +7,7 @@ type Props = { onSessionExpired: () => void };
 
 export default function KitchenTips({ onSessionExpired }: Props) {
   const [trucos, setTrucos] = useState<Truco[]>([]);
+  const [cargando, setCargando] = useState(true);
   const [seleccionado, setSeleccionado] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [titulo, setTitulo] = useState("");
@@ -20,11 +21,12 @@ export default function KitchenTips({ onSessionExpired }: Props) {
       if (!cancelado) {
         setTrucos(resultado.trucos);
         setSeleccionado(resultado.trucos[0]?.id ?? null);
+        setCargando(false);
       }
     }).catch((causa: unknown) => {
       if (cancelado) return;
       if (causa instanceof ApiError && causa.status === 401) onSessionExpired();
-      else setError("No se pudieron cargar los trucos.");
+      else { setError("No se pudieron cargar los trucos."); setCargando(false); }
     });
     return () => { cancelado = true; };
   }, [onSessionExpired]);
@@ -53,17 +55,31 @@ export default function KitchenTips({ onSessionExpired }: Props) {
       else setErrorFormulario("No se pudo guardar el truco.");
     }
   }
+  /** Confirma y elimina el truco seleccionado del catálogo compartido. */
+  async function eliminarTruco() {
+    if (!trucoActual || !window.confirm(`¿Eliminar definitivamente «${trucoActual.title}»?`)) return;
+    try {
+      await apiRequest(`/kitchen-tips/${trucoActual.id}`, { method: "DELETE" });
+      const restantes = trucos.filter((truco) => truco.id !== trucoActual.id);
+      setTrucos(restantes);
+      setSeleccionado(restantes[0]?.id ?? null);
+    } catch (causa) {
+      if (causa instanceof ApiError && causa.status === 401) onSessionExpired();
+      else setError("No se pudo eliminar el truco.");
+    }
+  }
   return <main className="dashboard">
     <section className="panel">
       <p className="eyebrow">Consejos prácticos</p>
       <h2>Trucos de cocina</h2>
       {error && <p className="message error" role="alert">{error}</p>}
-      {!error && trucos.length === 0 && <p role="status">Cargando trucos…</p>}
+      {!error && cargando && trucos.length === 0 && <p role="status">Cargando trucos…</p>}
+      {!error && !cargando && trucos.length === 0 && <p role="status">No hay trucos de cocina todavía.</p>}
       {trucos.length > 0 && <div className="kitchen-tips">
         <nav aria-label="Trucos disponibles">
           {trucos.map((truco) => <button key={truco.id} type="button" aria-current={seleccionado === truco.id ? "true" : undefined} onClick={() => setSeleccionado(truco.id)}>{truco.title}</button>)}
         </nav>
-        {trucoActual && <article aria-live="polite"><h3>{trucoActual.title}</h3><p>{trucoActual.content}</p><button type="button" onClick={() => { setEditando(trucoActual.id); setTitulo(trucoActual.title); setContenido(trucoActual.content); setErrorFormulario(""); }}>Editar truco</button></article>}
+        {trucoActual && <article aria-live="polite"><h3>{trucoActual.title}</h3><p>{trucoActual.content}</p><button type="button" onClick={() => { setEditando(trucoActual.id); setTitulo(trucoActual.title); setContenido(trucoActual.content); setErrorFormulario(""); }}>Editar truco</button><button type="button" onClick={() => void eliminarTruco()}>Eliminar truco</button></article>}
       </div>}
       <form onSubmit={guardarTruco}>
         <label>Título<input value={titulo} onChange={(evento) => setTitulo(evento.target.value)} /></label>

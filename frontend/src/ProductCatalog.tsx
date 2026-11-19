@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import { ApiError } from "./api";
 import ImagenCatalogo, { type RecorteCatalogo } from "./ImagenCatalogo";
 import AppIcon from "./AppIcon";
-import type { ShoppingCategory, ShoppingProduct } from "./mealPlanningApi";
+import type { ShoppingCategory, ShoppingProduct, ResultadoBusquedaProducto } from "./mealPlanningApi";
 
 // Describe una actualización de la imagen de un elemento existente.
 type CambioImagen = { name?: string; image_token?: string; remove_image?: true };
@@ -20,6 +20,7 @@ type Props = {
   onSessionExpired: () => void;
   onCreateCategory: (name: string, token?: string) => Promise<void>;
   onCreateProduct: (categoryId: string, name: string, token?: string) => Promise<ShoppingProduct>;
+  onSearchProducts?: (consulta: string) => Promise<{ products: ResultadoBusquedaProducto[] }>;
   onGetProducts: (categoryId: string) => Promise<ShoppingProduct[]>;
   onUpdateCategoryImage: (id: string, cambio: CambioImagen) => Promise<ShoppingCategory>;
   onUpdateProductImage: (categoriaId: string, id: string, cambio: CambioProducto) => Promise<ShoppingProduct>;
@@ -28,7 +29,7 @@ type Props = {
 };
 
 // Identifica el formulario activo sin presentar acciones no admitidas.
-type Editor = { tipo: "categoria" | "producto"; id: string; nombre: string; imagen: boolean } | null;
+type Editor = { tipo: "categoria" | "producto"; id: string; nombre: string; imagen: boolean; categoriaId?: string } | null;
 
 /** Presenta el editor de producto como diálogo modal y devuelve el foco al cerrarlo. */
 function ModalProducto({ titulo, cerrar, ocupado, children }: { titulo: string; cerrar: () => void; ocupado: boolean; children: ReactNode }) {
@@ -48,7 +49,7 @@ function urlImagen(url: string): string {
 }
 
 /** Muestra y gestiona categorías, productos y sus imágenes opcionales. */
-export default function ProductCatalog({ categories, cargandoCategorias, errorCategorias, onReintentarCategorias, onGetProducts, onCreateCategory, onCreateProduct, onUpdateCategoryImage, onUpdateProductImage, onImportImage, onPrepareImage, onSessionExpired, onConsultarUso, onBorrarProducto }: Props) {
+export default function ProductCatalog({ categories, cargandoCategorias, errorCategorias, onReintentarCategorias, onGetProducts, onSearchProducts, onCreateCategory, onCreateProduct, onUpdateCategoryImage, onUpdateProductImage, onImportImage, onPrepareImage, onSessionExpired, onConsultarUso, onBorrarProducto }: Props) {
   const [categoria, setCategoria] = useState<ShoppingCategory | null>(null);
   const [productos, setProductos] = useState<ShoppingProduct[]>([]);
   const [error, setError] = useState("");
@@ -63,6 +64,26 @@ export default function ProductCatalog({ categories, cargandoCategorias, errorCa
   const [quitar, setQuitar] = useState(false);
   const [versionEditor, setVersionEditor] = useState(0);
   const revision = useRef(0);
+  const [busqueda, setBusqueda] = useState("");
+  const [revisionBusqueda, setRevisionBusqueda] = useState(0);
+  const [respuestaBusqueda, setRespuestaBusqueda] = useState<{ consulta: string; revision: number; productos: ResultadoBusquedaProducto[] | null }>();
+  const consulta = busqueda.trim();
+  const buscando = !!onSearchProducts && consulta.length >= 3;
+  const respuestaVigente = respuestaBusqueda?.consulta === consulta && respuestaBusqueda.revision === revisionBusqueda ? respuestaBusqueda : undefined;
+
+  useEffect(() => {
+    if (!buscando || !onSearchProducts) return;
+    let vigente = true;
+    setRespuestaBusqueda(undefined);
+    void onSearchProducts(consulta).then(({ products }) => {
+      if (vigente) setRespuestaBusqueda({ consulta, revision: revisionBusqueda, productos: products });
+    }).catch((causa: unknown) => {
+      if (!vigente) return;
+      if (causa instanceof ApiError && causa.status === 401) onSessionExpired();
+      setRespuestaBusqueda({ consulta, revision: revisionBusqueda, productos: null });
+    });
+    return () => { vigente = false; };
+  }, [buscando, consulta, onSearchProducts, onSessionExpired, revisionBusqueda]);
 
   /** Notifica el vencimiento de sesión o presenta un error operativo. */
   function informar(causa: unknown, mensaje: string) {
@@ -79,10 +100,11 @@ export default function ProductCatalog({ categories, cargandoCategorias, errorCa
 
   /** Elimina el producto confirmado sin cerrar el editor si ocurre un error. */
   async function borrarProducto() {
-    if (!editor || !categoria || !onBorrarProducto || guardando) return;
+    if (!editor?.categoriaId || !onBorrarProducto || guardando) return;
     setGuardando(true);
     try {
-      await onBorrarProducto(categoria.id, editor.id);
+      await onBorrarProducto(editor.categoriaId, editor.id);
+      setRevisionBusqueda((actual) => actual + 1);
       setProductos((actuales) => actuales.filter((producto) => producto.id !== editor.id));
       abrirEditor(null);
     } catch (causa) { informar(causa, "No se pudo borrar el producto. Inténtalo de nuevo."); }
@@ -125,9 +147,10 @@ export default function ProductCatalog({ categories, cargandoCategorias, errorCa
         catch (causa) { informar(causa, "Producto creado; no se pudo actualizar su imagen."); }
       } else if (editor.tipo === "categoria") {
         await onUpdateCategoryImage(editor.id, { ...(nombre.trim() !== editor.nombre ? { name: nombre.trim() } : {}), ...(token ? { image_token: token } : quitar ? { remove_image: true as const } : {}) });
-      } else if (categoria) {
-        const actualizado = await onUpdateProductImage(categoria.id, editor.id, { name: nombre.trim(), ...(token ? { image_token: token } : quitar ? { remove_image: true as const } : {}) });
+      } else if (editor.categoriaId) {
+        const actualizado = await onUpdateProductImage(editor.categoriaId, editor.id, { name: nombre.trim(), ...(token ? { image_token: token } : quitar ? { remove_image: true as const } : {}) });
         setProductos((actuales) => actuales.map((item) => item.id === editor.id ? actualizado : item));
+        setRevisionBusqueda((actual) => actual + 1);
       }
       setEditor(null); setImagen(""); setRecorte(null); setNombre("");
     } catch (causa) { informar(causa, causa instanceof ApiError && causa.status === 409 ? (editor.tipo === "categoria" ? "Ya existe una categoría con ese nombre." : "Ya existe un producto con ese nombre.") : "No se pudo guardar. Inténtalo de nuevo."); }
@@ -146,22 +169,33 @@ export default function ProductCatalog({ categories, cargandoCategorias, errorCa
     } finally { if (solicitud === revision.current) setCargando(false); }
   }
 
+  /** Presenta las mismas acciones para productos de una categoría o de una búsqueda. */
+  function tarjetasProducto(elementos: (ShoppingProduct & { category_id?: string })[]) {
+    return <div className="catalogo-productos-grid">{elementos.map((producto) => <article className="catalogo-productos-tarjeta" key={producto.id}>
+        <button className="catalogo-tarjeta-contenido catalogo-producto-activar" type="button" aria-label={"Gestionar imagen de " + producto.name} disabled={guardando} onClick={() => abrirEditor({ tipo: "producto", id: producto.id, nombre: producto.name, imagen: !!producto.image_url, categoriaId: producto.category_id ?? categoria?.id })}>{producto.image_url ? <img src={urlImagen(producto.image_url)} alt="" /> : <span className="catalogo-productos-imagen" aria-hidden="true"><AppIcon name="utensils" /></span>}<strong>{producto.name}</strong></button>
+      </article>)}</div>;
+  }
+
+  const campoBusqueda = onSearchProducts && <div className="selector-compra-busqueda catalogo-busqueda">
+    <input aria-label="Buscar productos" placeholder="Busca tus productos" value={busqueda} onChange={(evento) => setBusqueda(evento.target.value)} />
+    {busqueda && <button type="button" className="compra-accion" aria-label="Limpiar búsqueda" onClick={() => { setRespuestaBusqueda(undefined); setBusqueda(""); }}><AppIcon name="close" /></button>}
+  </div>;
+
   return <section className="catalogo-productos">
     {categoria ? <>
       <button className="catalogo-volver" type="button" disabled={guardando} onClick={() => { revision.current++; setCategoria(null); setError(""); abrirEditor(null); }}><AppIcon name="chevron-left" />Volver a categorías</button>
       <div className="catalogo-cabecera"><div><h2>{categoria.name}</h2><p>Productos de esta categoría</p></div>
-      <button className="catalogo-crear" type="button" disabled={guardando || cargando} onClick={() => abrirEditor({ tipo: "producto", id: "", nombre: "", imagen: false })}><AppIcon name="plus" />Nuevo producto</button></div>
-      {cargando ? <p role="status">Cargando productos…</p> : productos.length === 0 ? <p>No hay productos en esta categoría.</p> : <div className="catalogo-productos-grid">{productos.map((producto) => <article className="catalogo-productos-tarjeta" key={producto.id}>
-        <button className="catalogo-tarjeta-contenido catalogo-producto-activar" type="button" aria-label={"Gestionar imagen de " + producto.name} disabled={guardando} onClick={() => abrirEditor({ tipo: "producto", id: producto.id, nombre: producto.name, imagen: !!producto.image_url })}>{producto.image_url ? <img src={urlImagen(producto.image_url)} alt="" /> : <span className="catalogo-productos-imagen" aria-hidden="true"><AppIcon name="utensils" /></span>}<strong>{producto.name}</strong></button>
-      </article>)}</div>}
+      {campoBusqueda}<button className="catalogo-crear" type="button" disabled={guardando || cargando} onClick={() => abrirEditor({ tipo: "producto", id: "", nombre: "", imagen: false })}><AppIcon name="plus" />Nuevo producto</button></div>
+      {!buscando && (cargando ? <p role="status">Cargando productos…</p> : productos.length === 0 ? <p>No hay productos en esta categoría.</p> : tarjetasProducto(productos))}
     </> : <>
-      <div className="catalogo-cabecera"><div><h2>Catálogo de categorías</h2><p>Organiza tus categorías de productos</p></div>
+      <div className="catalogo-cabecera"><div className="catalogo-cabecera-contenido"><h2>Catálogo de categorías</h2><p>Organiza tus categorías de productos</p>{campoBusqueda}</div>
       <button className="catalogo-crear" type="button" disabled={guardando || cargandoCategorias || !!errorCategorias} onClick={() => abrirEditor({ tipo: "categoria", id: "", nombre: "", imagen: false })}><AppIcon name="plus" />Nueva categoría</button></div>
-      {cargandoCategorias ? <p role="status">Cargando categorías…</p> : errorCategorias ? <div role="alert">{errorCategorias} <button type="button" onClick={onReintentarCategorias}>Reintentar</button></div> : categories.length === 0 ? <p>No hay categorías disponibles.</p> : <div className="catalogo-productos-grid">{[...categories].sort((a, b) => a.name.localeCompare(b.name, "es")).map((elemento) => <article className="catalogo-productos-tarjeta" key={elemento.id}>
+      {!buscando && (cargandoCategorias ? <p role="status">Cargando categorías…</p> : errorCategorias ? <div role="alert">{errorCategorias} <button type="button" onClick={onReintentarCategorias}>Reintentar</button></div> : categories.length === 0 ? <p>No hay categorías disponibles.</p> : <div className="catalogo-productos-grid">{[...categories].sort((a, b) => a.name.localeCompare(b.name, "es")).map((elemento) => <article className="catalogo-productos-tarjeta" key={elemento.id}>
         <button className="catalogo-tarjeta-contenido" type="button" disabled={guardando} onClick={() => void abrirCategoria(elemento)}>{elemento.image_url ? <img src={urlImagen(elemento.image_url)} alt="" /> : <span className="catalogo-productos-imagen" aria-hidden="true"><AppIcon name="utensils" /></span>}<strong>{elemento.name}</strong></button>
         <button className="catalogo-accion" type="button" aria-label={"Editar categoría " + elemento.name} title="Editar categoría" disabled={guardando} onClick={() => abrirEditor({ tipo: "categoria", id: elemento.id, nombre: elemento.name, imagen: !!elemento.image_url })}><span aria-hidden="true">⋮</span></button>
-      </article>)}</div>}
+      </article>)}</div>)}
     </>}
+    {buscando && (!respuestaVigente ? <p role="status">Buscando productos…</p> : respuestaVigente.productos === null ? <p role="alert">No se pudieron buscar los productos. <button type="button" onClick={() => setRevisionBusqueda((actual) => actual + 1)}>Reintentar</button></p> : respuestaVigente.productos.length ? tarjetasProducto(respuestaVigente.productos) : <p role="status">No se encontraron productos.</p>)}
     {error && !(editor?.tipo === "producto" && editor.id) && <p role="alert">{error}</p>}
     {editor && (() => { const formulario = <form className="catalogo-editor" onSubmit={(evento) => void guardar(evento)} aria-label={editor.id && editor.tipo === "producto" ? "Producto " + editor.nombre : editor.id ? "Categoría " + editor.nombre : editor.tipo === "categoria" ? "Nueva categoría" : "Nuevo producto"}>
       {!(editor.id && editor.tipo === "producto") && <h3>{editor.id ? "Categoría " + editor.nombre : editor.tipo === "categoria" ? "Nueva categoría" : "Nuevo producto"}</h3>}

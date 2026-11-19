@@ -41,7 +41,10 @@ def test_search_products_matches_partial_name_across_categories(meal_database):
     respuesta = api_get("/api/v1/shopping-products/search?q=sal", cookies=cookies)
 
     assert respuesta.status_code == 200
-    assert respuesta.json()["products"] == [fina, gorda]
+    assert respuesta.json()["products"] == [
+        {**fina, "category_id": fruta["id"]},
+        {**gorda, "category_id": limpieza["id"]},
+    ]
 
 def test_create_product_in_category(meal_database):
     """Comprueba la creación autenticada de un producto en una categoría."""

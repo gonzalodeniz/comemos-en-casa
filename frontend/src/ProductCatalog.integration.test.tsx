@@ -13,6 +13,32 @@ beforeEach(() => {
   HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
 });
 
+// Comprueba la búsqueda global, la edición con la categoría del resultado y la limpieza.
+it("busca productos en todo el catálogo y permite gestionar el resultado", async () => {
+  const usuario = userEvent.setup();
+  const buscar = vi.fn().mockResolvedValue({ products: [{ id: "p", category_id: "2", name: "Sal fina", image_url: "/sal.webp" }] });
+  const actualizar = vi.fn().mockResolvedValue({ id: "p", name: "Sal gruesa" });
+  render(<ProductCatalog categories={[{ id: "1", name: "Frutas" }, { id: "2", name: "Despensa" }]} onGetProducts={vi.fn().mockResolvedValue([{ id: "m", name: "Manzana" }])} onSearchProducts={buscar} onCreateCategory={vi.fn()} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} onUpdateCategoryImage={vi.fn()} onUpdateProductImage={actualizar} onImportImage={vi.fn()} onPrepareImage={vi.fn()} />);
+  await usuario.click(screen.getByRole("button", { name: "Frutas" }));
+  const campo = screen.getByPlaceholderText("Busca tus productos");
+  await usuario.type(campo, "sa");
+  expect(buscar).not.toHaveBeenCalled();
+  expect(screen.getByText("Manzana")).toBeTruthy();
+  await usuario.type(campo, "l");
+  const resultado = await screen.findByRole("button", { name: "Gestionar imagen de Sal fina" });
+  expect(buscar).toHaveBeenCalledWith("sal");
+  expect(resultado.querySelector('img[src$="/api/v1/sal.webp"]')).toBeTruthy();
+  expect(screen.queryByText("Manzana")).toBeNull();
+  await usuario.click(resultado);
+  const nombre = screen.getByLabelText("Nombre del producto");
+  await usuario.clear(nombre);
+  await usuario.type(nombre, "Sal gruesa");
+  await usuario.click(screen.getByRole("button", { name: "Guardar" }));
+  expect(actualizar).toHaveBeenCalledWith("2", "p", { name: "Sal gruesa" });
+  await usuario.click(screen.getByRole("button", { name: "Limpiar búsqueda" }));
+  expect(screen.getByText("Manzana")).toBeTruthy();
+});
+
 it("muestra la imagen y el nombre de los productos de la categoría", async () => {
   const usuario = userEvent.setup();
   render(<ProductCatalog onUpdateCategoryImage={vi.fn()} onUpdateProductImage={vi.fn()} onImportImage={vi.fn()} onPrepareImage={vi.fn()} categories={[{ id: "1", name: "Frutas" }]} onGetProducts={async () => [{ id: "p", name: "Pera", image_url: "/imagen" }]} onCreateCategory={vi.fn()} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} />);

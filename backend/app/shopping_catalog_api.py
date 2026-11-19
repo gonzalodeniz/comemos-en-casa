@@ -24,7 +24,7 @@ search_router = APIRouter(prefix="/api/v1/shopping-products", tags=["shopping-ca
 async def search_products(q: str = Query(min_length=3), _session: ActiveSession = Depends(get_active_session), db: Session = Depends(get_database_session)) -> dict[str, list[dict[str, str]]]:
     """Busca productos por nombre parcial en todas las categorías."""
     productos = db.scalars(select(ShoppingProduct).where(func.lower(ShoppingProduct.name).contains(q.lower())).order_by(ShoppingProduct.name)).all()
-    return {"products": [{"id": str(product.id), "name": product.name, **({"image_url": _product_image_url(product)} if product.image_path else {})} for product in productos]}
+    return {"products": [{"id": str(product.id), "category_id": str(product.category_id), "name": product.name, **({"image_url": _product_image_url(product)} if product.image_path else {})} for product in productos]}
 
 
 @router.delete("/{category_id}/products/{product_id}", status_code=204)

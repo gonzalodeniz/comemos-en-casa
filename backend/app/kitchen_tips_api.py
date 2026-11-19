@@ -1,5 +1,6 @@
 """Expone la consulta autenticada del catálogo de trucos."""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
+from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -8,6 +9,29 @@ from app.database import get_database_session
 from app.models import KitchenTip
 
 router = APIRouter(prefix="/api/v1", tags=["kitchen-tips"])
+
+
+class TrucoEntrada(BaseModel):
+    """Define los campos necesarios para crear un truco."""
+    title: str
+    content: str
+
+    @field_validator("title", "content")
+    @classmethod
+    def validar_texto_no_vacio(cls, valor: str) -> str:
+        """Rechaza campos compuestos únicamente por espacios."""
+        if not valor.strip():
+            raise ValueError("El campo no puede estar vacío.")
+        return valor
+
+
+@router.post("/kitchen-tips", status_code=status.HTTP_201_CREATED)
+def crear_truco(entrada: TrucoEntrada, _: ActiveSession = Depends(get_active_session), db: Session = Depends(get_database_session)):
+    """Guarda un truco para que lo consulten los usuarios autenticados."""
+    truco = KitchenTip(title=entrada.title, content=entrada.content)
+    db.add(truco)
+    db.commit()
+    return {"id": str(truco.id), "title": truco.title, "content": truco.content}
 
 
 @router.get("/kitchen-tips")

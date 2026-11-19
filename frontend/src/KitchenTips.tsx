@@ -9,6 +9,9 @@ export default function KitchenTips({ onSessionExpired }: Props) {
   const [trucos, setTrucos] = useState<Truco[]>([]);
   const [seleccionado, setSeleccionado] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [titulo, setTitulo] = useState("");
+  const [contenido, setContenido] = useState("");
+  const [errorFormulario, setErrorFormulario] = useState("");
 
   useEffect(() => {
     let cancelado = false;
@@ -26,6 +29,28 @@ export default function KitchenTips({ onSessionExpired }: Props) {
   }, [onSessionExpired]);
 
   const trucoActual = trucos.find((truco) => truco.id === seleccionado);
+  async function guardarTruco(evento: React.FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    const tituloLimpio = titulo.trim();
+    const contenidoLimpio = contenido.trim();
+    if (!tituloLimpio || !contenidoLimpio) {
+      setErrorFormulario(!tituloLimpio ? "El título es obligatorio." : "El contenido es obligatorio.");
+      return;
+    }
+    try {
+      const nuevo = await apiRequest<Truco>("/kitchen-tips", {
+        method: "POST", body: { title: tituloLimpio, content: contenidoLimpio },
+      });
+      setTrucos((actuales) => [...actuales, nuevo].sort((a, b) => a.title.localeCompare(b.title)));
+      setSeleccionado(nuevo.id);
+      setTitulo("");
+      setContenido("");
+      setErrorFormulario("");
+    } catch (causa) {
+      if (causa instanceof ApiError && causa.status === 401) onSessionExpired();
+      else setErrorFormulario("No se pudo guardar el truco.");
+    }
+  }
   return <main className="dashboard">
     <section className="panel">
       <p className="eyebrow">Consejos prácticos</p>
@@ -38,6 +63,12 @@ export default function KitchenTips({ onSessionExpired }: Props) {
         </nav>
         {trucoActual && <article aria-live="polite"><h3>{trucoActual.title}</h3><p>{trucoActual.content}</p></article>}
       </div>}
+      <form onSubmit={guardarTruco}>
+        <label>Título<input value={titulo} onChange={(evento) => setTitulo(evento.target.value)} /></label>
+        <label>Contenido<textarea value={contenido} onChange={(evento) => setContenido(evento.target.value)} /></label>
+        {errorFormulario && <p role="alert">{errorFormulario}</p>}
+        <button type="submit">Guardar truco</button>
+      </form>
     </section>
   </main>;
 }

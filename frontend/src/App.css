@@ -676,8 +676,16 @@ button.today-button { display: inline-flex; align-items: center; gap: .4rem; }
   .planning-sticky-header .week-meal-headings,
   .planning-sticky-header .calendar-context { display: none; }
   .meal-planning .meal-title { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
-  button.alternar-filtros-planificacion { display: grid; place-items: center; width: 44px; padding: 0; color: #006b3c; }
-  button.alternar-filtros-planificacion[aria-expanded="true"] { color: #fff; background: #006b3c; }
+  /* Los colores dependen del estado abierto, no del puntero. */
+  button.secondary.alternar-filtros-planificacion,
+  button.secondary.alternar-filtros-planificacion:hover:not(:disabled) {
+    display: grid; place-items: center; width: 44px; padding: 0;
+    color: #006b3c; background: #fff; border-color: #006b3c; transition: none;
+  }
+  button.secondary.alternar-filtros-planificacion[aria-expanded="true"],
+  button.secondary.alternar-filtros-planificacion[aria-expanded="true"]:hover:not(:disabled) {
+    color: #fff; background: #006b3c; border-color: #006b3c;
+  }
   /* Reutiliza los botones de escritorio, ocultándolos solo en móvil al plegar los filtros. */
   .meal-planning .calendar-toolbar:not(:has(.calendar-navigation, .planning-switches[data-abiertos="true"])),
   .meal-planning .planning-switches[data-abiertos="false"] { display: none; }
@@ -693,9 +701,10 @@ button.today-button { display: inline-flex; align-items: center; gap: .4rem; }
   .week-grid .calendar-day h4 { padding: .25rem .35rem; border-radius: .8rem 0 0 .8rem; font-size: .9rem; }
   .week-grid .calendar-day h4 time { font-size: .75rem; }
   .week-grid .day-meals { grid-template-columns: minmax(0, 1fr); }
-  .week-grid .meal-card { align-items: center; padding: 0 .2rem 0 0; }
+  .week-grid .meal-card { min-width: 0; align-items: center; padding: 0 .2rem 0 0; }
   .week-grid .meal-card + .meal-card { border-left: 0; border-top: 1px solid #e0ebef; }
-  .week-grid .meal-slot {
+  .week-grid .meal-card .meal-slot {
+    min-width: 0;
     flex-direction: row;
     justify-content: flex-start;
     min-height: 44px;

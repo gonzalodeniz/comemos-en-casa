@@ -12,6 +12,7 @@ export default function KitchenTips({ onSessionExpired }: Props) {
   const [titulo, setTitulo] = useState("");
   const [contenido, setContenido] = useState("");
   const [errorFormulario, setErrorFormulario] = useState("");
+  const [editando, setEditando] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelado = false;
@@ -38,11 +39,12 @@ export default function KitchenTips({ onSessionExpired }: Props) {
       return;
     }
     try {
-      const nuevo = await apiRequest<Truco>("/kitchen-tips", {
-        method: "POST", body: { title: tituloLimpio, content: contenidoLimpio },
+      const nuevo = await apiRequest<Truco>(editando ? `/kitchen-tips/${editando}` : "/kitchen-tips", {
+        method: editando ? "PATCH" : "POST", body: { title: tituloLimpio, content: contenidoLimpio },
       });
-      setTrucos((actuales) => [...actuales, nuevo].sort((a, b) => a.title.localeCompare(b.title)));
+      setTrucos((actuales) => [...actuales.filter((truco) => truco.id !== nuevo.id), nuevo].sort((a, b) => a.title.localeCompare(b.title)));
       setSeleccionado(nuevo.id);
+      setEditando(null);
       setTitulo("");
       setContenido("");
       setErrorFormulario("");
@@ -61,13 +63,13 @@ export default function KitchenTips({ onSessionExpired }: Props) {
         <nav aria-label="Trucos disponibles">
           {trucos.map((truco) => <button key={truco.id} type="button" aria-current={seleccionado === truco.id ? "true" : undefined} onClick={() => setSeleccionado(truco.id)}>{truco.title}</button>)}
         </nav>
-        {trucoActual && <article aria-live="polite"><h3>{trucoActual.title}</h3><p>{trucoActual.content}</p></article>}
+        {trucoActual && <article aria-live="polite"><h3>{trucoActual.title}</h3><p>{trucoActual.content}</p><button type="button" onClick={() => { setEditando(trucoActual.id); setTitulo(trucoActual.title); setContenido(trucoActual.content); setErrorFormulario(""); }}>Editar truco</button></article>}
       </div>}
       <form onSubmit={guardarTruco}>
         <label>Título<input value={titulo} onChange={(evento) => setTitulo(evento.target.value)} /></label>
         <label>Contenido<textarea value={contenido} onChange={(evento) => setContenido(evento.target.value)} /></label>
         {errorFormulario && <p role="alert">{errorFormulario}</p>}
-        <button type="submit">Guardar truco</button>
+        <button type="submit">{editando ? "Guardar cambios" : "Guardar truco"}</button>
       </form>
     </section>
   </main>;

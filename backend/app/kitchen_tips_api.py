@@ -1,5 +1,6 @@
 """Expone la consulta autenticada del catálogo de trucos."""
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from uuid import UUID
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -23,6 +24,18 @@ class TrucoEntrada(BaseModel):
         if not valor.strip():
             raise ValueError("El campo no puede estar vacío.")
         return valor
+
+
+@router.patch("/kitchen-tips/{truco_id}")
+def editar_truco(truco_id: UUID, entrada: TrucoEntrada, _: ActiveSession = Depends(get_active_session), db: Session = Depends(get_database_session)):
+    """Actualiza un truco compartido por usuarios autenticados."""
+    truco = db.get(KitchenTip, truco_id)
+    if truco is None:
+        raise HTTPException(status_code=404, detail="Truco no encontrado")
+    truco.title = entrada.title
+    truco.content = entrada.content
+    db.commit()
+    return {"id": str(truco.id), "title": truco.title, "content": truco.content}
 
 
 @router.post("/kitchen-tips", status_code=status.HTTP_201_CREATED)

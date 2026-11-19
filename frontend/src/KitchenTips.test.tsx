@@ -21,6 +21,27 @@ describe("KitchenTips", () => {
   ] });
   });
 
+  it("edits a tip using its current values and updates the detail", async () => {
+    vi.mocked(apiRequest).mockImplementation(async (_path, opciones) => {
+      if (opciones?.method === "PATCH") return { id: "lechuga", title: "Título editado", content: "Contenido editado." };
+      return { trucos: [{ id: "lechuga", title: "Lechuga", content: "Contenido original." }] };
+    });
+    render(<KitchenTips onSessionExpired={vi.fn()} />);
+    await screen.findByRole("button", { name: "Lechuga" });
+    await userEvent.click(screen.getByRole("button", { name: "Editar truco" }));
+    const titulo = screen.getByLabelText("Título") as HTMLInputElement;
+    const contenido = screen.getByLabelText("Contenido") as HTMLTextAreaElement;
+    expect(titulo.value).toBe("Lechuga");
+    expect(contenido.value).toBe("Contenido original.");
+    await userEvent.clear(titulo);
+    await userEvent.type(titulo, "Título editado");
+    await userEvent.clear(contenido);
+    await userEvent.type(contenido, "Contenido editado.");
+    await userEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+    expect(await screen.findByRole("button", { name: "Título editado" })).toBeTruthy();
+    expect(screen.getByText("Contenido editado.")).toBeTruthy();
+  });
+
   it("shows both tips and their selected instructions", async () => {
     render(<KitchenTips onSessionExpired={vi.fn()} />);
     expect(await screen.findByRole("button", { name: "Limpiar lechuga con Thermomix" })).toBeTruthy();

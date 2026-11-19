@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 from app.database import get_database_session
 from app.main import app
 from app.models import Base, KitchenTip
-from meal_planning_test_support import api_get, api_post, authenticate
+from meal_planning_test_support import api_get, api_patch, api_post, authenticate
 
 
 @pytest.fixture
@@ -80,3 +80,30 @@ def test_create_kitchen_tip_rejects_blank_fields(trucos_db, payload):
     assert response.status_code == 422
     with trucos_db() as db:
         assert db.query(KitchenTip).count() == 2
+
+
+def test_edit_kitchen_tip_updates_title_and_content_for_another_user(trucos_db):
+    """Comprueba que la edición se comparte con otros usuarios autenticados."""
+    cookies = authenticate(trucos_db)
+    otro_usuario = authenticate(trucos_db)
+    truco = api_get("/api/v1/kitchen-tips", cookies=cookies).json()["trucos"][0]
+    response = api_patch(f"/api/v1/kitchen-tips/{truco['id']}",
+        payload={"title": "Título editado", "content": "Contenido editado."}, cookies=cookies, csrf_token=cookies["csrf_token"])
+    assert response.status_code == 200
+    actualizado = next(t for t in api_get("/api/v1/kitchen-tips", cookies=otro_usuario).json()["trucos"] if t["id"] == truco["id"])
+    assert actualizado["title"] == "Título editado"
+    assert actualizado["content"] == "Contenido editado."
+
+
+@pytest.mark.parametrize("payload", [
+    {"title": "   ", "content": "Contenido."},
+    {"title": "Título", "content": "   "},
+])
+def test_edit_kitchen_tip_rejects_blank_fields_without_changing_tip(trucos_db, payload):
+    """Comprueba que un campo en blanco conserva el truco original."""
+    cookies = authenticate(trucos_db)
+    original = api_get("/api/v1/kitchen-tips", cookies=cookies).json()["trucos"][0]
+    response = api_patch(f"/api/v1/kitchen-tips/{original['id']}", payload=payload,
+        cookies=cookies, csrf_token=cookies["csrf_token"])
+    assert response.status_code == 422
+    assert next(t for t in api_get("/api/v1/kitchen-tips", cookies=cookies).json()["trucos"] if t["id"] == original["id"]) == original

@@ -8,6 +8,20 @@ import ShoppingList from "./ShoppingList";
 
 afterEach(() => cleanup());
 
+// Verifica la incorporación de un producto encontrado mediante el buscador.
+it("añade un producto encontrado mediante la búsqueda", async () => {
+  HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
+  HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
+  const usuario = userEvent.setup();
+  const agregar = vi.fn().mockResolvedValue({ product_id: "s", quantity: 1, unit: "unit" });
+  render(<ShoppingList categories={[]} mostrarAdministracion={false} onCreateCategory={vi.fn()} onCreateProduct={vi.fn()} onGetProducts={vi.fn()} onSearchProducts={vi.fn().mockResolvedValue([{ id: "s", name: "Sal fina" }])} onAddToShoppingList={agregar} />);
+  await usuario.type(screen.getByRole("textbox", { name: "Buscar productos" }), "sal");
+  await usuario.click(await screen.findByRole("button", { name: "Sal fina" }));
+  await usuario.click(screen.getByRole("button", { name: "Añadir" }));
+  expect(await screen.findByRole("button", { name: "Editar Sal fina" })).toBeTruthy();
+  expect(agregar).toHaveBeenCalledWith("s", 1, "unit");
+});
+
 describe("ShoppingList", () => {
   // Comprueba la presentación de ingredientes copiados en el orden original.
   it("muestra la sección de receta con sus ingredientes en orden", async () => {

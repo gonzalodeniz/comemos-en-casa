@@ -38,6 +38,7 @@ type Props = {
   onAbrirCatalogo?: () => void;
   onCreateCategory: (name: string, imageToken?: string) => void | Promise<void>;
   onGetProducts: (categoryId: string) => Promise<ShoppingProduct[]>;
+  onSearchProducts?: (query: string) => Promise<ShoppingProduct[]>;
   onCreateProduct: (categoryId: string, name: string, imageToken?: string) => Promise<ShoppingProduct>;
   onPrepareImage?: (dataUrl: string, crop: { x: number; y: number; width: number; height: number }) => Promise<string>;
   onImportImage?: (url: string) => Promise<string>;
@@ -56,7 +57,7 @@ type Props = {
 };
 
 /** Presenta las categorías y permite consultar y crear sus productos. */
-export default function ShoppingList({ categories, mostrarAdministracion = true, onAbrirCatalogo, onCreateCategory, onGetProducts, onCreateProduct, onPrepareImage, onImportImage, onUpdateProductImage, onUpdateCategoryImage, onAddToShoppingList, onUpdateShoppingItem, onGetShoppingList, onMarkPurchased, onUnmarkPurchased, onDeleteItem, onMarkRecipeIngredient, onUnmarkRecipeIngredient, onDeleteRecipeIngredient, onDeleteRecipeSection }: Props) {
+export default function ShoppingList({ categories, mostrarAdministracion = true, onAbrirCatalogo, onCreateCategory, onGetProducts, onSearchProducts, onCreateProduct, onPrepareImage, onImportImage, onUpdateProductImage, onUpdateCategoryImage, onAddToShoppingList, onUpdateShoppingItem, onGetShoppingList, onMarkPurchased, onUnmarkPurchased, onDeleteItem, onMarkRecipeIngredient, onUnmarkRecipeIngredient, onDeleteRecipeIngredient, onDeleteRecipeSection }: Props) {
   const [pestana, setPestana] = useState<"productos" | "recetas">("productos");
   const [entradaEditada, setEntradaEditada] = useState<ShoppingListItem | null>(null);
   const [productoSeleccionado, setProductoSeleccionado] = useState<ShoppingProduct | null>(null);
@@ -406,7 +407,7 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
     {entradaEditada && onUpdateShoppingItem && <DialogoEditarCompra entrada={entradaEditada} guardar={onUpdateShoppingItem} cerrar={() => setEntradaEditada(null)} alGuardar={(actualizada) => {
       setListaCompra((actual) => { const siguiente = { ...actual }; delete siguiente[claveEntrada(entradaEditada)]; siguiente[claveEntrada(actualizada)] = { ...entradaEditada, ...actualizada }; return siguiente; });
     }} />}
-    <SelectorCompra categorias={categories} consultar={onGetProducts} seleccionar={setProductoSeleccionado} />
+    <SelectorCompra categorias={categories} consultar={onGetProducts} buscar={onSearchProducts} seleccionar={setProductoSeleccionado} />
     {productoSeleccionado && onAddToShoppingList && <DialogoCantidadCompra producto={productoSeleccionado} agregar={onAddToShoppingList}
       alAgregar={(entrada) => setListaCompra((actual) => ({ ...actual, [claveEntrada(entrada)]: { ...entrada, product_name: productoSeleccionado.name, image_url: productoSeleccionado.image_url } }))}
       cerrar={() => setProductoSeleccionado(null)} /> }

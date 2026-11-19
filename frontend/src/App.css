@@ -581,6 +581,9 @@ span.meal-thumbnail[role="button"]:focus-visible { outline:3px solid #00854a; ou
 .selector-compra { position: sticky; top: 0; z-index: 3; margin-top: 1rem; padding: .75rem; border: 1px solid var(--color-border); border-radius: .85rem; background: white; box-shadow: var(--shadow-panel); }
 .selector-compra-cabecera { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
 .selector-compra-cabecera h3 { margin: 0; }
+.selector-compra-busqueda { flex: 1; min-width: 0; display: flex; align-items: center; }
+.selector-compra-busqueda input { flex: 1; min-width: 0; width: 100%; }
+.selector-compra-busqueda input::placeholder { color: #777; opacity: .75; }
 .selector-compra-contenido { max-height: 30vh; overflow: auto; padding-top: .6rem; }
 .selector-compra-acciones { display: inline-flex; align-items: center; gap: .4rem; }
 .selector-compra-cuadricula { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 145px), 1fr)); gap: .5rem; }

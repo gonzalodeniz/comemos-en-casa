@@ -37,6 +37,14 @@ export default function KitchenTips({ onSessionExpired }: Props) {
   const consulta = normalizarBusqueda(busqueda.trim());
   const visibles = trucos.filter((truco) => normalizarBusqueda(`${truco.title} ${truco.content}`).includes(consulta));
   const trucoActual = trucos.find((truco) => truco.id === seleccionado);
+  // Descarta el borrador y devuelve el formulario al modo de creación.
+  function limpiarFormulario() {
+    setEditando(null);
+    setTitulo("");
+    setContenido("");
+    setErrorFormulario("");
+  }
+
   async function guardarTruco(evento: React.FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     const tituloLimpio = titulo.trim();
@@ -51,10 +59,7 @@ export default function KitchenTips({ onSessionExpired }: Props) {
       });
       setTrucos((actuales) => [...actuales.filter((truco) => truco.id !== nuevo.id), nuevo].sort((a, b) => a.title.localeCompare(b.title)));
       setSeleccionado(nuevo.id);
-      setEditando(null);
-      setTitulo("");
-      setContenido("");
-      setErrorFormulario("");
+      limpiarFormulario();
     } catch (causa) {
       if (causa instanceof ApiError && causa.status === 401) onSessionExpired();
       else setErrorFormulario("No se pudo guardar el truco.");
@@ -136,7 +141,12 @@ export default function KitchenTips({ onSessionExpired }: Props) {
           <div><strong>Consejo</strong><p>Sé claro y breve e incluye los pasos necesarios para que sea fácil de seguir.</p></div>
         </aside>
         {errorFormulario && <p className="message error" role="alert">{errorFormulario}</p>}
-        <button type="submit"><AppIcon name="check" />{editando ? "Guardar cambios" : "Guardar truco"}</button>
+        <div className="kitchen-tip-form-actions">
+          <button type="submit" aria-label={editando ? "Guardar cambios" : "Guardar truco"} title={editando ? "Guardar cambios" : "Guardar truco"}>
+            <AppIcon name="check" />
+          </button>
+          {editando && <button type="button" className="secondary kitchen-tip-cancel" aria-label="Cancelar edición" title="Cancelar edición" onClick={limpiarFormulario}><AppIcon name="close" /></button>}
+        </div>
       </form>
     </section>
   </main>;

@@ -42,6 +42,39 @@ describe("KitchenTips", () => {
     expect(within(screen.getByRole("article")).getByText("Contenido editado.")).toBeTruthy();
   });
 
+  // Comprueba que cancelar descarta el borrador y no guarda cambios.
+  it("cancels editing without changing the selected tip", async () => {
+    render(<KitchenTips onSessionExpired={vi.fn()} />);
+    const editar = await screen.findByRole("button", { name: "Editar truco Limpiar lechuga con Thermomix" });
+    expect(screen.queryByRole("button", { name: "Cancelar edición" })).toBeNull();
+    await userEvent.click(editar);
+    const titulo = screen.getByRole<HTMLInputElement>("textbox", { name: "Título" });
+    const contenido = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Contenido" });
+    await userEvent.clear(titulo);
+    await userEvent.type(titulo, "Borrador");
+    await userEvent.type(contenido, " Sin guardar.");
+    await userEvent.click(screen.getByRole("button", { name: "Cancelar edición" }));
+
+    expect(screen.getByRole("heading", { name: "Añadir un truco" })).toBeTruthy();
+    expect(titulo.value).toBe("");
+    expect(contenido.value).toBe("");
+    expect(within(screen.getByRole("article")).getByText("Lava y escurre las hojas.")).toBeTruthy();
+    expect(apiRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows icon-only edit actions with save first and cancel second", async () => {
+    render(<KitchenTips onSessionExpired={vi.fn()} />);
+    await screen.findByRole("button", { name: "Limpiar lechuga con Thermomix" });
+    await userEvent.click(screen.getByRole("button", { name: "Editar truco Limpiar lechuga con Thermomix" }));
+    const guardar = screen.getByRole("button", { name: "Guardar cambios" });
+    const cancelar = screen.getByRole("button", { name: "Cancelar edición" });
+    expect(guardar.querySelector("svg")).toBeTruthy();
+    expect(cancelar.querySelector("svg")).toBeTruthy();
+    expect(guardar.textContent).toBe("");
+    expect(cancelar.textContent).toBe("");
+    expect(Array.from(guardar.parentElement!.children)).toEqual([guardar, cancelar]);
+  });
+
   it("shows both tips and their selected instructions", async () => {
     render(<KitchenTips onSessionExpired={vi.fn()} />);
     expect(await screen.findByRole("button", { name: "Limpiar lechuga con Thermomix" })).toBeTruthy();

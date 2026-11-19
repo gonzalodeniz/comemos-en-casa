@@ -108,7 +108,11 @@ h2 { font-size: clamp(1.5rem, 2.2vw, 2.35rem); letter-spacing: -.035em; }
 .kitchen-tip-form-panel textarea:focus { outline: 3px solid #d3eee0; border-color: #18875a; }
 .kitchen-tip-help { display: flex; align-items: flex-start; gap: .75rem; padding: .85rem; border-radius: .75rem; color: var(--color-primary-strong); background: #edf7f0; }
 .kitchen-tip-help p { font-size: .9rem; }
-.kitchen-tip-form-panel form > button { display: flex; min-height: 50px; align-items: center; justify-content: center; gap: .55rem; margin-top: 0; }
+/* Mantiene las acciones legibles cuando el panel de edición es estrecho. */
+.kitchen-tip-form-actions { display: flex; flex-wrap: wrap; gap: .65rem; }
+.kitchen-tip-form-actions button { display: flex; flex: 1 0 auto; min-height: 50px; align-items: center; justify-content: center; gap: .55rem; }
+.kitchen-tip-form-actions button:not(.kitchen-tip-cancel) { order: 0; }
+.kitchen-tip-form-actions .kitchen-tip-cancel { order: 1; }
 @media (max-width: 900px) {
   .kitchen-tips-page { grid-template-columns: minmax(0, 1fr); }
 }

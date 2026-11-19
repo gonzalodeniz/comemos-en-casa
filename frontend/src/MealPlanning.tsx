@@ -91,6 +91,10 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
   const bottomSentinelRef = useRef<HTMLDivElement>(null);
   const scrollAnchorRef = useRef<{ start: CalendarDate; top: number } | null>(null);
   const todayScrollRef = useRef<CalendarDate | null>(null);
+  // Permite posicionar una sola vez el día actual tras la carga inicial en móvil.
+  const initialMobilePositionRef = useRef(true);
+  // Distingue la alineación inicial superior del centrado al volver a hoy.
+  const pendingInitialMobilePositionRef = useRef(false);
   const [editorDate, setEditorDate] = useState<CalendarDate | null>(null);
   const [editorSlot, setEditorSlot] = useState<MealSlot | null>(null);
   const [draft, setDraft] = useState<EditorDraft | null>(null);
@@ -159,6 +163,13 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
         if (cancelled || generation !== generationRef.current) return;
         setAssignments(result.assignments);
         setToday(result.today);
+        if (initialMobilePositionRef.current) {
+          initialMobilePositionRef.current = false;
+          if (window.matchMedia("(max-width: 600px)").matches) {
+            todayScrollRef.current = result.today as CalendarDate;
+            pendingInitialMobilePositionRef.current = true;
+          }
+        }
         if (referenceDate === null) {
           const serverToday = result.today as CalendarDate;
           const serverWeek = visibleDateRange(serverToday, "week").start;
@@ -198,12 +209,18 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
         const header = scrollRoot?.querySelector<HTMLElement>(".planning-sticky-header");
         if (row && scrollRoot && header) {
           const rowRect = row.getBoundingClientRect();
-          const visibleCenter = (header.getBoundingClientRect().bottom + scrollRoot.getBoundingClientRect().bottom) / 2;
-          scrollRoot.scrollBy(0, rowRect.top + rowRect.height / 2 - visibleCenter);
+          const headerBottom = header.getBoundingClientRect().bottom;
+          if (pendingInitialMobilePositionRef.current) {
+            pendingInitialMobilePositionRef.current = false;
+            scrollRoot.scrollBy(0, rowRect.top - headerBottom);
+          } else {
+            const visibleCenter = (headerBottom + scrollRoot.getBoundingClientRect().bottom) / 2;
+            scrollRoot.scrollBy(0, rowRect.top + rowRect.height / 2 - visibleCenter);
+          }
         }
       });
     }
-  }, [weekStarts, view]);
+  }, [calendarLoading, weekStarts, view]);
 
   async function loadAdjacentWeek(direction: -1 | 1) {
     if (view !== "week" || calendarLoading || mainLoadError || edgeBusyRef.current || editorOpen || busyRef.current) return;

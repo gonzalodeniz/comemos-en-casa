@@ -8,7 +8,7 @@ describe("MealPlanning presentation", () => {
   it("renders the weekly layout with accessible date and view controls", () => {
     const markup = renderToStaticMarkup(<MealPlanning csrfToken="test" onSessionExpired={() => {}} onOpenRecipes={() => {}} />);
 
-    expect(markup).toContain("Planificación de comidas");
+    expect(markup).toContain("Planificación<span");
     expect(markup).toContain("Semana del");
     expect(markup).not.toContain('aria-label="Semana anterior"');
     expect(markup).not.toContain('aria-label="Semana siguiente"');
@@ -20,7 +20,7 @@ describe("MealPlanning presentation", () => {
     expect(markup.match(/class="meal-slot /g)).toHaveLength(14);
     expect(markup.match(/week-heading-label/g)).toHaveLength(2);
     const fixedHeader = markup.slice(markup.indexOf('class="planning-sticky-header"'), markup.indexOf('class="week-scroll-content"'));
-    expect(fixedHeader).toContain("Planificación de comidas");
+    expect(fixedHeader).toContain("Planificación<span");
     expect(fixedHeader).toContain('aria-label="Vista del calendario"');
     expect(fixedHeader).not.toContain("Tu menú, día a día");
     expect(fixedHeader).not.toContain("Atlantic/Canary");

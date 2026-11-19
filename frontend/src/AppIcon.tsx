@@ -1,5 +1,5 @@
 // Presenta los iconos utilizados por las vistas de la aplicación.
-type IconName = "database" | "download" | "settings" | "calendar" | "repeat" | "users" | "chevron-left" | "chevron-right" | "chevron-up" | "chevron-down" | "plus" | "logout" | "utensils" | "menu" | "edit" | "trash" | "eye" | "shopping-cart" | "check" | "undo" | "clear-list" | "store" | "arrow-left" | "close";
+type IconName = "database" | "download" | "settings" | "calendar" | "repeat" | "users" | "chevron-left" | "chevron-right" | "chevron-up" | "chevron-down" | "plus" | "logout" | "utensils" | "menu" | "edit" | "trash" | "eye" | "shopping-cart" | "check" | "undo" | "clear-list" | "store" | "arrow-left" | "close" | "diana";
 
 const paths: Record<IconName, string> = {
   database: "M4 6c0-4 16-4 16 0s-16 4-16 0Zm0 0v12c0 4 16 4 16 0V6M4 12c0 4 16 4 16 0",
@@ -18,6 +18,8 @@ const paths: Record<IconName, string> = {
   "chevron-up": "m6 15 6-6 6 6",
   "chevron-down": "m6 9 6 6 6-6",
   "arrow-left": "M19 12H5m7 7-7-7 7-7",
+  // Identifica el acceso a la fecha actual.
+  diana: "M12 2v4m0 12v4M2 12h4m12 0h4M20 12a8 8 0 1 0-16 0 8 8 0 0 0 16 0Zm-5 0a3 3 0 1 0-6 0 3 3 0 0 0 6 0Z",
   close: "M6 6l12 12M18 6 6 18",
   plus: "M12 5v14M5 12h14",
   logout: "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 14 5-5-5-5m5 5H9",

@@ -1,43 +1,12 @@
 // Presenta un día y sus comidas dentro del calendario.
 import AppIcon from "./AppIcon";
-import { useEffect, useRef } from "react";
 import { formatDateLabel, type CalendarDate } from "./mealPlanningDates";
 import type { MealAssignment, MealSlot } from "./mealPlanningApi";
 
 const SLOT_LABELS: Record<MealSlot, string> = { lunch: "Almuerzo", dinner: "Cena" };
 
 function MealThumbnail({ name, imageUrl, onOpen }: { name: string; imageUrl?: string | null; onOpen?: () => void }) {
-  const ref = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    const image = ref.current;
-    const slot = image?.parentElement;
-    const text = slot?.querySelector(".meal-details strong");
-    if (!image || !slot || !(text instanceof HTMLElement)) return;
-    const media = window.matchMedia("(max-width: 600px)");
-    let active = true;
-    const update = () => {
-      if (!active) return;
-      if (!media.matches || !slot.closest(".week-grid")) { slot.classList.remove("hide-meal-image"); return; }
-      const canvas = document.createElement("canvas");
-      const context = canvas.getContext("2d");
-      if (!context) return;
-      const style = getComputedStyle(text);
-      const slotStyle = getComputedStyle(slot);
-      context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-      const longest = Math.max(0, ...name.split(/\s+/).map((word) => context.measureText(word).width));
-      const available = slot.clientWidth - parseFloat(slotStyle.paddingLeft) - parseFloat(slotStyle.paddingRight) - 44 - (parseFloat(slotStyle.columnGap) || 0);
-      slot.classList.toggle("hide-meal-image", longest > available);
-    };
-    const observer = new ResizeObserver(update);
-    observer.observe(slot);
-    media.addEventListener("change", update);
-    void document.fonts.ready.then(update);
-    update();
-    return () => { active = false; observer.disconnect(); media.removeEventListener("change", update); slot.classList.remove("hide-meal-image"); };
-  }, [name]);
-
-  return <span className="meal-thumbnail" ref={ref} role={onOpen ? "button" : undefined} tabIndex={onOpen ? 0 : undefined} onClick={onOpen} onKeyDown={onOpen ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(); } } : undefined} aria-label={onOpen ? `Ver recetas de ${name}` : undefined}>{imageUrl ? <img src={`${import.meta.env.VITE_API_BASE_URL || "/comemos"}/api/v1${imageUrl}`} alt="" /> : <AppIcon name="utensils" />}</span>;
+  return <span className="meal-thumbnail" role={onOpen ? "button" : undefined} tabIndex={onOpen ? 0 : undefined} onClick={onOpen} onKeyDown={onOpen ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(); } } : undefined} aria-label={onOpen ? `Ver recetas de ${name}` : undefined}>{imageUrl ? <img src={`${import.meta.env.VITE_API_BASE_URL || "/comemos"}/api/v1${imageUrl}`} alt="" /> : <AppIcon name="utensils" />}</span>;
 }
 
 export default function CalendarDay({ date, weekday, today, outsideMonth = false, compact = false, visibleSlot = "both", assignments, disabled, onEdit, onDelete, onOpenRecipes = () => {} }: {
@@ -64,7 +33,7 @@ export default function CalendarDay({ date, weekday, today, outsideMonth = false
             <div className={`meal-card${assignment ? " assigned" : ""}`} key={slot}>
             <div className={`meal-slot ${assignment ? "planned" : "unplanned"}`}>
               <MealThumbnail name={assignment?.label.name ?? "Sin planificar"} imageUrl={assignment?.label.image_url} onOpen={assignment ? () => onOpenRecipes(assignment.label.id) : undefined} />
-              <span className="meal-details"><strong>{assignment ? <button type="button" className="link-button meal-recipe-link" onClick={() => onOpenRecipes(assignment.label.id)}>{assignment.label.name}</button> : "Sin planificar"}</strong>{compact && assignment && <span className={`meal-card-status ${slot}`}>{SLOT_LABELS[slot]}</span>}</span>
+              <span className="meal-details">{!compact && visibleSlot === "both" && <span className="etiqueta-comida-movil">{SLOT_LABELS[slot]}</span>}<strong>{assignment ? <button type="button" className="link-button meal-recipe-link" onClick={() => onOpenRecipes(assignment.label.id)}>{assignment.label.name}</button> : "Sin planificar"}</strong>{compact && assignment && <span className={`meal-card-status ${slot}`}>{SLOT_LABELS[slot]}</span>}</span>
               <button type="button" className="meal-edit" disabled={disabled}
                 aria-label={`${assignment ? "Editar" : "Añadir"} ${SLOT_LABELS[slot].toLowerCase()} del ${formatDateLabel(date, { dateStyle: "full" })}`}
                 title={assignment ? "Editar comida" : "Añadir comida"} onClick={() => onEdit(date, slot)}><AppIcon name={assignment ? "edit" : "plus"} /></button>

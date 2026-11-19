@@ -67,6 +67,14 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
   });
   // Conserva la elección sin afectar a las comidas guardadas.
   function changeVisibleSlot(value: MealSlot | "both") {
+    const contenedor = weekListRef.current?.closest<HTMLElement>(".workspace-content");
+    const limite = contenedor?.querySelector(".planning-sticky-header")?.getBoundingClientRect().bottom;
+    if (limite !== undefined && window.matchMedia("(max-width: 600px)").matches && value !== visibleSlot) {
+      const fila = Array.from(weekListRef.current?.querySelectorAll<HTMLElement>("article.calendar-day") ?? [])
+        .find((elemento) => elemento.getBoundingClientRect().bottom > limite + 1);
+      const fecha = fila?.querySelector("time")?.dateTime;
+      if (fila && fecha) anclaFiltroRef.current = { fecha, top: fila.getBoundingClientRect().top };
+    }
     setVisibleSlot(value);
     try { localStorage.setItem("meal-planning-visible-slot", value); } catch { /* La vista sigue funcionando sin almacenamiento. */ }
   }
@@ -90,11 +98,17 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
   const topSentinelRef = useRef<HTMLDivElement>(null);
   const bottomSentinelRef = useRef<HTMLDivElement>(null);
   const scrollAnchorRef = useRef<{ start: CalendarDate; top: number } | null>(null);
+  // Conserva el primer día visible cuando el filtro cambia la altura de las tarjetas.
+  const anclaFiltroRef = useRef<{ fecha: string; top: number } | null>(null);
   const todayScrollRef = useRef<CalendarDate | null>(null);
-  // Permite posicionar una sola vez el día actual tras la carga inicial en móvil.
-  const initialMobilePositionRef = useRef(true);
-  // Distingue la alineación inicial superior del centrado al volver a hoy.
-  const pendingInitialMobilePositionRef = useRef(false);
+  // Conserva la apertura pendiente hasta poder alinear el día actual.
+  const aperturaMovilPendiente = useRef(true);
+  // Solicita desplazar la cuadrícula mensual después de actualizar el periodo.
+  const volverHoyMesPendiente = useRef(false);
+  // Permite medir las filas y los límites visibles en ambas vistas.
+  const planificacionRef = useRef<HTMLElement>(null);
+  // Muestra el acceso rápido móvil solo cuando el día actual queda fuera de vista.
+  const [mostrarVolverMovil, setMostrarVolverMovil] = useState(false);
   const [editorDate, setEditorDate] = useState<CalendarDate | null>(null);
   const [editorSlot, setEditorSlot] = useState<MealSlot | null>(null);
   const [draft, setDraft] = useState<EditorDraft | null>(null);
@@ -163,13 +177,6 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
         if (cancelled || generation !== generationRef.current) return;
         setAssignments(result.assignments);
         setToday(result.today);
-        if (initialMobilePositionRef.current) {
-          initialMobilePositionRef.current = false;
-          if (window.matchMedia("(max-width: 600px)").matches) {
-            todayScrollRef.current = result.today as CalendarDate;
-            pendingInitialMobilePositionRef.current = true;
-          }
-        }
         if (referenceDate === null) {
           const serverToday = result.today as CalendarDate;
           const serverWeek = visibleDateRange(serverToday, "week").start;
@@ -194,6 +201,12 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
   }, [view, range.start, range.end, referenceDate, revision, onSessionExpired]);
 
   useLayoutEffect(() => {
+    const anclaFiltro = anclaFiltroRef.current;
+    if (anclaFiltro) {
+      anclaFiltroRef.current = null;
+      const fila = weekListRef.current?.querySelector(`time[datetime="${anclaFiltro.fecha}"]`)?.closest(".calendar-day");
+      if (fila) weekListRef.current?.closest(".workspace-content")?.scrollBy(0, fila.getBoundingClientRect().top - anclaFiltro.top);
+    }
     const anchor = scrollAnchorRef.current;
     if (anchor) {
       const element = weekListRef.current?.querySelector<HTMLElement>(`[data-week-start="${anchor.start}"]`);
@@ -209,18 +222,60 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
         const header = scrollRoot?.querySelector<HTMLElement>(".planning-sticky-header");
         if (row && scrollRoot && header) {
           const rowRect = row.getBoundingClientRect();
-          const headerBottom = header.getBoundingClientRect().bottom;
-          if (pendingInitialMobilePositionRef.current) {
-            pendingInitialMobilePositionRef.current = false;
-            scrollRoot.scrollBy(0, rowRect.top - headerBottom);
-          } else {
-            const visibleCenter = (headerBottom + scrollRoot.getBoundingClientRect().bottom) / 2;
-            scrollRoot.scrollBy(0, rowRect.top + rowRect.height / 2 - visibleCenter);
-          }
+          const visibleCenter = (header.getBoundingClientRect().bottom + scrollRoot.getBoundingClientRect().bottom) / 2;
+          scrollRoot.scrollBy(0, rowRect.top + rowRect.height / 2 - visibleCenter);
         }
       });
     }
-  }, [calendarLoading, weekStarts, view]);
+    if (!aperturaMovilPendiente.current || view !== "week" || calendarLoading || mainLoadError || !today) return;
+    if (!window.matchMedia("(max-width: 600px)").matches) {
+      aperturaMovilPendiente.current = false;
+      return;
+    }
+    const fila = weekListRef.current?.querySelector<HTMLElement>('[aria-current="date"]');
+    const contenedor = weekListRef.current?.closest<HTMLElement>(".workspace-content");
+    const cabecera = contenedor?.querySelector<HTMLElement>(".planning-sticky-header");
+    if (!fila || !contenedor || !cabecera) return;
+    contenedor.scrollBy(0, fila.getBoundingClientRect().top - cabecera.getBoundingClientRect().bottom);
+    // Si aún falta la semana siguiente, el navegador limita cuánto se puede desplazar.
+    aperturaMovilPendiente.current = fila.getBoundingClientRect().top - cabecera.getBoundingClientRect().bottom > 1 && !edgeError && observerAvailable;
+  }, [calendarLoading, mainLoadError, edgeError, observerAvailable, today, weekStarts, view, visibleSlot]);
+
+  useLayoutEffect(() => {
+    const planificacion = planificacionRef.current;
+    const contenedor = planificacion?.closest<HTMLElement>(".workspace-content");
+    const cabecera = planificacion?.querySelector<HTMLElement>(".planning-sticky-header");
+    const calendario = planificacion?.querySelector<HTMLElement>(view === "week" ? ".week-scroll-content" : ".month-calendar");
+    if (!contenedor || !cabecera || !calendario) return;
+    // Cruza el área visible con la fila de hoy, descontando la cabecera fija.
+    const actualizarVisibilidad = () => {
+      const fila = calendario.querySelector<HTMLElement>('[aria-current="date"]')?.getBoundingClientRect();
+      const limites = contenedor.getBoundingClientRect();
+      const rejilla = calendario.getBoundingClientRect();
+      const otroMes = view === "month" && today?.slice(0, 7) !== queryDate.slice(0, 7);
+      setMostrarVolverMovil(Boolean(today && !calendarLoading && (otroMes || !fila ||
+        fila.bottom <= cabecera.getBoundingClientRect().bottom + 1 || fila.top >= limites.bottom ||
+        fila.right <= rejilla.left || fila.left >= Math.min(rejilla.right, limites.right))));
+    };
+    const observador = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(actualizarVisibilidad);
+    for (const elemento of [cabecera, contenedor, calendario]) observador?.observe(elemento);
+    contenedor.addEventListener("scroll", actualizarVisibilidad, { capture: true, passive: true });
+    window.addEventListener("resize", actualizarVisibilidad);
+    actualizarVisibilidad();
+    return () => {
+      observador?.disconnect();
+      contenedor.removeEventListener("scroll", actualizarVisibilidad, true);
+      window.removeEventListener("resize", actualizarVisibilidad);
+    };
+  }, [calendarLoading, queryDate, today, view, weekStarts]);
+
+  useLayoutEffect(() => {
+    if (view !== "month" || calendarLoading || !volverHoyMesPendiente.current) return;
+    const fila = planificacionRef.current?.querySelector<HTMLElement>('.month-calendar [aria-current="date"]');
+    if (!fila) return;
+    volverHoyMesPendiente.current = false;
+    fila.scrollIntoView({ block: "center", inline: "nearest" });
+  }, [calendarLoading, queryDate, revision, view]);
 
   async function loadAdjacentWeek(direction: -1 | 1) {
     if (view !== "week" || calendarLoading || mainLoadError || edgeBusyRef.current || editorOpen || busyRef.current) return;
@@ -319,6 +374,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
 
   function changeView(next: CalendarView) {
     if (next === view) return;
+    aperturaMovilPendiente.current = false;
     generationRef.current += 1;
     edgeBusyRef.current = false;
     scrollAnchorRef.current = null;
@@ -335,11 +391,13 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
       const date = visibleDay?.querySelector<HTMLTimeElement>("time")?.dateTime;
       if (date) setReferenceDate(date as CalendarDate);
     }
+    volverHoyMesPendiente.current = false;
     setView(next);
     closeEditor();
   }
 
   function returnToToday() {
+    aperturaMovilPendiente.current = false;
     const current = (today ?? localToday()) as CalendarDate;
     if (view === "week") {
       generationRef.current += 1;
@@ -350,6 +408,13 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
       setWeekStarts([start]);
       todayScrollRef.current = current;
       setRevision((value) => value + 1);
+    } else if (window.matchMedia("(max-width: 600px)").matches) {
+      volverHoyMesPendiente.current = true;
+      if (referenceDate === current) {
+        const fila = planificacionRef.current?.querySelector<HTMLElement>('.month-calendar [aria-current="date"]');
+        fila?.scrollIntoView({ block: "center", inline: "nearest" });
+        volverHoyMesPendiente.current = false;
+      }
     }
     setReferenceDate(current);
     closeEditor();
@@ -503,14 +568,25 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
   const title = formatDateLabel(queryDate, { month: "long", year: "numeric" });
 
   return (
-    <section className={`meal-planning${visibleSlot !== "both" ? " single-meal" : ""}`} aria-labelledby="meal-planning-title">
+    <section ref={planificacionRef} className={`meal-planning${visibleSlot !== "both" ? " single-meal" : ""}`} aria-labelledby="meal-planning-title">
       <div className="planning-sticky-header">
       <div className="meal-heading">
         <div className="meal-title">
-          <h2 id="meal-planning-title">Planificación de comidas</h2>
+          <h2 id="meal-planning-title">Planificación<span className="titulo-planificacion-amplio"> de comidas</span></h2>
           {view === "month" && <p className="meal-subtitle">Vista mensual</p>}
         </div>
         <div className="calendar-toolbar">
+          <div className="selectores-planificacion-movil">
+            <select aria-label="Comidas visibles" value={visibleSlot} onChange={(event) => changeVisibleSlot(event.target.value as MealSlot | "both")}>
+              <option value="both">Ambas</option>
+              <option value="lunch">☀️ Almuerzo</option>
+              <option value="dinner">🌙 Cena</option>
+            </select>
+            <select aria-label="Vista del calendario" value={view} disabled={calendarLoading || busy} onChange={(event) => changeView(event.target.value as CalendarView)}>
+              <option value="week">Semana</option>
+              <option value="month">Mes</option>
+            </select>
+          </div>
           {view === "month" && <div className="calendar-navigation">
             <button type="button" className="secondary" aria-label="Mes anterior" disabled={calendarLoading || busy} onClick={() => moveRange(-1)}><AppIcon name="chevron-left" /></button>
             <h3 aria-live="polite">{title}</h3>
@@ -529,14 +605,14 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
           </div>
         </div>
       </div>
-      <div className="calendar-context">
-        <button type="button" className={`secondary today-button${view === "week" ? " today-button-fixed" : ""}`} disabled={calendarLoading || busy} onClick={returnToToday}>Volver a hoy</button>
+      <div className={`calendar-context${mostrarVolverMovil ? " hoy-fuera-de-vista" : ""}`}>
+        <button type="button" className={`secondary today-button${view === "week" ? " today-button-fixed" : ""}`} disabled={calendarLoading || busy} onClick={returnToToday}><AppIcon name="diana" />Volver a hoy</button>
       </div>
-      {view === "week" && <div className="week-meal-headings">
+      {view === "week" && visibleSlot === "both" && <div className="week-meal-headings">
         <span className="week-heading-spacer" aria-hidden="true" />
         <div className="week-heading-meals">
-          {visibleSlot !== "dinner" && <span><span aria-hidden="true">☀️</span><span className="week-heading-label" aria-hidden="true">Almuerzo</span><span className="visually-hidden">Almuerzo</span></span>}
-          {visibleSlot !== "lunch" && <span><span aria-hidden="true">🌙</span><span className="week-heading-label" aria-hidden="true">Cena</span><span className="visually-hidden">Cena</span></span>}
+          <span><span aria-hidden="true">☀️</span><span className="week-heading-label" aria-hidden="true">Almuerzo</span><span className="visually-hidden">Almuerzo</span></span>
+          <span><span aria-hidden="true">🌙</span><span className="week-heading-label" aria-hidden="true">Cena</span><span className="visually-hidden">Cena</span></span>
         </div>
       </div>}
       </div>

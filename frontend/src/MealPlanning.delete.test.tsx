@@ -47,3 +47,19 @@ it("configura el borrado periódico desde el panel de la comida", async () => {
   await usuario.click(within(panel).getByRole("button", { name: "Confirmar y guardar" }));
   expect(applyMealPlanning).toHaveBeenCalledOnce();
 });
+
+// Comprueba que los desplegables reutilizan la selección y la navegación del calendario.
+it("filtra las comidas desde el desplegable y conserva el filtro al cambiar de vista", async () => {
+  const usuario = userEvent.setup();
+  render(<MealPlanning csrfToken="token" onSessionExpired={vi.fn()} />);
+  const comida = screen.getByRole("combobox", { name: "Comidas visibles" });
+  const periodo = screen.getByRole("combobox", { name: "Vista del calendario" });
+  await screen.findByRole("button", { name: /Eliminar almuerzo.*Pescado/ });
+  await usuario.selectOptions(comida, "dinner");
+  expect(screen.queryByRole("button", { name: /Eliminar almuerzo/ })).toBeNull();
+  expect(localStorage.getItem("meal-planning-visible-slot")).toBe("dinner");
+  await usuario.selectOptions(periodo, "month");
+  expect(await screen.findByRole("region", { name: "Planificación mensual" })).toBeTruthy();
+  expect((comida as HTMLSelectElement).value).toBe("dinner");
+  localStorage.removeItem("meal-planning-visible-slot");
+});

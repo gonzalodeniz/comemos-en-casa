@@ -42,7 +42,7 @@ describe("CalendarDay", () => {
     const element = day(["lunch"], { onOpenRecipes });
     const mealSlot = element.props.children[1].props.children[0].props.children[0];
     mealSlot.props.children[0].props.onOpen();
-    mealSlot.props.children[1].props.children[0].props.children.props.onClick();
+    mealSlot.props.children[1].props.children[1].props.children.props.onClick();
     expect(onOpenRecipes.mock.calls).toEqual([["rice"], ["rice"]]);
   });
 

@@ -621,7 +621,7 @@ button.compra-accion:hover::after, button.compra-accion:focus-visible::after { o
 input.compra-casilla { flex: 0 0 22px; width: 22px; height: 22px; min-height: 0; margin: 0; accent-color: var(--color-primary); cursor: pointer; }
 .compra-fila-comprada { padding: .65rem .6rem; border-radius: .65rem; background: #e0f3eb; }
 .compra-fila-comprada .compra-fila-texto { text-decoration: line-through; }
-.compra-comprados-cabecera { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.compra-comprados-cabecera { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 1.25rem; }
 
 .compra-cabecera { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; }
 .compra-cabecera h2 { margin: 0; }

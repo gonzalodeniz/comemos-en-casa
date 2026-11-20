@@ -453,7 +453,7 @@ export default function ShoppingList({ categories, mostrarAdministracion = true,
       </form>
     </li>)}</ul>
     </>}
-    <section aria-label="Lista de la compra"><h3>Lista de la compra</h3>
+    <section aria-label="Lista de la compra">
       {errorListaCompra && <p role="alert">{errorListaCompra}</p>}
       <h4 className="compra-comprados-cabecera"><span>Pendientes</span><button className="compra-accion" type="button" aria-label="Eliminar todos los productos pendientes" data-tooltip="Eliminar todos los productos pendientes" disabled={!onDeleteItem || borrandoComprados || !Object.keys(listaCompra).length} onClick={() => void borrarTodosPendientes()}><AppIcon name="clear-list" /></button></h4><ul className="compra-filas">{Object.values(listaCompra).map((item) => {
         const nombre = item.product_name ?? Object.values(products).flat().find((producto) => producto.id === item.product_id)?.name ?? "Producto";

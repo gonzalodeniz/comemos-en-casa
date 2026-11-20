@@ -458,3 +458,54 @@ def test_error_de_recordatorio_se_registra_y_no_se_reintenta(meal_database, monk
     api.deliver_due_meal_reminders(datetime(2026, 11, 2, 18, 1, tzinfo=timezone.utc))
     assert len(intentos) == 2
     assert "meal_reminder_delivery_failed" in caplog.text
+
+# Comprueba cada envío semanal y sus destinatarios en la hora de Canarias.
+def test_envia_recordatorios_de_cada_comida_repetida(meal_database, monkeypatch):
+    import app.meal_planning_api as api
+    from app.models import User
+    cookies = authenticate(meal_database)
+    authenticate(meal_database)
+    authenticate(meal_database, active=False)
+    pescado, _ = seed_labels(meal_database)
+    class Reloj(datetime):
+        """Fija el momento anterior a la primera comida de la serie."""
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 11, 1, 12, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(api, "datetime", Reloj)
+    monkeypatch.setattr(api, "SessionFactory", meal_database)
+    envios = []
+    monkeypatch.setattr(api, "send_meal_reminder_email", lambda *args: envios.append(args))
+    respuesta = post_with_session("/api/v1/meal-planning/operations", {"action":"assign", "start_date":"2026-11-08", "slot":"lunch", "label_id":str(pescado.id), "repeat":{"interval_weeks":1,"end_date":"2026-11-15"}, "reminder":{"days_before":1,"send_time":"18:00","message":"Sacar el pollo"}}, cookies)
+    assert respuesta.status_code == 200
+    with meal_database() as db:
+        correos = set(db.scalars(select(User.email).where(User.is_active.is_(True))).all())
+    assert api.deliver_due_meal_reminders(datetime(2026, 11, 7, 17, 59, tzinfo=timezone.utc)) == 0
+    assert api.deliver_due_meal_reminders(datetime(2026, 11, 7, 18, 0, tzinfo=timezone.utc)) == 1
+    assert {(e[0], e[1], e[2], e[3]) for e in envios} == {(c, "Sacar el pollo", "Pescado", date(2026, 11, 8)) for c in correos}
+    assert api.deliver_due_meal_reminders(datetime(2026, 11, 14, 18, 0, tzinfo=timezone.utc)) == 1
+    assert {(e[0], e[3]) for e in envios} == {(c, fecha) for c in correos for fecha in (date(2026, 11, 8), date(2026, 11, 15))}
+    assert len(envios) == 4
+
+# Comprueba que un aviso vencido no impide los envíos futuros de una serie.
+def test_omite_primer_aviso_vencido_y_envia_el_siguiente(meal_database, monkeypatch):
+    import app.meal_planning_api as api
+    from app.models import User
+    cookies = authenticate(meal_database)
+    pescado, _ = seed_labels(meal_database)
+    class Reloj(datetime):
+        """Sitúa el guardado después del primer aviso y antes del siguiente."""
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 11, 7, 19, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(api, "datetime", Reloj)
+    monkeypatch.setattr(api, "SessionFactory", meal_database)
+    envios = []
+    monkeypatch.setattr(api, "send_meal_reminder_email", lambda *args: envios.append(args))
+    respuesta = post_with_session("/api/v1/meal-planning/operations", {"action":"assign", "start_date":"2026-11-08", "slot":"lunch", "label_id":str(pescado.id), "repeat":{"interval_weeks":1,"end_date":"2026-11-15"}, "reminder":{"days_before":1,"send_time":"18:00","message":"Sacar el pollo"}}, cookies)
+    assert respuesta.status_code == 200
+    with meal_database() as db:
+        correos = set(db.scalars(select(User.email).where(User.is_active.is_(True))).all())
+    assert api.deliver_due_meal_reminders(datetime(2026, 11, 7, 19, 1, tzinfo=timezone.utc)) == 0
+    assert api.deliver_due_meal_reminders(datetime(2026, 11, 14, 18, 0, tzinfo=timezone.utc)) == 1
+    assert {(e[0], e[1], e[2], e[3]) for e in envios} == {(c, "Sacar el pollo", "Pescado", date(2026, 11, 15)) for c in correos}

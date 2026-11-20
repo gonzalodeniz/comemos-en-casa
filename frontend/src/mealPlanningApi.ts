@@ -107,6 +107,7 @@ export type MealAssignment = {
   date: string;
   slot: MealSlot;
   label: FoodLabel;
+  reminder?: null | { days_before: number; send_time: string; message: string };
 };
 export type MealPlanningResponse = {
   start_date: string;

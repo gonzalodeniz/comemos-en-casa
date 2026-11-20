@@ -433,7 +433,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
     const nextDraft: EditorDraft = {
       action: "assign", labelId, intervalWeeks: "0",
       endDate: annualMaximumEndDate(date),
-      reminderEnabled: false, reminderDays: "1", reminderTime: "09:00", reminderMessage: "",
+      reminderEnabled: Boolean(current?.reminder), reminderDays: String(current?.reminder?.days_before ?? 1), reminderTime: current?.reminder?.send_time ?? "09:00", reminderMessage: current?.reminder?.message ?? "",
     };
     const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const closedDetails = active?.closest("details:not([open])");

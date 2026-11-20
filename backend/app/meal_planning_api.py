@@ -507,6 +507,11 @@ async def get_meal_planning(
                 "id": str(assignment.id),
                 "date": assignment.date.isoformat(),
                 "slot": assignment.slot,
+                "reminder": None if assignment.reminder_days is None else {
+                    "days_before": assignment.reminder_days,
+                    "send_time": assignment.reminder_time,
+                    "message": assignment.reminder_message,
+                },
                 "label": {
                     "id": str(label.id),
                     "code": label.code,

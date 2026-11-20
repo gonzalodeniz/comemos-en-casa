@@ -4,6 +4,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, it, vi } from "vitest";
 import MealPlanning from "./MealPlanning";
+import { getMealPlanning } from "./mealPlanningApi";
 
 vi.mock("./mealPlanningApi", () => ({
   getFoodLabels: vi.fn().mockResolvedValue({ labels: [{ id: "fish", code: "fish", name: "Pescado" }] }),
@@ -31,4 +32,16 @@ it("muestra los campos opcionales del recordatorio y acepta cero días", async (
   expect((days as HTMLInputElement).value).toBe("0");
   expect(screen.getByLabelText("Hora del recordatorio")).toBeTruthy();
   expect(screen.getByLabelText("Mensaje del recordatorio")).toBeTruthy();
+});
+
+// Comprueba que editar una comida conserva su recordatorio existente.
+it("muestra el recordatorio guardado al editar la comida", async () => {
+  vi.mocked(getMealPlanning).mockResolvedValue({ today: "2026-11-02", start_date: "2026-11-02", end_date: "2026-11-08", timezone: "Atlantic/Canary", assignments: [{ id: "1", date: "2026-11-02", slot: "lunch", label: { id: "fish", code: "fish", name: "Pescado" }, reminder: { days_before: 2, send_time: "18:30", message: "Sacar pescado" } }] } as Awaited<ReturnType<typeof getMealPlanning>>);
+  const user = userEvent.setup();
+  render(<MealPlanning csrfToken="token" onSessionExpired={vi.fn()} />);
+  await user.click(await screen.findByRole("button", { name: /Editar almuerzo del lunes, 2 de noviembre de 2026/ }));
+  expect((screen.getByRole("switch", { name: "Recordatorio" }) as HTMLInputElement).checked).toBe(true);
+  expect((screen.getByLabelText("Días de antelación") as HTMLInputElement).value).toBe("2");
+  expect((screen.getByLabelText("Hora del recordatorio") as HTMLInputElement).value).toBe("18:30");
+  expect((screen.getByLabelText("Mensaje del recordatorio") as HTMLTextAreaElement).value).toBe("Sacar pescado");
 });

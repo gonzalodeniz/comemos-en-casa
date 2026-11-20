@@ -509,3 +509,83 @@ def test_omite_primer_aviso_vencido_y_envia_el_siguiente(meal_database, monkeypa
     assert api.deliver_due_meal_reminders(datetime(2026, 11, 7, 19, 1, tzinfo=timezone.utc)) == 0
     assert api.deliver_due_meal_reminders(datetime(2026, 11, 14, 18, 0, tzinfo=timezone.utc)) == 1
     assert {(e[0], e[1], e[2], e[3]) for e in envios} == {(c, "Sacar el pollo", "Pescado", date(2026, 11, 15)) for c in correos}
+
+# Comprueba que la consulta entrega la configuración del aviso al editor.
+def test_consulta_planificacion_incluye_recordatorio_guardado(meal_database):
+    cookies = authenticate(meal_database)
+    pescado, _ = seed_labels(meal_database)
+    with meal_database() as db:
+        db.add(MealAssignment(date=date(2026, 11, 2), slot="lunch", label_id=pescado.id, reminder_days=2, reminder_time="18:30", reminder_message="Sacar pescado"))
+        db.commit()
+    respuesta = api_get("/api/v1/meal-planning", params={"start_date": "2026-11-02", "end_date": "2026-11-02"}, cookies=cookies)
+    assert respuesta.status_code == 200
+    assert respuesta.json()["assignments"][0]["reminder"] == {"days_before": 2, "send_time": "18:30", "message": "Sacar pescado"}
+
+# Comprueba que la edición cambia el aviso y no envía el contenido anterior.
+def test_actualiza_aviso_pendiente_con_nueva_comida_mensaje_y_horario(meal_database, monkeypatch):
+    import app.meal_planning_api as api
+    cookies = authenticate(meal_database)
+    pescado, arroz = seed_labels(meal_database)
+    with meal_database() as db:
+        db.add(MealAssignment(date=date(2099, 11, 8), slot="lunch", label_id=pescado.id, reminder_days=1, reminder_time="12:00", reminder_message="Anterior"))
+        db.commit()
+    monkeypatch.setattr(api, "SessionFactory", meal_database)
+    envios = []
+    monkeypatch.setattr(api, "send_meal_reminder_email", lambda *args: envios.append(args))
+    operacion = {"action":"assign", "start_date":"2099-11-08", "slot":"lunch", "label_id":str(arroz.id), "reminder":{"days_before":1,"send_time":"18:00","message":"Nuevo"}}
+    previa = post_with_session("/api/v1/meal-planning/preview", operacion, cookies).json()
+    assert post_with_session("/api/v1/meal-planning/operations", {**operacion, "confirmed": True, "preview_token": previa["preview_token"]}, cookies).status_code == 200
+    assert api.deliver_due_meal_reminders(datetime(2099, 11, 7, 12, 0, tzinfo=timezone.utc)) == 0
+    assert api.deliver_due_meal_reminders(datetime(2099, 11, 7, 18, 0, tzinfo=timezone.utc)) == 1
+    assert len(envios) == 1
+    assert envios[0][1:] == ("Nuevo", "Arroz", date(2099, 11, 8))
+
+# Comprueba que desactivar un aviso impide su envío posterior.
+def test_no_envia_aviso_al_desactivar_recordatorio(meal_database, monkeypatch):
+    import app.meal_planning_api as api
+    cookies = authenticate(meal_database)
+    pescado, _ = seed_labels(meal_database)
+    with meal_database() as db:
+        db.add(MealAssignment(date=date(2099, 11, 8), slot="lunch", label_id=pescado.id, reminder_days=1, reminder_time="18:00", reminder_message="Sacar"))
+        db.commit()
+    monkeypatch.setattr(api, "SessionFactory", meal_database)
+    envios = []
+    monkeypatch.setattr(api, "send_meal_reminder_email", lambda *args: envios.append(args))
+    operacion = {"action":"assign", "start_date":"2099-11-08", "slot":"lunch", "label_id":str(pescado.id)}
+    assert post_with_session("/api/v1/meal-planning/operations", operacion, cookies).status_code == 200
+    assert api.deliver_due_meal_reminders(datetime(2099, 11, 7, 18, 0, tzinfo=timezone.utc)) == 0
+    assert not envios
+
+# Comprueba que borrar una comida cancela su recordatorio pendiente.
+def test_no_envia_aviso_al_borrar_comida(meal_database, monkeypatch):
+    import app.meal_planning_api as api
+    cookies = authenticate(meal_database)
+    pescado, _ = seed_labels(meal_database)
+    with meal_database() as db:
+        db.add(MealAssignment(date=date(2099, 11, 8), slot="lunch", label_id=pescado.id, reminder_days=1, reminder_time="18:00", reminder_message="Sacar"))
+        db.commit()
+    monkeypatch.setattr(api, "SessionFactory", meal_database)
+    envios = []
+    monkeypatch.setattr(api, "send_meal_reminder_email", lambda *args: envios.append(args))
+    operacion = {"action":"delete", "start_date":"2099-11-08", "slot":"lunch", "label_id":str(pescado.id)}
+    previa = post_with_session("/api/v1/meal-planning/preview", operacion, cookies).json()
+    assert post_with_session("/api/v1/meal-planning/operations", {**operacion, "confirmed": True, "preview_token": previa["preview_token"]}, cookies).status_code == 200
+    assert api.deliver_due_meal_reminders(datetime(2099, 11, 7, 18, 0, tzinfo=timezone.utc)) == 0
+    assert not envios
+
+# Comprueba que editar un recordatorio ya enviado no lo vuelve a enviar.
+def test_no_reenvia_aviso_ya_enviado_al_editarlo(meal_database, monkeypatch):
+    import app.meal_planning_api as api
+    cookies = authenticate(meal_database)
+    pescado, _ = seed_labels(meal_database)
+    with meal_database() as db:
+        db.add(MealAssignment(date=date(2099, 11, 8), slot="lunch", label_id=pescado.id, reminder_days=1, reminder_time="12:00", reminder_message="Original"))
+        db.commit()
+    monkeypatch.setattr(api, "SessionFactory", meal_database)
+    envios = []
+    monkeypatch.setattr(api, "send_meal_reminder_email", lambda *args: envios.append(args))
+    assert api.deliver_due_meal_reminders(datetime(2099, 11, 7, 12, 0, tzinfo=timezone.utc)) == 1
+    operacion = {"action":"assign", "start_date":"2099-11-08", "slot":"lunch", "label_id":str(pescado.id), "reminder":{"days_before":1,"send_time":"18:00","message":"Modificado"}}
+    assert post_with_session("/api/v1/meal-planning/operations", operacion, cookies).status_code == 200
+    assert api.deliver_due_meal_reminders(datetime(2099, 11, 7, 18, 0, tzinfo=timezone.utc)) == 0
+    assert len(envios) == 1

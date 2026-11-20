@@ -1,5 +1,5 @@
 // Presenta los iconos utilizados por las vistas de la aplicación.
-type IconName = "search" | "bulb" | "database" | "download" | "settings" | "calendar" | "repeat" | "users" | "chevron-left" | "chevron-right" | "chevron-up" | "chevron-down" | "plus" | "logout" | "utensils" | "menu" | "edit" | "trash" | "eye" | "shopping-cart" | "check" | "undo" | "clear-list" | "store" | "arrow-left" | "close" | "diana" | "filtros";
+type IconName = "search" | "bulb" | "database" | "download" | "settings" | "calendar" | "repeat" | "bell" | "users" | "chevron-left" | "chevron-right" | "chevron-up" | "chevron-down" | "plus" | "logout" | "utensils" | "menu" | "edit" | "trash" | "eye" | "shopping-cart" | "check" | "undo" | "clear-list" | "store" | "arrow-left" | "close" | "diana" | "filtros";
 
 const paths: Record<IconName, string> = {
   // Representa la acción de buscar en un listado.
@@ -16,6 +16,7 @@ const paths: Record<IconName, string> = {
   menu: "M4 6h16M4 12h16M4 18h16",
   calendar: "M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm3 10h2m4 0h2m-8 4h2",
   repeat: "M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4m14-1v2a3 3 0 0 1-3 3H3",
+  bell: "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-8 12a2 2 0 0 0 4 0",
   users: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m20 0v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z",
   "chevron-left": "m15 18-6-6 6-6",
   "chevron-right": "m9 18 6-6-6-6",

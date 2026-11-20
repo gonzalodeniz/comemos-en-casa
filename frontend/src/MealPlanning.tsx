@@ -713,14 +713,16 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
               ) : <fieldset className="drawer-edit-fields" disabled={busy}>
                 <div className="repeat-panel">
                   <label className="repeat-toggle"><AppIcon name="repeat" /><strong>Repetir</strong><input type="checkbox" role="switch" checked={draft.intervalWeeks !== "0"} onChange={(event) => { setDraft({ ...draft, intervalWeeks: event.target.checked ? "1" : "0" }); setPreview(null); }} /></label>
+                  {draft.intervalWeeks !== "0" && <>
                   <div className="repeat-fields">
                     <label>Cada<input type="number" min={1} step={1} aria-label="Intervalo en semanas" value={draft.intervalWeeks !== "0" ? draft.intervalWeeks : ""} disabled={draft.intervalWeeks === "0"} onChange={(event) => { setDraft({ ...draft, intervalWeeks: event.target.value }); setPreview(null); }} required={draft.intervalWeeks !== "0"} /><span>semanas</span></label>
                     <label>Hasta<input type="date" aria-label="Fecha final" min={editorDate} max={annualMaximumEndDate(editorDate)} value={draft.endDate} disabled={draft.intervalWeeks === "0"} onChange={(event) => { setDraft({ ...draft, endDate: event.target.value }); setPreview(null); }} required={draft.intervalWeeks !== "0"} /></label>
                   </div>
                   <p className="repeat-summary">{draft.intervalWeeks !== "0" ? `${draft.action === "delete" ? "Se borrará" : "Se repetirá"} cada ${draft.intervalWeeks} semana${Number(draft.intervalWeeks) === 1 ? "" : "s"}${draft.endDate ? ` hasta el ${formatDateLabel(draft.endDate, { dateStyle: "long" })}` : ""}.` : draft.action === "delete" ? "Solo se borrará esta comida." : "No se repetirá esta comida."}</p>
+                  </>}
                 </div>
                 {draft.action === "assign" && <div className="repeat-panel">
-                  <label className="repeat-toggle"><strong>Recordatorio</strong><input type="checkbox" role="switch" checked={draft.reminderEnabled} onChange={(event) => { setDraft({ ...draft, reminderEnabled: event.target.checked }); setPreview(null); }} /></label>
+                  <label className="repeat-toggle"><AppIcon name="bell" /><strong>Recordatorio</strong><input type="checkbox" role="switch" checked={draft.reminderEnabled} onChange={(event) => { setDraft({ ...draft, reminderEnabled: event.target.checked }); setPreview(null); }} /></label>
                   {draft.reminderEnabled && <div className="repeat-fields">
                     <label>Días de antelación<input aria-label="Días de antelación" type="number" min="0" step="1" value={draft.reminderDays} onChange={(event) => setDraft({ ...draft, reminderDays: event.target.value })} required /></label>
                     <label>Hora<input aria-label="Hora del recordatorio" type="time" value={draft.reminderTime} onChange={(event) => setDraft({ ...draft, reminderTime: event.target.value })} required /></label>

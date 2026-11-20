@@ -74,3 +74,9 @@ Sigue los patrones existentes: Python en `snake_case`, componentes React en `Pas
 **Mantenimiento del manual:** actualízalo al modificar estructura, dependencias, comandos, pruebas, migraciones o configuración.
 
 **Referencias:** [README](../../README.md), [README backend](../../backend/README.md), [arquitectura](../arquitectura.md), [plan HU-001](../planes/hu-001-gestion-de-usuarios.md).
+
+### Probar un recordatorio inmediatamente
+
+Para probar un recordatorio ya guardado sin esperar a la hora programada, envía una petición autenticada `POST /api/v1/meal-planning/{id}/reminder/test` (con el prefijo público `/comemos`, si corresponde), con la cookie de sesión, la cabecera `X-CSRF-Token` y un `Origin` permitido. El identificador es el `id` de la asignación devuelto por `GET /api/v1/meal-planning`.
+
+La operación envía una copia a **todas las cuentas activas** y no marca el recordatorio programado como enviado; este se enviará también a su hora. Devuelve el número de destinatarios en `recipients`. Devuelve 404 si no existe la asignación, 409 si no tiene recordatorio y 503 si falla el envío; ante 503 algunos destinatarios podrían haber recibido ya la copia. Utiliza únicamente cuentas y datos de prueba con MailHog.

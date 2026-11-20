@@ -1,5 +1,7 @@
 # HU-015 — Programar un recordatorio por correo
 
+**Estado:** Cerrada por decisión del usuario; validación con MailHog dada por aceptada sin ejecución registrada.
+
 ## Historia
 
 Como usuario, quiero programar un recordatorio con mi propio mensaje, eligiendo los días de antelación y la hora, para que todos sepamos qué preparar y para qué comida.
@@ -8,9 +10,11 @@ Como usuario, quiero programar un recordatorio con mi propio mensaje, eligiendo 
 
 ## Criterios de aceptación
 
-- [ ] Dado el panel «Asignar comida» de la planificación semanal, cuando activo «Recordatorio» debajo de «Repetir», entonces puedo elegir los días de antelación (incluido 0) y la hora, y escribir el mensaje. Si lo dejo desactivado, no se programa ningún aviso.
-- [ ] Dada una comida puntual con un aviso programado para una hora futura, cuando llega esa hora en Canarias, entonces todas las cuentas activas, incluida la que lo configuró, reciben un correo con el mensaje, la comida y su fecha. Con 0 días, el aviso se envía el mismo día de la comida. El formulario no muestra una etiqueta de zona horaria.
-- [ ] Dada una comida cuya hora de envío ya pasó, cuando guardo el recordatorio, entonces no se envía el correo ni se muestra un aviso sobre la omisión.
+- [x] Dado el panel «Asignar comida» de la planificación semanal, cuando activo «Recordatorio» debajo de «Repetir», entonces puedo elegir los días de antelación (incluido 0) y la hora, y escribir el mensaje. Si lo dejo desactivado, no se programa ningún aviso.
+- [x] Dada una comida puntual con un aviso programado para una hora futura, cuando llega esa hora en Canarias, entonces todas las cuentas activas, incluida la que lo configuró, reciben un correo con el mensaje, la comida y su fecha. Con 0 días, el aviso se envía el mismo día de la comida. El formulario no muestra una etiqueta de zona horaria.
+- [x] Dada una comida cuya hora de envío ya pasó, cuando guardo el recordatorio, entonces no se envía el correo ni se muestra un aviso sobre la omisión.
+
+La comprobación SMTP real con MailHog no se realizó; el usuario aceptó cerrar la historia sin ella. Los envíos se intentan una vez: los fallos se registran y no se reintentan, por lo que pueden perderse correos.
 
 ## Plan propuesto
 

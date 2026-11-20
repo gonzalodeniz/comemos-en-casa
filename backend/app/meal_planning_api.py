@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select, text, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -46,10 +46,16 @@ def deliver_due_meal_reminders(now: datetime | None = None) -> int:
         for assignment, label in pendientes:
             envio = datetime.combine(assignment.date - timedelta(days=assignment.reminder_days), time.fromisoformat(assignment.reminder_time), tzinfo=CANARY_ZONE)
             if envio <= instant.astimezone(CANARY_ZONE):
+                reserva = db.execute(update(MealAssignment).where(MealAssignment.id == assignment.id, MealAssignment.reminder_sent_at.is_(None), MealAssignment.reminder_days == assignment.reminder_days, MealAssignment.reminder_time == assignment.reminder_time, MealAssignment.reminder_message == assignment.reminder_message).values(reminder_sent_at=instant))
+                db.commit()
+                if reserva.rowcount != 1:
+                    continue
                 destinatarios = db.scalars(select(User.email).where(User.is_active.is_(True))).all()
                 for correo in destinatarios:
-                    send_meal_reminder_email(correo, assignment.reminder_message, label.name, assignment.date)
-                assignment.reminder_sent_at = instant
+                    try:
+                        send_meal_reminder_email(correo, assignment.reminder_message, label.name, assignment.date)
+                    except Exception:
+                        logger.exception("meal_reminder_delivery_failed assignment_id=%s", assignment.id)
                 enviados += 1
         db.commit()
     return enviados
@@ -511,6 +517,31 @@ async def get_meal_planning(
             for assignment, label in assignments
         ],
     }
+
+
+@router.post("/meal-planning/{assignment_id}/reminder/test")
+async def probar_recordatorio(
+    assignment_id: UUID,
+    request: Request,
+    active_session: ActiveSession = Depends(get_active_session),
+    db: Session = Depends(get_database_session),
+) -> dict[str, int]:
+    """Envía una copia inmediata sin alterar el estado del aviso programado."""
+    require_csrf(request, active_session)
+    resultado = db.execute(select(MealAssignment, FoodLabel).join(FoodLabel).where(MealAssignment.id == assignment_id)).first()
+    if resultado is None:
+        raise HTTPException(status_code=404, detail="Meal assignment not found")
+    comida, plato = resultado
+    if comida.reminder_days is None or comida.reminder_message is None:
+        raise HTTPException(status_code=409, detail="Meal has no active reminder")
+    destinatarios = db.scalars(select(User.email).where(User.is_active.is_(True))).all()
+    try:
+        for correo in destinatarios:
+            await asyncio.to_thread(send_meal_reminder_email, correo, comida.reminder_message, plato.name, comida.date)
+    except Exception as error:
+        logger.exception("meal_reminder_test_failed")
+        raise HTTPException(status_code=503, detail="Reminder test delivery failed; some recipients may have received it") from error
+    return {"recipients": len(destinatarios)}
 
 
 @router.post("/meal-planning/preview")

@@ -38,7 +38,7 @@ export default function AppWorkspace({ view, onViewChange, disabled, mealPlannin
           <AppIcon name="calendar" /><span>Plan semanal</span>
         </button>
         <button type="button" aria-current={view === "recipes" ? "page" : undefined} disabled={disabled} onClick={() => { onViewChange("recipes"); setMenuOpen(false); }}>
-          <AppIcon name="utensils" /><span>Recetas</span>
+          <AppIcon name="book" /><span>Recetas</span>
         </button>
         <button
           type="button"
@@ -57,13 +57,13 @@ export default function AppWorkspace({ view, onViewChange, disabled, mealPlannin
           <AppIcon name="shopping-cart" /><span>Lista de la compra</span>
         </button>
         <button type="button" aria-current={view === "product-catalog" ? "page" : undefined} disabled={disabled} onClick={() => { onViewChange("product-catalog"); setMenuOpen(false); }}>
-          <AppIcon name="shopping-cart" /><span>Catálogo de productos</span>
+          <AppIcon name="store" /><span>Catálogo de productos</span>
         </button>
         <button type="button" aria-current={view === "backups" ? "page" : undefined} disabled={disabled} onClick={() => { onViewChange("backups"); setMenuOpen(false); }}>
-          <AppIcon name="database" /><span>Copias de seguridad</span>
+          <AppIcon name="archive" /><span>Copias de seguridad</span>
         </button>
         <button type="button" aria-current={view === "kitchen-tips" ? "page" : undefined} disabled={disabled} onClick={() => { onViewChange("kitchen-tips"); setMenuOpen(false); }}>
-          <AppIcon name="utensils" /><span>Trucos de cocina</span>
+          <AppIcon name="bulb" /><span>Trucos de cocina</span>
         </button>
         <button
           type="button"

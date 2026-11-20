@@ -1,5 +1,5 @@
 // Presenta los iconos utilizados por las vistas de la aplicación.
-type IconName = "search" | "bulb" | "database" | "download" | "settings" | "calendar" | "repeat" | "bell" | "users" | "chevron-left" | "chevron-right" | "chevron-up" | "chevron-down" | "plus" | "logout" | "utensils" | "menu" | "edit" | "trash" | "eye" | "shopping-cart" | "check" | "undo" | "clear-list" | "store" | "arrow-left" | "close" | "diana" | "filtros";
+type IconName = "search" | "bulb" | "database" | "download" | "settings" | "calendar" | "repeat" | "bell" | "users" | "chevron-left" | "chevron-right" | "chevron-up" | "chevron-down" | "plus" | "logout" | "utensils" | "menu" | "edit" | "trash" | "eye" | "shopping-cart" | "check" | "undo" | "clear-list" | "store" | "arrow-left" | "close" | "diana" | "filtros" | "book" | "archive";
 
 const paths: Record<IconName, string> = {
   // Representa la acción de buscar en un listado.
@@ -35,6 +35,8 @@ const paths: Record<IconName, string> = {
   store: "M3 10h18l-2-6H5l-2 6Zm1 0v10h16V10M9 20v-6h6v6M3 10a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 3 1.7A2 2 0 0 0 21 10",
   "clear-list": "M4 5h10M4 10h10M4 15h6M4 20h6m7-7 6 6m0-6-6 6",
   eye: "M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Zm10-2a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z",
+  book: "M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 0 4 22Zm0 0V22m0-3a2.5 2.5 0 0 1 2.5-2.5H20M8 6h8",
+  archive: "M3 4h18v4H3zm2 4v12h14V8m-9 4h4",
 };
 
 export default function AppIcon({ name, className = "" }: { name: IconName; className?: string }) {

@@ -121,6 +121,7 @@ export type MealPlanningOperation = {
   slot: MealSlot;
   label_id: string;
   repeat: null | { interval_weeks: number; end_date: string };
+  reminder?: null | { days_before: number; send_time: string; message: string };
 };
 export type MealPlanningPreviewEntry = {
   date: string;

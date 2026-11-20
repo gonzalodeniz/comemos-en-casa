@@ -9,7 +9,7 @@ import os
 import unicodedata
 from pathlib import Path
 from contextlib import contextmanager
-from datetime import date, datetime
+from datetime import date, datetime, time, timedelta, timezone
 from functools import wraps
 from typing import Literal
 from uuid import UUID
@@ -23,7 +23,9 @@ from sqlalchemy.orm import Session
 
 from app.auth import ActiveSession, get_active_session, require_csrf
 from app.database import get_database_session
-from app.models import FoodLabel, MealAssignment, RecipeFoodLabel
+from app.database import SessionFactory
+from app.models import FoodLabel, MealAssignment, RecipeFoodLabel, User
+from app.mailer import send_meal_reminder_email
 from app.meal_planning import repetition_dates
 from app.food_images import InvalidFoodImage, async_publication_lock, crop_to_webp, publish_temporary, save_temporary, temporary_path
 from app.safe_image_url import UnsafeImageURL, safe_fetch_image
@@ -32,6 +34,25 @@ router = APIRouter(prefix="/api/v1", tags=["meal-planning"])
 logger = logging.getLogger(__name__)
 MEAL_PLANNING_WRITE_LOCK = 1128481603
 DATA_ROOT = Path(os.getenv("APP_DATA_ROOT", "/app/data"))
+CANARY_ZONE = ZoneInfo("Atlantic/Canary")
+
+
+def deliver_due_meal_reminders(now: datetime | None = None) -> int:
+    """Envía recordatorios vencidos y marca las asignaciones notificadas."""
+    instant = now or datetime.now(timezone.utc)
+    enviados = 0
+    with SessionFactory() as db:
+        pendientes = db.execute(select(MealAssignment, FoodLabel).join(FoodLabel).where(MealAssignment.reminder_days.is_not(None), MealAssignment.reminder_sent_at.is_(None))).all()
+        for assignment, label in pendientes:
+            envio = datetime.combine(assignment.date - timedelta(days=assignment.reminder_days), time.fromisoformat(assignment.reminder_time), tzinfo=CANARY_ZONE)
+            if envio <= instant.astimezone(CANARY_ZONE):
+                destinatarios = db.scalars(select(User.email).where(User.is_active.is_(True))).all()
+                for correo in destinatarios:
+                    send_meal_reminder_email(correo, assignment.reminder_message, label.name, assignment.date)
+                assignment.reminder_sent_at = instant
+                enviados += 1
+        db.commit()
+    return enviados
 
 
 def serialized_image_publication(function):
@@ -101,6 +122,13 @@ class Repetition(BaseModel):
     end_date: date
 
 
+class MealReminder(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    days_before: StrictInt = Field(ge=0, le=365)
+    send_time: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    message: str = Field(min_length=1, max_length=2000)
+
+
 class MealPlanningOperation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -109,6 +137,7 @@ class MealPlanningOperation(BaseModel):
     slot: Literal["lunch", "dinner"]
     label_id: UUID
     repeat: Repetition | None = None
+    reminder: MealReminder | None = None
     confirmed: bool = False
     preview_token: str | None = None
 
@@ -149,6 +178,13 @@ def _operation_data(operation: MealPlanningOperation) -> dict[str, object]:
             else {
                 "interval_weeks": operation.repeat.interval_weeks,
                 "end_date": operation.repeat.end_date.isoformat(),
+            }
+        ),
+        "reminder": (
+            None if operation.reminder is None else {
+                "days_before": operation.reminder.days_before,
+                "send_time": operation.reminder.send_time,
+                "message": operation.reminder.message,
             }
         ),
     }
@@ -529,18 +565,30 @@ async def apply_meal_planning_operation(
             for occurrence in dates:
                 current = by_date.get(occurrence)
                 if operation.action == "assign":
+                    reminder = operation.reminder
+                    if reminder is not None:
+                        envio = datetime.combine(occurrence - timedelta(days=reminder.days_before), time.fromisoformat(reminder.send_time), tzinfo=CANARY_ZONE)
+                        if envio <= datetime.now(CANARY_ZONE):
+                            reminder = None
                     if current is None:
                         db.add(
                             MealAssignment(
                                 date=occurrence,
                                 slot=operation.slot,
                                 label_id=label_id,
+                                reminder_days=reminder.days_before if reminder else None,
+                                reminder_time=reminder.send_time if reminder else None,
+                                reminder_message=reminder.message if reminder else None,
                             )
                         )
                         changed_dates.append(occurrence.isoformat())
                     elif current.label_id != label_id:
                         current.label_id = label_id
                         changed_dates.append(occurrence.isoformat())
+                    if current is not None:
+                        current.reminder_days = reminder.days_before if reminder else None
+                        current.reminder_time = reminder.send_time if reminder else None
+                        current.reminder_message = reminder.message if reminder else None
                 elif current is not None and (operation.repeat is not None or current.label_id == label_id):
                     db.delete(current)
                     changed_dates.append(occurrence.isoformat())

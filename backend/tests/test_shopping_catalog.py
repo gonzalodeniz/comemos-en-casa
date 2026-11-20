@@ -140,6 +140,8 @@ def test_database_schema_contains_shopping_categories(tmp_path, monkeypatch):
     import sqlite3
     with sqlite3.connect(database) as conexion:
         conexion.execute("CREATE TABLE users (id TEXT PRIMARY KEY)")
+        # La revisión 0007 también presupone creada la planificación de comidas.
+        conexion.execute("CREATE TABLE meal_assignments (id TEXT PRIMARY KEY)")
     command.stamp(config, "0007_recipes")
     command.upgrade(config, "head")
 

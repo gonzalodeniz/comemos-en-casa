@@ -31,6 +31,10 @@ type EditorDraft = {
   labelId: string;
   intervalWeeks: string;
   endDate: string;
+  reminderEnabled: boolean;
+  reminderDays: string;
+  reminderTime: string;
+  reminderMessage: string;
 };
 
 type Props = { csrfToken: string; onSessionExpired: () => void; onOpenRecipes?: (foodId: string) => void };
@@ -429,6 +433,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
     const nextDraft: EditorDraft = {
       action: "assign", labelId, intervalWeeks: "0",
       endDate: annualMaximumEndDate(date),
+      reminderEnabled: false, reminderDays: "1", reminderTime: "09:00", reminderMessage: "",
     };
     const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const closedDetails = active?.closest("details:not([open])");
@@ -449,6 +454,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
     const nextDraft: EditorDraft = {
       action: "delete", labelId: current.label.id, intervalWeeks: "0",
       endDate: annualMaximumEndDate(date),
+      reminderEnabled: false, reminderDays: "1", reminderTime: "09:00", reminderMessage: "",
     };
     const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     openerRef.current = active;
@@ -505,6 +511,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
       slot: editorSlot,
       label_id: draft.labelId,
       repeat: repeatFromInterval(draft.intervalWeeks, draft.endDate),
+      ...(draft.action === "assign" && draft.reminderEnabled ? { reminder: { days_before: Number(draft.reminderDays), send_time: draft.reminderTime, message: draft.reminderMessage } } : {}),
     };
   }
 
@@ -712,6 +719,14 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
                   </div>
                   <p className="repeat-summary">{draft.intervalWeeks !== "0" ? `${draft.action === "delete" ? "Se borrará" : "Se repetirá"} cada ${draft.intervalWeeks} semana${Number(draft.intervalWeeks) === 1 ? "" : "s"}${draft.endDate ? ` hasta el ${formatDateLabel(draft.endDate, { dateStyle: "long" })}` : ""}.` : draft.action === "delete" ? "Solo se borrará esta comida." : "No se repetirá esta comida."}</p>
                 </div>
+                {draft.action === "assign" && <div className="repeat-panel">
+                  <label className="repeat-toggle"><strong>Recordatorio</strong><input type="checkbox" role="switch" checked={draft.reminderEnabled} onChange={(event) => { setDraft({ ...draft, reminderEnabled: event.target.checked }); setPreview(null); }} /></label>
+                  {draft.reminderEnabled && <div className="repeat-fields">
+                    <label>Días de antelación<input aria-label="Días de antelación" type="number" min="0" step="1" value={draft.reminderDays} onChange={(event) => setDraft({ ...draft, reminderDays: event.target.value })} required /></label>
+                    <label>Hora<input aria-label="Hora del recordatorio" type="time" value={draft.reminderTime} onChange={(event) => setDraft({ ...draft, reminderTime: event.target.value })} required /></label>
+                    <label>Mensaje<textarea aria-label="Mensaje del recordatorio" value={draft.reminderMessage} onChange={(event) => setDraft({ ...draft, reminderMessage: event.target.value })} required /></label>
+                  </div>}
+                </div>}
                 {draft.action === "assign" && <>
                 <label className="dish-search">
                   <span className="visually-hidden">Buscar plato</span>

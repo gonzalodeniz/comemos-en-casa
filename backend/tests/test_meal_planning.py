@@ -1,5 +1,5 @@
 # Comprueba las consultas y operaciones de planificación de comidas.
-from datetime import date
+from datetime import date, datetime, timezone
 from uuid import uuid4
 
 from sqlalchemy import select, text
@@ -99,6 +99,25 @@ def test_meal_planning_rejects_a_reversed_range_without_writes(meal_database):
     assert response.status_code == 422
     with meal_database() as db:
         assert db.query(MealAssignment).count() == 0
+
+def test_assigning_meal_schedules_canary_reminder_for_all_active_users(meal_database, monkeypatch):
+    """Verifica configuración de recordatorio y destinatarios activos."""
+    from app.models import User
+    cookies = authenticate(meal_database)
+    pescado, _ = seed_labels(meal_database)
+    class Reloj(datetime):
+        """Fija el instante de programación para la prueba."""
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 11, 1, 17, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr("app.meal_planning_api.datetime", Reloj)
+    payload = {"action": "assign", "start_date": "2026-11-02", "slot": "lunch", "label_id": str(pescado.id), "reminder": {"days_before": 0, "send_time": "18:00", "message": "Sacar el pollo"}}
+    response = post_with_session("/api/v1/meal-planning/operations", payload, cookies)
+    assert response.status_code == 200
+    with meal_database() as db:
+        assignment = db.scalar(select(MealAssignment))
+        assert (assignment.reminder_days, assignment.reminder_time, assignment.reminder_message) == (0, "18:00", "Sacar el pollo")
+        assert db.query(User).filter(User.is_active.is_(True)).count() == 1
 
 def test_preview_is_authenticated_csrf_protected_and_has_no_side_effects(
     meal_database,

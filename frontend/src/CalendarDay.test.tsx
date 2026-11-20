@@ -82,3 +82,21 @@ describe("CalendarDay", () => {
     expect(markup).not.toContain("add-meal");
   });
 });
+
+// Verifica que el aviso es informativo y está junto al control de edición.
+it("muestra una campana informativa junto a editar con recordatorio", () => {
+  const assignments = new Map<string, MealAssignment>([[`${date}:lunch`, { id: "1", date, slot: "lunch", label: { id: "rice", code: "arroz", name: "Arroz" }, reminder: { days_before: 1, send_time: "18:00", message: "Preparar" } }]]);
+  const markup = renderToStaticMarkup(CalendarDay({ date, weekday: "Martes", today: false, assignments, disabled: false, onEdit: vi.fn(), onDelete: vi.fn() }));
+  expect(markup).toMatch(/title="Editar comida"[^]*?<\/button><span class="meal-reminder"[^>]*aria-label="Recordatorio activado"/);
+  expect(markup).not.toMatch(/<button[^>]*aria-label="Recordatorio activado"/);
+});
+
+// Comprueba que no se muestra el indicador en comidas sin aviso activo.
+it("no muestra la campana sin recordatorio activo", () => {
+  const assignments = new Map<string, MealAssignment>([
+    [`${date}:lunch`, { id: "1", date, slot: "lunch", label: { id: "rice", code: "arroz", name: "Arroz" }, reminder: null }],
+    [`${date}:dinner`, { id: "2", date, slot: "dinner", label: { id: "fish", code: "pescado", name: "Pescado" } }],
+  ]);
+  const markup = renderToStaticMarkup(CalendarDay({ date, weekday: "Martes", today: false, assignments, disabled: false, onEdit: vi.fn(), onDelete: vi.fn() }));
+  expect(markup).not.toContain('aria-label="Recordatorio activado"');
+});

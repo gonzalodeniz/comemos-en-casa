@@ -271,6 +271,10 @@ class MealAssignment(Base):
     label_id: Mapped[UUID] = mapped_column(
         ForeignKey("food_labels.id", ondelete="RESTRICT"), nullable=False
     )
+    reminder_days: Mapped[int | None] = mapped_column(Integer)
+    reminder_time: Mapped[str | None] = mapped_column(String(5))
+    reminder_message: Mapped[str | None] = mapped_column(Text)
+    reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class BackupSchedule(Base):

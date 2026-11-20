@@ -503,13 +503,19 @@ button.today-button-fixed { position: fixed; right: max(1rem, env(safe-area-inse
 .meal-editor .repeat-toggle .app-icon { color: #00854a; }
 .meal-editor .repeat-toggle input { margin-left: auto; }
 .meal-editor .repeat-fields { align-items: end; gap: .65rem; margin-top: .65rem; }
+.meal-editor .repeat-fields:has(textarea[aria-label="Mensaje del recordatorio"]) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .meal-editor .repeat-fields label { flex: 1 1 0; min-width: 0; color: #54758a; font-size: .8rem; font-weight: 700; }
 .meal-editor .repeat-fields input { min-height: 40px; margin-top: .25rem; padding: .45rem; font-size: .9rem; }
+.meal-editor .repeat-fields textarea { box-sizing: border-box; display: block; width: 100%; min-width: 0; min-height: 5rem; margin-top: .25rem; padding: .45rem; resize: vertical; }
+.meal-editor .repeat-fields label:has(textarea[aria-label="Mensaje del recordatorio"]) { grid-column: 1 / -1; }
 .meal-editor .repeat-fields input { text-align: center; }
 .meal-editor .repeat-fields label:first-child { position: relative; }
 .meal-editor .repeat-fields label:first-child input { padding-right: 4.3rem; }
 .meal-editor .repeat-fields label:first-child span { position: absolute; right: .5rem; bottom: .7rem; font-weight: 400; }
 .meal-editor .repeat-summary { margin: .5rem 0 0; padding: .4rem .5rem; border-radius: .4rem; background: #e8f7ef; color: #496c65; font-size: .75rem; }
+.meal-reminder { display: inline-flex; position: absolute; top: 50%; right: 5.5rem; transform: translateY(-50%); align-items: center; color: #00854a; }
+.meal-reminder .app-icon { width: 14px; height: 14px; }
+.week-grid .meal-slot:has(.meal-reminder) { padding-right: 6.8rem; }
 .meal-editor .dish-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .4rem; }
 .meal-editor .dish-card { gap: .25rem; padding: .3rem; font-size: .8rem; }
 .meal-editor .dish-card.selected { padding: calc(.3rem - 1px); }
@@ -615,7 +621,7 @@ button.compra-accion:hover::after, button.compra-accion:focus-visible::after { o
 input.compra-casilla { flex: 0 0 22px; width: 22px; height: 22px; min-height: 0; margin: 0; accent-color: var(--color-primary); cursor: pointer; }
 .compra-fila-comprada { padding: .65rem .6rem; border-radius: .65rem; background: #e0f3eb; }
 .compra-fila-comprada .compra-fila-texto { text-decoration: line-through; }
-.compra-comprados-cabecera { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.compra-comprados-cabecera { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 1.25rem; }
 
 .compra-cabecera { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; }
 .compra-cabecera h2 { margin: 0; }
@@ -778,6 +784,8 @@ button.today-button { display: inline-flex; align-items: center; gap: .4rem; }
     width: 44px;
     transform: none;
   }
+  .week-grid .meal-reminder { position: static; flex: 0 0 auto; transform: none; }
+  .week-grid .meal-card .meal-slot:has(.meal-reminder) { padding-right: .2rem; }
   .planning-sticky-header .calendar-context.hoy-fuera-de-vista { display: contents; }
   .meal-planning button.today-button {
     position: fixed;

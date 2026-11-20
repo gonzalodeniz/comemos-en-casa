@@ -7,6 +7,7 @@ import os
 import smtplib
 import ssl
 from email.message import EmailMessage
+from datetime import date
 
 
 def send_password_reset_email(recipient: str, reset_url: str) -> None:
@@ -30,6 +31,30 @@ def send_password_reset_email(recipient: str, reset_url: str) -> None:
         "If you did not request this change, you can ignore this message."
     )
 
+    with smtplib.SMTP(host, port, timeout=10) as client:
+        if os.getenv("EMAIL_SMTP_STARTTLS", "true").lower() not in {"0", "false", "no"}:
+            client.starttls(context=ssl.create_default_context())
+        username = os.getenv("EMAIL_SMTP_USERNAME", "")
+        password = os.getenv("EMAIL_SMTP_PASSWORD", "")
+        if username:
+            if not password:
+                raise RuntimeError("SMTP password is required when a username is configured")
+            client.login(username, password)
+        client.send_message(message)
+
+
+def send_meal_reminder_email(recipient: str, reminder: str, meal: str, meal_date: date) -> None:
+    """Envía por SMTP el texto del recordatorio y el contexto de la comida."""
+    host = os.getenv("EMAIL_SMTP_HOST", "").strip()
+    sender = os.getenv("EMAIL_FROM", "").strip()
+    if not host or not sender:
+        raise RuntimeError("SMTP host and sender must be configured")
+    port = int(os.getenv("EMAIL_SMTP_PORT", "587"))
+    message = EmailMessage()
+    message["Subject"] = f"Recordatorio: {meal} ({meal_date.isoformat()})"
+    message["From"] = sender
+    message["To"] = recipient
+    message.set_content(f"{reminder}\n\nComida: {meal}\nFecha: {meal_date.isoformat()}")
     with smtplib.SMTP(host, port, timeout=10) as client:
         if os.getenv("EMAIL_SMTP_STARTTLS", "true").lower() not in {"0", "false", "no"}:
             client.starttls(context=ssl.create_default_context())

@@ -226,6 +226,8 @@ def test_database_schema_contains_shopping_list_items_with_quantity_and_unit(
     import sqlite3
     with sqlite3.connect(database) as conexion:
         conexion.execute("CREATE TABLE users (id TEXT PRIMARY KEY)")
+        # La revisión 0007 también presupone creada la planificación de comidas.
+        conexion.execute("CREATE TABLE meal_assignments (id TEXT PRIMARY KEY)")
     command.stamp(config, "0007_recipes")
     command.upgrade(config, "0009_shopping_products")
     command.upgrade(config, "head")
@@ -260,6 +262,8 @@ def test_database_schema_contains_recipe_shopping_sections_with_name(tmp_path, m
     import sqlite3
     with sqlite3.connect(database) as conexion:
         conexion.execute("CREATE TABLE users (id TEXT PRIMARY KEY)")
+        # La revisión 0007 también presupone creada la planificación de comidas.
+        conexion.execute("CREATE TABLE meal_assignments (id TEXT PRIMARY KEY)")
     command.stamp(config, "0007_recipes")
     command.upgrade(config, "0011_shopping_item_purchased")
     command.upgrade(config, "head")
@@ -288,6 +292,8 @@ def test_database_schema_contains_ordered_recipe_shopping_ingredients(tmp_path, 
     import sqlite3
     with sqlite3.connect(database) as conexion:
         conexion.execute("CREATE TABLE users (id TEXT PRIMARY KEY)")
+        # La revisión 0007 también presupone creada la planificación de comidas.
+        conexion.execute("CREATE TABLE meal_assignments (id TEXT PRIMARY KEY)")
     command.stamp(config, "0007_recipes")
     command.upgrade(config, "0011_shopping_item_purchased")
     command.upgrade(config, "head")

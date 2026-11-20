@@ -20,7 +20,7 @@ from app.shopping_list_api import router as shopping_list_router
 from app.backups import router as backups_router, _WRITE_LOCK, run_scheduled_backup
 from app.kitchen_tips_api import router as kitchen_tips_router
 from app.food_images import cleanup_expired_temporary
-from app.meal_planning_api import DATA_ROOT
+from app.meal_planning_api import DATA_ROOT, deliver_due_meal_reminders
 from app.settings import allowed_origins
 
 logger = logging.getLogger(__name__)
@@ -41,15 +41,29 @@ async def _run_scheduled_backups() -> None:
         await asyncio.sleep(60)
 
 
+async def _run_meal_reminders() -> None:
+    """Comprueba periódicamente los recordatorios pendientes."""
+    while True:
+        try:
+            await asyncio.to_thread(deliver_due_meal_reminders)
+        except Exception:
+            logger.exception("meal_reminders_failed")
+        await asyncio.sleep(60)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     cleanup_task = asyncio.create_task(_cleanup_food_image_temporaries())
     backup_task = asyncio.create_task(_run_scheduled_backups())
+    reminder_task = asyncio.create_task(_run_meal_reminders())
     try:
         yield
     finally:
         cleanup_task.cancel()
         backup_task.cancel()
+        reminder_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await reminder_task
         with suppress(asyncio.CancelledError):
             await cleanup_task
         with suppress(asyncio.CancelledError):

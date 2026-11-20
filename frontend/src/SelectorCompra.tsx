@@ -52,7 +52,7 @@ export default function SelectorCompra({ categorias, consultar, buscar, seleccio
   }, [categoria, revision]);
 
   return <section className="selector-compra" aria-label="Añadir productos">
-    <div className="selector-compra-cabecera"><h3>Añadir productos</h3>
+    <div className="selector-compra-cabecera">
       <div className="selector-compra-busqueda"><input aria-label="Buscar productos" placeholder="Busca tus productos" value={busqueda} onChange={(evento) => setBusqueda(evento.target.value)} />
       {busqueda && <button type="button" className="compra-accion" aria-label="Limpiar búsqueda" onClick={() => setBusqueda("")}><AppIcon name="close" /></button>}</div><span className="selector-compra-acciones">
       {categoria && <button type="button" className="compra-accion" aria-label="Volver a categorías" data-tooltip="Volver a categorías" onClick={() => setCategoria(null)}><AppIcon name="arrow-left" /></button>}

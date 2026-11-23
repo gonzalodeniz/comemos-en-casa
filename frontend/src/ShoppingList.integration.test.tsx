@@ -24,6 +24,12 @@ async function agregarManzanas(user: ReturnType<typeof userEvent.setup>, cantida
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 }
 
+// Localiza el acceso en el menú principal, sin confundirlo con la barra móvil.
+async function buscarAccesoPrincipal(nombre: string) {
+  const menu = await screen.findByRole("navigation", { name: "Menú principal" });
+  return within(menu).findByRole("button", { name: nombre });
+}
+
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); sessionStorage.clear(); });
 
 describe("shopping list integration", () => {
@@ -631,7 +637,7 @@ describe("shopping list integration", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await buscarAccesoPrincipal("Lista de la compra"));
 
     expect(await screen.findByRole("img", { name: "Manzanas" })).toBeTruthy();
     await user.click(await screen.findByRole("button", { name: "Fruta" }));
@@ -652,7 +658,7 @@ describe("shopping list integration", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await buscarAccesoPrincipal("Lista de la compra"));
     await user.click(screen.getByRole("button", { name: "Gestionar catálogo" }));
     await user.click(await screen.findByRole("button", { name: "Fruta" }));
     await user.click(await screen.findByRole("button", { name: "Nuevo producto" }));
@@ -678,7 +684,7 @@ describe("shopping list integration", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await buscarAccesoPrincipal("Lista de la compra"));
     await user.click(screen.getByRole("button", { name: "Gestionar catálogo" }));
     await user.click(await screen.findByRole("button", { name: "Fruta" }));
     await user.click(await screen.findByRole("button", { name: "Nuevo producto" }));
@@ -706,7 +712,7 @@ describe("shopping list integration", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await buscarAccesoPrincipal("Lista de la compra"));
 
     expect((await screen.findByRole("alert")).textContent).toContain("No se pudo cargar la lista de la compra.");
   });
@@ -731,7 +737,7 @@ describe("shopping list integration", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await buscarAccesoPrincipal("Lista de la compra"));
     await user.click(await screen.findByRole("button", { name: "Fruta" }));
     await agregarManzanas(user, "2", "unit");
     await agregarManzanas(user, "500", "g");
@@ -766,7 +772,7 @@ describe("shopping list integration", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await buscarAccesoPrincipal("Lista de la compra"));
     await user.click(await screen.findByRole("button", { name: "Fruta" }));
     await agregarManzanas(user, "2", "unit");
     await agregarManzanas(user, "3", "unit");
@@ -800,7 +806,7 @@ describe("shopping list integration", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await buscarAccesoPrincipal("Lista de la compra"));
     await user.click(await screen.findByRole("button", { name: "Fruta" }));
     await agregarManzanas(user, "0.5", "kg");
     await agregarManzanas(user, "250", "g");
@@ -829,7 +835,7 @@ describe("shopping list integration", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await buscarAccesoPrincipal("Lista de la compra"));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/shopping-list"), expect.objectContaining({ method: "GET" })));
     await waitFor(() => expect(screen.getByRole("region", { name: "Lista de la compra" }).textContent).toContain("Manzanas: 1500 g"));
@@ -851,7 +857,7 @@ describe("shopping list integration", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await buscarAccesoPrincipal("Lista de la compra"));
     await user.click(await screen.findByRole("button", { name: "Fruta" }));
     await agregarManzanas(user, "1.5", "kg");
 
@@ -881,7 +887,7 @@ describe("shopping list integration", () => {
     const user = userEvent.setup();
 
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await buscarAccesoPrincipal("Lista de la compra"));
 
     expect(await screen.findByRole("button", { name: "Verduras" })).toBeTruthy();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/shopping-categories"), expect.anything()));
@@ -902,7 +908,7 @@ describe("shopping list integration", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await buscarAccesoPrincipal("Lista de la compra"));
     await user.click(screen.getByRole("button", { name: "Gestionar catálogo" }));
     await user.click(await screen.findByRole("button", { name: "Nueva categoría" }));
     await user.type(screen.getByLabelText("Nombre de la categoría"), "Verduras");
@@ -930,7 +936,7 @@ describe("shopping list integration", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await buscarAccesoPrincipal("Lista de la compra"));
     await user.click(screen.getByRole("button", { name: "Gestionar catálogo" }));
     await user.click(await screen.findByRole("button", { name: "Verduras" }));
     await user.click(await screen.findByRole("button", { name: "Nuevo producto" }));
@@ -959,7 +965,7 @@ describe("shopping list integration", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await buscarAccesoPrincipal("Lista de la compra"));
     await user.click(screen.getByRole("button", { name: "Gestionar catálogo" }));
     await user.click(await screen.findByRole("button", { name: "Verduras" }));
     await user.click(await screen.findByRole("button", { name: "Nuevo producto" }));
@@ -988,7 +994,7 @@ describe("shopping list integration", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await buscarAccesoPrincipal("Lista de la compra"));
 
     await user.click(await screen.findByRole("checkbox", { name: "Marcar Manzanas como comprado" }));
 
@@ -1023,10 +1029,10 @@ describe("shopping list integration", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await buscarAccesoPrincipal("Lista de la compra"));
     await user.click(await screen.findByRole("checkbox", { name: "Marcar Manzanas como comprado" }));
-    await user.click(screen.getByRole("button", { name: "Plan semanal" }));
-    await user.click(screen.getByRole("button", { name: "Lista de la compra" }));
+    await user.click(await buscarAccesoPrincipal("Plan semanal"));
+    await user.click(await buscarAccesoPrincipal("Lista de la compra"));
 
     const lista = await screen.findByRole("region", { name: "Lista de la compra" });
     await waitFor(() => expect(lista.textContent).toContain("Comprados"));
@@ -1093,7 +1099,7 @@ describe("shopping list integration", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await buscarAccesoPrincipal("Lista de la compra"));
     const lista = await screen.findByRole("region", { name: "Lista de la compra" });
 
     await user.click(await within(lista).findByRole("checkbox", { name: "Desmarcar Manzanas como pendiente" }));
@@ -1128,7 +1134,7 @@ describe("shopping list integration", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await buscarAccesoPrincipal("Lista de la compra"));
     await user.click(await screen.findByRole("button", { name: "Fruta" }));
     await agregarManzanas(user, "2");
 
@@ -1161,7 +1167,7 @@ describe("shopping list integration", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await buscarAccesoPrincipal("Lista de la compra"));
     await user.click(await screen.findByRole("checkbox", { name: "Marcar Manzanas como comprado" }));
 
     const lista = screen.getByRole("region", { name: "Lista de la compra" });
@@ -1190,7 +1196,7 @@ describe("shopping list integration", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await buscarAccesoPrincipal("Lista de la compra"));
     await user.click(await screen.findByRole("checkbox", { name: "Marcar Manzanas como comprado" }));
 
     const lista = screen.getByRole("region", { name: "Lista de la compra" });
@@ -1216,7 +1222,7 @@ describe("shopping list integration", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await buscarAccesoPrincipal("Lista de la compra"));
 
     await user.click(await screen.findByRole("button", { name: "Verduras" }));
     expect((await screen.findByRole("alert")).textContent).toContain("No se pudieron cargar los productos");
@@ -1242,7 +1248,7 @@ describe("shopping list integration", () => {
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<App />);
-    await user.click(await screen.findByRole("button", { name: "Lista de la compra" }));
+    await user.click(await buscarAccesoPrincipal("Lista de la compra"));
     const region = await screen.findByRole("region", { name: "Lista de la compra" });
     const pending = within(region).getByRole("heading", { name: "Pendientes" }).nextElementSibling as HTMLElement;
     const purchased = within(region).getByRole("heading", { name: "Comprados" }).nextElementSibling as HTMLElement;

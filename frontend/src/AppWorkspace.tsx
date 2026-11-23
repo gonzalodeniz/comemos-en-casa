@@ -21,6 +21,14 @@ type Props = {
   notifications?: ReactNode;
 };
 
+// Define los destinos disponibles en la barra inferior móvil.
+const accesosRapidos = [
+  ["meal-planning", "calendar", "Plan semanal"],
+  ["recipes", "book", "Recetas"],
+  ["shopping-list", "shopping-cart", "Lista de la compra"],
+  ["product-catalog", "store", "Catálogo de productos"],
+] as const;
+
 export default function AppWorkspace({ view, onViewChange, disabled, mealPlanning, userManagement, foodCatalog, recipes, shoppingList, productCatalog, backups, kitchenTips, sessionTools, notifications }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
@@ -81,6 +89,14 @@ export default function AppWorkspace({ view, onViewChange, disabled, mealPlannin
         {notifications}
         {view === "meal-planning" ? mealPlanning : view === "food-catalog" ? foodCatalog : view === "recipes" ? recipes : view === "shopping-list" ? shoppingList : view === "product-catalog" ? productCatalog : view === "backups" ? backups : view === "kitchen-tips" ? kitchenTips : userManagement}
       </div>
+      <nav className="accesos-rapidos" aria-label="Accesos rápidos">
+        {accesosRapidos.map(([destino, icono, etiqueta]) => (
+          <button key={destino} type="button" disabled={disabled} aria-label={etiqueta} aria-current={view === destino ? "page" : undefined}
+            onClick={() => { onViewChange(destino); setMenuOpen(false); }}>
+            <AppIcon name={icono} />
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }

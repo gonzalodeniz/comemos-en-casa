@@ -802,6 +802,28 @@ button.today-button { display: inline-flex; align-items: center; gap: .4rem; }
   .single-meal .week-grid .meal-thumbnail { width: 30px; }
 }
 
+/* Unifica la cabecera móvil y reduce el espacio de los títulos de cada vista. */
+@media (max-width: 600px) {
+  .app-workspace > .app-sidebar { padding: .2rem .7rem; }
+  .app-workspace .brand-mark { width: 29px; height: 32px; }
+  .app-workspace .app-brand h1 { max-width: none; font-size: 1.05rem; }
+  .app-workspace .mobile-menu-toggle { min-width: 44px; min-height: 44px; }
+  .app-workspace > .workspace-content { padding: .35rem .65rem 1rem; }
+  .workspace-content .panel, .workspace-content .food-catalog-panel { padding: .75rem; }
+  .food-catalog-heading, .catalogo-cabecera { flex-direction: row; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: .65rem; }
+  .food-catalog-heading > div, .catalogo-cabecera > div { min-width: 0; flex: 1 1 12rem; }
+  .food-catalog-heading h1, .recipe-page h1, .compra-cabecera h2,
+  .catalogo-cabecera h2, .copias-pagina > .panel > header h2,
+  .kitchen-tips-panel > header h2, .dashboard > .panel > h2 {
+    margin: 0; font-size: 1.35rem; line-height: 1.2;
+  }
+  .food-catalog-heading p, .catalogo-cabecera p, .copias-pagina > .panel > header p,
+  .kitchen-tips-panel > header p, .dashboard > .panel > h2 + p, .dashboard > .panel > p.eyebrow { margin: .25rem 0; font-size: .85rem; }
+  .catalogo-cabecera-contenido .catalogo-busqueda { margin-top: .5rem; }
+  .recipe-page > header, .compra-cabecera { gap: .5rem; margin-bottom: .65rem; }
+  .recipe-page > header h1 { min-width: 0; overflow-wrap: anywhere; }
+}
+
 /* Mantiene los accesos móviles al alcance sin cubrir el contenido ni el botón Hoy. */
 .accesos-rapidos { display: none; }
 @media (max-width: 760px) {

@@ -7,6 +7,18 @@ import Recipes from "./Recipes";
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
+// Comprueba que volver solo aparece cuando se proporciona un destino de origen.
+it("muestra el icono de retorno antes de crear una receta", async () => {
+  vi.stubGlobal("fetch", vi.fn((entrada: RequestInfo | URL) => Promise.resolve(new Response(JSON.stringify(String(entrada).endsWith("/food-labels") ? { labels: [] } : { recipes: [] })))));
+  const volver = vi.fn();
+  const usuario = userEvent.setup();
+  render(<Recipes csrfToken="token-csrf" onSessionExpired={vi.fn()} onBack={volver} />);
+  const boton = screen.getByRole("button", { name: "Volver" });
+  expect(boton.nextElementSibling).toBe(screen.getByRole("button", { name: "Nueva receta" }));
+  await usuario.click(boton);
+  expect(volver).toHaveBeenCalledOnce();
+});
+
 // Comprueba que el icono accesible abre el formulario de creación.
 it("abre una receta nueva mediante el icono", async () => {
   vi.stubGlobal("fetch", vi.fn((entrada: RequestInfo | URL) => Promise.resolve(new Response(JSON.stringify(String(entrada).endsWith("/food-labels") ? { labels: [] } : { recipes: [] })))));

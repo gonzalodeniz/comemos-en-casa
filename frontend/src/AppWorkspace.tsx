@@ -7,6 +7,7 @@ export type AppView = "meal-planning" | "food-catalog" | "recipes" | "shopping-l
 
 type Props = {
   view: AppView;
+  retainedView?: "meal-planning" | "food-catalog" | null;
   onViewChange: (view: AppView) => void;
   disabled: boolean;
   mealPlanning: ReactNode;
@@ -29,7 +30,7 @@ const accesosRapidos = [
   ["product-catalog", "store", "Catálogo de productos"],
 ] as const;
 
-export default function AppWorkspace({ view, onViewChange, disabled, mealPlanning, userManagement, foodCatalog, recipes, shoppingList, productCatalog, backups, kitchenTips, sessionTools, notifications }: Props) {
+export default function AppWorkspace({ view, retainedView, onViewChange, disabled, mealPlanning, userManagement, foodCatalog, recipes, shoppingList, productCatalog, backups, kitchenTips, sessionTools, notifications }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div className="app-workspace">
@@ -87,7 +88,9 @@ export default function AppWorkspace({ view, onViewChange, disabled, mealPlannin
       </aside>
       <div className="workspace-content" id="workspace-content" tabIndex={-1}>
         {notifications}
-        {view === "meal-planning" ? mealPlanning : view === "food-catalog" ? foodCatalog : view === "recipes" ? recipes : view === "shopping-list" ? shoppingList : view === "product-catalog" ? productCatalog : view === "backups" ? backups : view === "kitchen-tips" ? kitchenTips : userManagement}
+        {(view === "meal-planning" || (view === "recipes" && retainedView === "meal-planning")) && <div hidden={view !== "meal-planning"}>{mealPlanning}</div>}
+        {(view === "food-catalog" || (view === "recipes" && retainedView === "food-catalog")) && <div hidden={view !== "food-catalog"}>{foodCatalog}</div>}
+        {view === "recipes" ? recipes : view === "shopping-list" ? shoppingList : view === "product-catalog" ? productCatalog : view === "backups" ? backups : view === "kitchen-tips" ? kitchenTips : view === "users" ? userManagement : null}
       </div>
       <nav className="accesos-rapidos" aria-label="Accesos rápidos">
         {accesosRapidos.map(([destino, icono, etiqueta]) => (

@@ -7,6 +7,18 @@ import Recipes from "./Recipes";
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
+// Comprueba que el icono accesible abre el formulario de creación.
+it("abre una receta nueva mediante el icono", async () => {
+  vi.stubGlobal("fetch", vi.fn((entrada: RequestInfo | URL) => Promise.resolve(new Response(JSON.stringify(String(entrada).endsWith("/food-labels") ? { labels: [] } : { recipes: [] })))));
+  const usuario = userEvent.setup();
+  render(<Recipes csrfToken="token-csrf" onSessionExpired={vi.fn()} />);
+  const boton = screen.getByRole("button", { name: "Nueva receta" });
+  expect(boton.querySelector("svg")).not.toBeNull();
+  expect(boton.textContent).toBe("");
+  await usuario.click(boton);
+  expect(screen.getByRole("heading", { name: "Nueva receta" })).toBeTruthy();
+});
+
 it("añade la receta seleccionada a la lista de la compra", async () => {
   let terminar!: (respuesta: Response) => void;
   const peticion = vi.fn((entrada: RequestInfo | URL, _opciones?: RequestInit) => {

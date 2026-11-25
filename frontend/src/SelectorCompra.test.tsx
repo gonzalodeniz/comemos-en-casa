@@ -7,6 +7,20 @@ import SelectorCompra from "./SelectorCompra";
 
 afterEach(cleanup);
 
+// Comprueba que una búsqueda despliega el selector al alcanzar el umbral.
+it("despliega los resultados al escribir tres letras con el selector recogido", async () => {
+  const usuario = userEvent.setup();
+  const buscar = vi.fn().mockResolvedValue([{ id: "s", name: "Sal fina" }]);
+  render(<SelectorCompra categorias={[]} consultar={vi.fn()} buscar={buscar} seleccionar={vi.fn()} />);
+  await usuario.click(screen.getByRole("button", { name: "Recoger" }));
+  const campo = screen.getByRole("textbox", { name: "Buscar productos" });
+  await usuario.type(campo, "sa");
+  expect(screen.getByRole("button", { name: "Mostrar" }).getAttribute("aria-expanded")).toBe("false");
+  await usuario.type(campo, "l");
+  expect(screen.getByRole("button", { name: "Recoger" }).getAttribute("aria-expanded")).toBe("true");
+  expect(await screen.findByRole("button", { name: "Sal fina" })).toBeTruthy();
+});
+
 // Comprueba que los resultados conservan su imagen cuando está disponible.
 it("muestra la imagen del producto encontrado", async () => {
   const usuario = userEvent.setup();

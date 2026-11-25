@@ -31,8 +31,8 @@ describe("CalendarDay", () => {
     const element = day(["lunch", "dinner"], { onEdit });
     const cards = element.props.children[1].props.children;
 
-    cards[0].props.children[0].props.children[2].props.onClick();
-    cards[1].props.children[0].props.children[2].props.onClick();
+    cards[0].props.children[0].props.children[3].props.onClick();
+    cards[1].props.children[0].props.children[3].props.onClick();
 
     expect(onEdit.mock.calls).toEqual([[date, "lunch"], [date, "dinner"]]);
   });
@@ -87,7 +87,7 @@ describe("CalendarDay", () => {
 it("muestra una campana informativa junto a editar con recordatorio", () => {
   const assignments = new Map<string, MealAssignment>([[`${date}:lunch`, { id: "1", date, slot: "lunch", label: { id: "rice", code: "arroz", name: "Arroz" }, reminder: { days_before: 1, send_time: "18:00", message: "Preparar" } }]]);
   const markup = renderToStaticMarkup(CalendarDay({ date, weekday: "Martes", today: false, assignments, disabled: false, onEdit: vi.fn(), onDelete: vi.fn() }));
-  expect(markup).toMatch(/title="Editar comida"[^]*?<\/button><span class="meal-reminder"[^>]*aria-label="Recordatorio activado"/);
+  expect(markup).toMatch(/<span class="meal-reminder"[^>]*aria-label="Recordatorio activado"[^]*?<\/span><button[^>]*title="Editar comida"/);
   expect(markup).not.toMatch(/<button[^>]*aria-label="Recordatorio activado"/);
 });
 

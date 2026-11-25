@@ -1,7 +1,7 @@
 // Presenta los flujos de acceso y administración de cuentas.
 // Coordina la sesión, formularios, recuperación de contraseña y operaciones de usuario con la API, manteniendo los estados de carga y error.
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { apiRequest, ApiError, type User, type UserResponse } from "./api";
 import MealPlanning from "./MealPlanning";
 import FoodCatalog from "./FoodCatalog";
@@ -31,6 +31,9 @@ export default function App() {
   const [view, setView] = useState<AppView>(restoreAppView);
   const colaVistas = useRef<Promise<void>>(Promise.resolve());
   const [recipeFoodId, setRecipeFoodId] = useState<string | null>(null);
+  const [origenRecetas, setOrigenRecetas] = useState<"meal-planning" | "food-catalog" | null>(null);
+  const desplazamientoOrigen = useRef<number | null>(null);
+  const restaurarDesplazamiento = useRef(false);
   const [recipeListReset, setRecipeListReset] = useState(0);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [csrfToken, setCsrfToken] = useState("");
@@ -52,6 +55,29 @@ export default function App() {
       await apiRequest<null>("/auth/last-view", { method: "PUT", csrfToken, body: { vista: siguiente } });
     }).catch(() => { setError("No se pudo guardar la última vista."); });
   }
+
+  // Conserva la vista de origen y su desplazamiento mientras se consultan recetas.
+  function abrirRecetas(foodId: string, origen: "meal-planning" | "food-catalog") {
+    desplazamientoOrigen.current = document.getElementById("workspace-content")?.scrollTop ?? 0;
+    setOrigenRecetas(origen);
+    setRecipeFoodId(foodId);
+    cambiarVista("recipes");
+  }
+
+  // Devuelve a la vista conservada y solicita restaurar su desplazamiento.
+  function volverDesdeRecetas() {
+    if (!origenRecetas) return;
+    restaurarDesplazamiento.current = true;
+    cambiarVista(origenRecetas);
+    setOrigenRecetas(null);
+  }
+
+  useLayoutEffect(() => {
+    if (!restaurarDesplazamiento.current) return;
+    const contenido = document.getElementById("workspace-content");
+    if (contenido && desplazamientoOrigen.current !== null) contenido.scrollTop = desplazamientoOrigen.current;
+    restaurarDesplazamiento.current = false;
+  }, [view]);
 
   const mealSessionExpired = useCallback(() => {
     setCurrentUser(null);
@@ -340,15 +366,16 @@ export default function App() {
       {screen === "app" && currentUser && (
         <AppWorkspace
           view={view}
-          onViewChange={(nextView) => { cambiarVista(nextView); if (nextView === "recipes") { setRecipeFoodId(null); setRecipeListReset((value) => value + 1); } setError(""); setNotice(""); }}
+          retainedView={origenRecetas}
+          onViewChange={(nextView) => { setOrigenRecetas(null); cambiarVista(nextView); if (nextView === "recipes") { setRecipeFoodId(null); setRecipeListReset((value) => value + 1); } setError(""); setNotice(""); }}
           disabled={loading}
           backups={<Backups csrfToken={csrfToken} onSessionExpired={mealSessionExpired} />}
           kitchenTips={<KitchenTips onSessionExpired={mealSessionExpired} />}
           sessionTools={<div className="session-tools"><div className="session-identity"><span className="session-avatar" aria-hidden="true">{currentUser.name.trim().charAt(0).toLocaleUpperCase("es")}</span><div><small>Tu cuenta</small><strong>{currentUser.name}</strong></div></div><button type="button" className="secondary sign-out" disabled={loading} onClick={() => void perform(signOut)}><AppIcon name="logout" />Cerrar sesión</button></div>}
           notifications={<>{error && <p className="message error" role="alert">{error}</p>}{notice && <p className="message success" role="status">{notice}</p>}</>}
-          mealPlanning={<MealPlanning csrfToken={csrfToken} onSessionExpired={mealSessionExpired} onOpenRecipes={(foodId) => { setRecipeFoodId(foodId); cambiarVista("recipes"); }} />}
-          foodCatalog={<FoodCatalog csrfToken={csrfToken} onSessionExpired={mealSessionExpired} onOpenRecipes={(foodId) => { setRecipeFoodId(foodId); cambiarVista("recipes"); }} />}
-          recipes={<Recipes key={recipeListReset} csrfToken={csrfToken} onSessionExpired={mealSessionExpired} initialFoodId={recipeFoodId} />}
+          mealPlanning={<MealPlanning csrfToken={csrfToken} onSessionExpired={mealSessionExpired} onOpenRecipes={(foodId) => abrirRecetas(foodId, "meal-planning")} />}
+          foodCatalog={<FoodCatalog csrfToken={csrfToken} onSessionExpired={mealSessionExpired} onOpenRecipes={(foodId) => abrirRecetas(foodId, "food-catalog")} />}
+          recipes={<Recipes key={recipeListReset} csrfToken={csrfToken} onSessionExpired={mealSessionExpired} initialFoodId={recipeFoodId} onBack={origenRecetas ? volverDesdeRecetas : undefined} />}
           productCatalog={<ProductCatalog onSearchProducts={searchShoppingProducts} onConsultarUso={async (id) => { const lista = await obtenerListaCompra(); return [...lista.items, ...(lista.purchased_items ?? [])].some((item) => item.product_id === id); }} onBorrarProducto={async (categoriaId, id) => { await borrarProductoCatalogo(categoriaId, id, csrfToken); }} onSessionExpired={mealSessionExpired} categories={shoppingCategories} cargandoCategorias={cargandoCategorias} errorCategorias={errorCategorias} onReintentarCategorias={() => setRevisionCategorias((actual) => actual + 1)} onCreateCategory={async (name, token) => { const category = await createShoppingCategory(name, csrfToken, token); setShoppingCategories((current) => [...current, category]); }} onCreateProduct={(id, name, token) => createShoppingProduct(id, name, csrfToken, token)} onGetProducts={async (id) => (await getShoppingProducts(id)).products} onUpdateCategoryImage={async (id, change) => { const updated = await updateShoppingCategoryImage(id, csrfToken, change); setShoppingCategories((current) => current.map((category) => category.id === id ? updated : category)); return updated; }} onUpdateProductImage={(categoryId, id, change) => updateShoppingProductImage(categoryId, id, csrfToken, change)} onImportImage={async (url) => (await apiRequest<{ data_url: string }>("/food-labels/images/import-url", { method: "POST", csrfToken, body: { url } })).data_url} onPrepareImage={async (dataUrl, crop) => (await apiRequest<{ image_token: string }>("/food-labels/images/prepare", { method: "POST", csrfToken, body: { data_url: dataUrl, crop } })).image_token} />}
           shoppingList={<ShoppingList onSearchProducts={async (query) => (await searchShoppingProducts(query)).products} mostrarAdministracion={false} onAbrirCatalogo={() => { cambiarVista("product-catalog"); }} categories={shoppingCategories} onGetProducts={async (categoryId) => (await getShoppingProducts(categoryId)).products} onCreateProduct={(categoryId, name, imageToken) => createShoppingProduct(categoryId, name, csrfToken, imageToken)} onUpdateCategoryImage={async (categoryId, change) => { const updated = await updateShoppingCategoryImage(categoryId, csrfToken, change); setShoppingCategories((current) => current.map((category) => category.id === categoryId ? updated : category)); return updated; }} onUpdateProductImage={(categoryId, productId, change) => updateShoppingProductImage(categoryId, productId, csrfToken, change)} onImportImage={async (url) => (await apiRequest<{ data_url: string }>("/food-labels/images/import-url", { method: "POST", csrfToken, body: { url } })).data_url} onPrepareImage={async (dataUrl, crop) => (await apiRequest<{ image_token: string }>("/food-labels/images/prepare", { method: "POST", csrfToken, body: { data_url: dataUrl, crop } })).image_token} onAddToShoppingList={(productoId, cantidad, unidad, texto, observacion) => agregarProductoListaCompra(productoId, cantidad, unidad, csrfToken, texto, observacion)} onUpdateShoppingItem={(id, cambio) => actualizarCantidadCompra(id, cambio, csrfToken)} onGetShoppingList={obtenerListaCompra} onMarkRecipeIngredient={(id) => marcarIngredienteReceta(id, csrfToken)} onUnmarkRecipeIngredient={(id) => desmarcarIngredienteReceta(id, csrfToken)} onDeleteRecipeIngredient={(id) => eliminarIngredienteReceta(id, csrfToken)} onDeleteRecipeSection={(id) => eliminarSeccionReceta(id, csrfToken)} onMarkPurchased={(itemId) => marcarProductoComprado(itemId, csrfToken)} onUnmarkPurchased={(itemId) => desmarcarProductoComprado(itemId, csrfToken)} onDeleteItem={(itemId) => eliminarEntradaListaCompra(itemId, csrfToken)} onCreateCategory={async (name, imageToken) => {
             try {

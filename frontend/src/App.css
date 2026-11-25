@@ -536,6 +536,7 @@ button.today-button-fixed { position: fixed; right: max(1rem, env(safe-area-inse
 .recipe-page .recipe-categories .link-button { width: auto; min-height: 0; margin: 0; padding: .35rem .65rem; border: 1px solid #dce8ec; border-radius: 999px; background: #f2f8f6; text-decoration: none; }
 .recipe-page .recipe-actions { display: flex; flex-wrap: wrap; gap: .8rem; margin-top: 1.25rem; }
 .recipe-page > header { display:flex; align-items:center; justify-content:space-between; gap:1rem; }
+.recipe-header-actions { display: flex; align-items: center; gap: .5rem; }
 .recipe-page form { max-width:760px; }
 .recipe-page textarea { display:block; width:100%; margin-top:.4rem; padding:.75rem; border:1px solid var(--color-border); border-radius:.65rem; font:inherit; resize:vertical; }
 .recipe-page fieldset label { display:flex; align-items:center; gap:.5rem; }
@@ -543,7 +544,7 @@ button.today-button-fixed { position: fixed; right: max(1rem, env(safe-area-inse
 .recipe-copy { white-space:pre-wrap; }
 .recipe-image { display:block; width:min(100%,360px); aspect-ratio:1; object-fit:cover; border-radius:.8rem; }
 .food-recipes-link { display:block; width:100%; min-height:0; margin:.35rem 0; padding:.15rem; color:inherit; font-weight:700; text-align:left; }
-.meal-recipe-link { min-height:0; padding:0; color:inherit; font:inherit; text-align:left; }
+button.meal-recipe-link { min-height:0; padding:0; color:inherit; font:inherit; text-align:left; text-decoration:none; }
 .food-card-open { display:flex; width:100%; min-height:0; flex-direction:column; align-items:stretch; gap:.35rem; padding:0; border:0; color:inherit; background:transparent; text-align:left; }
 span.meal-thumbnail[role="button"] { cursor:pointer; }
 span.meal-thumbnail[role="button"]:focus-visible { outline:3px solid #00854a; outline-offset:2px; }
@@ -799,6 +800,28 @@ button.today-button { display: inline-flex; align-items: center; gap: .4rem; }
 
 @media (max-width: 310px) {
   .single-meal .week-grid .meal-thumbnail { width: 30px; }
+}
+
+/* Unifica la cabecera móvil y reduce el espacio de los títulos de cada vista. */
+@media (max-width: 600px) {
+  .app-workspace > .app-sidebar { padding: .2rem .7rem; }
+  .app-workspace .brand-mark { width: 29px; height: 32px; }
+  .app-workspace .app-brand h1 { max-width: none; font-size: 1.05rem; }
+  .app-workspace .mobile-menu-toggle { min-width: 44px; min-height: 44px; }
+  .app-workspace > .workspace-content { padding: .35rem .65rem 1rem; }
+  .workspace-content .panel, .workspace-content .food-catalog-panel { padding: .75rem; }
+  .food-catalog-heading, .catalogo-cabecera { flex-direction: row; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: .65rem; }
+  .food-catalog-heading > div, .catalogo-cabecera > div { min-width: 0; flex: 1 1 12rem; }
+  .food-catalog-heading h1, .recipe-page h1, .compra-cabecera h2,
+  .catalogo-cabecera h2, .copias-pagina > .panel > header h2,
+  .kitchen-tips-panel > header h2, .dashboard > .panel > h2 {
+    margin: 0; font-size: 1.35rem; line-height: 1.2;
+  }
+  .food-catalog-heading p, .catalogo-cabecera p, .copias-pagina > .panel > header p,
+  .kitchen-tips-panel > header p, .dashboard > .panel > h2 + p, .dashboard > .panel > p.eyebrow { margin: .25rem 0; font-size: .85rem; }
+  .catalogo-cabecera-contenido .catalogo-busqueda { margin-top: .5rem; }
+  .recipe-page > header, .compra-cabecera { gap: .5rem; margin-bottom: .65rem; }
+  .recipe-page > header h1 { min-width: 0; overflow-wrap: anywhere; }
 }
 
 /* Mantiene los accesos móviles al alcance sin cubrir el contenido ni el botón Hoy. */

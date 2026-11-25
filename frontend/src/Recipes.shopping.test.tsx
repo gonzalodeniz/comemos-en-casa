@@ -7,6 +7,44 @@ import Recipes from "./Recipes";
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
+// Verifica que el icono del detalle devuelve al listado de recetas.
+it("vuelve al listado desde el icono del detalle", async () => {
+  vi.stubGlobal("fetch", vi.fn((entrada: RequestInfo | URL) => Promise.resolve(new Response(JSON.stringify(String(entrada).endsWith("/food-labels") ? { labels: [] } : { recipes: [{ id: "1", title: "Sopa", image_url: null, ingredients: null, preparation: null, foods: [] }] })))));
+  const usuario = userEvent.setup();
+  render(<Recipes csrfToken="token-csrf" onSessionExpired={vi.fn()} />);
+  await usuario.click(await screen.findByRole("button", { name: "Sopa" }));
+  const boton = screen.getByRole("button", { name: "Volver al listado" });
+  expect(boton.querySelector("svg")).not.toBeNull();
+  expect(boton.textContent).toBe("");
+  expect(boton.parentElement?.firstElementChild).toBe(screen.getByRole("heading", { name: "Sopa" }));
+  await usuario.click(boton);
+  expect(await screen.findByRole("button", { name: "Sopa" })).toBeTruthy();
+});
+
+// Comprueba que volver solo aparece cuando se proporciona un destino de origen.
+it("muestra el icono de retorno antes de crear una receta", async () => {
+  vi.stubGlobal("fetch", vi.fn((entrada: RequestInfo | URL) => Promise.resolve(new Response(JSON.stringify(String(entrada).endsWith("/food-labels") ? { labels: [] } : { recipes: [] })))));
+  const volver = vi.fn();
+  const usuario = userEvent.setup();
+  render(<Recipes csrfToken="token-csrf" onSessionExpired={vi.fn()} onBack={volver} />);
+  const boton = screen.getByRole("button", { name: "Volver" });
+  expect(boton.nextElementSibling).toBe(screen.getByRole("button", { name: "Nueva receta" }));
+  await usuario.click(boton);
+  expect(volver).toHaveBeenCalledOnce();
+});
+
+// Comprueba que el icono accesible abre el formulario de creación.
+it("abre una receta nueva mediante el icono", async () => {
+  vi.stubGlobal("fetch", vi.fn((entrada: RequestInfo | URL) => Promise.resolve(new Response(JSON.stringify(String(entrada).endsWith("/food-labels") ? { labels: [] } : { recipes: [] })))));
+  const usuario = userEvent.setup();
+  render(<Recipes csrfToken="token-csrf" onSessionExpired={vi.fn()} />);
+  const boton = screen.getByRole("button", { name: "Nueva receta" });
+  expect(boton.querySelector("svg")).not.toBeNull();
+  expect(boton.textContent).toBe("");
+  await usuario.click(boton);
+  expect(screen.getByRole("heading", { name: "Nueva receta" })).toBeTruthy();
+});
+
 it("añade la receta seleccionada a la lista de la compra", async () => {
   let terminar!: (respuesta: Response) => void;
   const peticion = vi.fn((entrada: RequestInfo | URL, _opciones?: RequestInit) => {

@@ -34,10 +34,10 @@ export default function CalendarDay({ date, weekday, today, outsideMonth = false
             <div className={`meal-slot ${assignment ? "planned" : "unplanned"}`}>
               <MealThumbnail name={assignment?.label.name ?? "Sin planificar"} imageUrl={assignment?.label.image_url} onOpen={assignment ? () => onOpenRecipes(assignment.label.id) : undefined} />
               <span className="meal-details">{!compact && visibleSlot === "both" && <span className="etiqueta-comida-movil">{SLOT_LABELS[slot]}</span>}<strong>{assignment ? <button type="button" className="link-button meal-recipe-link" onClick={() => onOpenRecipes(assignment.label.id)}>{assignment.label.name}</button> : "Sin planificar"}</strong>{compact && assignment && <span className={`meal-card-status ${slot}`}>{SLOT_LABELS[slot]}</span>}</span>
+              {assignment?.reminder && <span className="meal-reminder" role="img" aria-label="Recordatorio activado" title="Recordatorio activado"><AppIcon name="bell" /></span>}
               <button type="button" className="meal-edit" disabled={disabled}
                 aria-label={`${assignment ? "Editar" : "Añadir"} ${SLOT_LABELS[slot].toLowerCase()} del ${formatDateLabel(date, { dateStyle: "full" })}`}
                 title={assignment ? "Editar comida" : "Añadir comida"} onClick={() => onEdit(date, slot)}><AppIcon name={assignment ? "edit" : "plus"} /></button>
-              {assignment?.reminder && <span className="meal-reminder" role="img" aria-label="Recordatorio activado" title="Recordatorio activado"><AppIcon name="bell" /></span>}
             </div>
             {assignment && <button type="button" className="meal-delete" disabled={disabled}
               aria-label={`Eliminar ${SLOT_LABELS[slot].toLowerCase()} del ${formatDateLabel(date, { dateStyle: "full" })}: ${assignment.label.name}`}

@@ -11,6 +11,10 @@ Verificados en esta adaptación: `make help`, `cd frontend && npm test` (229 pru
 ## Agentes locales
 
 Para iniciar una sesión se necesita Codex CLI, `flock` y Python 3.11 o posterior. Pasa la tarea como un único argumento entre comillas. Si omites el rol, se usa `orquestador`.
+El lanzador aplica el modelo y esfuerzo configurados en el TOML del rol, tanto en modo interactivo como automático.
+
+- Para una ejecución puntual: `./scripts/orquestador.sh --modelo gpt-6-luna --esfuerzo high security-auditor`. Se pueden especificar ambas opciones o solo una; la otra conserva el valor del rol. Las opciones van antes del rol.
+- La validación utiliza `${CODEX_HOME:-~/.codex}/models_cache.json`: muestra los modelos visibles y sus esfuerzos si la combinación no es válida. Es una caché local que puede estar desactualizada y no garantiza acceso actual; si falta o es ilegible, la selección puntual se detiene sin iniciar Codex. Actualiza la caché mediante Codex y vuelve a intentarlo.
 
 - `./scripts/orquestador.sh --list`: muestra los roles disponibles.
 - `./scripts/orquestador.sh <rol> "<tarea>"`: inicia Codex interactivo con las instrucciones del rol como contexto del agente principal.

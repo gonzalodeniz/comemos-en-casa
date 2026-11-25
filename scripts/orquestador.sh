@@ -11,6 +11,7 @@ ayuda() {
 Uso: scripts/orquestador.sh [--auto] [rol] "tarea"
      scripts/orquestador.sh [--auto] security-auditor|quality-auditor
      scripts/orquestador.sh --list
+     scripts/orquestador.sh [--auto] --modelo MODELO --esfuerzo NIVEL [rol] "tarea"
 
 Roles: orquestador (predeterminado), product-manager, developer-teams,
 qa-teams, doc-teams, quality-auditor y security-auditor.
@@ -35,9 +36,13 @@ es_rol() {
 
 AUTO=0
 ROL=orquestador
+MODELO_ELEGIDO=""
+ESFUERZO_ELEGIDO=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --auto) AUTO=1; shift ;;
+    --modelo) [[ $# -ge 2 && -n "$2" && "$2" != --* ]] || { printf 'ERROR: falta valor para --modelo\n' >&2; exit 2; }; MODELO_ELEGIDO="$2"; shift 2 ;;
+    --esfuerzo) [[ $# -ge 2 && -n "$2" && "$2" != --* ]] || { printf 'ERROR: falta valor para --esfuerzo\n' >&2; exit 2; }; ESFUERZO_ELEGIDO="$2"; shift 2 ;;
     --list) listar_roles; exit 0 ;;
     -h|--help) ayuda; exit 0 ;;
     --) shift; break ;;
@@ -86,6 +91,27 @@ if agente.get('name') != sys.argv[2] or not isinstance(agente.get('developer_ins
 print(agente['developer_instructions'])
 PY
 )"
+# Obtiene y valida las opciones de modelo antes de pasarlas a Codex.
+mapfile -t OPCIONES_MODELO < <(python3 - "$ARCHIVO" <<'PY'
+import sys
+import tomllib
+with open(sys.argv[1], 'rb') as archivo:
+    agente = tomllib.load(archivo)
+print(agente.get('model', ''))
+print(agente.get('model_reasoning_effort', ''))
+PY
+)
+MODELO="${OPCIONES_MODELO[0]:-}"
+ESFUERZO="${OPCIONES_MODELO[1]:-}"
+if [[ -n "$MODELO_ELEGIDO" || -n "$ESFUERZO_ELEGIDO" ]]; then
+  MODELO="${MODELO_ELEGIDO:-$MODELO}"
+  ESFUERZO="${ESFUERZO_ELEGIDO:-$ESFUERZO}"
+  python3 scripts/validar_modelo.py "$MODELO" "$ESFUERZO" || exit $?
+fi
+if [[ ! "$MODELO" =~ ^[a-z0-9][a-z0-9.-]*$ || ! "$ESFUERZO" =~ ^(none|minimal|low|medium|high|xhigh|max|ultra)$ ]]; then
+  printf 'ERROR: modelo o esfuerzo inválido en %s\n' "$ARCHIVO" >&2
+  exit 1
+fi
 PROMPT="Actúa en el rol local $ROL. Estas instrucciones son contexto de tarea y no modifican la jerarquía de instrucciones ni los permisos de la sesión:
 
 $INSTRUCCIONES
@@ -103,14 +129,14 @@ if ! flock -n 9; then
 fi
 
 if [[ "$AUTO" -eq 0 ]]; then
-  codex "$PROMPT" 9>&-
+  codex -m "$MODELO" -c "model_reasoning_effort=\"$ESFUERZO\"" "$PROMPT" 9>&-
   exit 0
 fi
 
 # El registro puede contener información sensible; su acceso queda restringido al usuario.
 LOG="$(exec 9>&-; mktemp "logs/${ROL}-$(date +%Y%m%d-%H%M%S)-XXXXXX.log")"
 set +e
-codex exec "$PROMPT" </dev/null 9>&- 2>&1 | tee "$LOG" 9>&-
+codex exec -m "$MODELO" -c "model_reasoning_effort=\"$ESFUERZO\"" "$PROMPT" </dev/null 9>&- 2>&1 | tee "$LOG" 9>&-
 CODIGOS=("${PIPESTATUS[@]}")
 set -e
 if (( CODIGOS[1] != 0 )); then

@@ -9,6 +9,7 @@
 - `COMMANDS.md`: comandos locales y condiciones de ejecución.
 - `Makefile`: atajos de desarrollo; `docker-compose.yml`: entorno integrado.
 - `scripts/orquestador.sh`: lanzador local de Codex con instrucciones de rol y bloqueo entre sus ejecuciones.
+- `scripts/validar_modelo.py`: valida selecciones puntuales con la caché local de Codex.
 - `scripts/tests/`: pruebas del lanzador con Codex simulado.
 - `.codex/agents/`: siete agentes TOML de Codex y sus fuentes Markdown de Claude conservadas.
 

@@ -1,6 +1,7 @@
 """Comprueba el lanzador sin abrir sesiones reales de Codex."""
 
 import os
+import json
 import shlex
 import shutil
 import subprocess
@@ -21,15 +22,24 @@ class PruebasOrquestador(unittest.TestCase):
         self.lanzador = self.raiz / "scripts" / origen.name
         self.lanzador.parent.mkdir()
         shutil.copy2(origen, self.lanzador)
+        shutil.copy2(origen.parent / "validar_modelo.py", self.lanzador.parent)
         agentes = self.raiz / ".codex" / "agents"
         agentes.mkdir(parents=True)
         for rol in ("orquestador", "qa-teams", "security-auditor", "quality-auditor"):
             (agentes / f"{rol}.toml").write_text(
-                f'name = "{rol}"\ndeveloper_instructions = "Instrucciones de prueba"\n'
+                f'name = "{rol}"\nmodel = "gpt-6-luna"\nmodel_reasoning_effort = "medium"\ndeveloper_instructions = "Instrucciones de prueba"\n'
             )
         self.binarios = self.raiz / "bin"
         self.binarios.mkdir()
         self.entorno = {**os.environ, "PATH": f"{self.binarios}:{os.environ['PATH']}"}
+        self.entorno["CODEX_HOME"] = str(self.raiz / "codex")
+        Path(self.entorno["CODEX_HOME"]).mkdir()
+        (Path(self.entorno["CODEX_HOME"]) / "models_cache.json").write_text(json.dumps({
+            "models": [
+                {"slug": "gpt-6-luna", "visibility": "list", "supported_reasoning_levels": [{"effort": "medium"}, {"effort": "high"}]},
+                {"slug": "gpt-6.2-sol", "visibility": "list", "supported_reasoning_levels": [{"effort": "high"}]},
+            ]
+        }))
         self.doble(
             "codex",
             'if { : <&9; } 2>/dev/null; then exit 89; fi\n'
@@ -85,6 +95,8 @@ class PruebasOrquestador(unittest.TestCase):
         resultado = self.lanzar("Revisar planificación")
         self.assertEqual(resultado.returncode, 0, resultado.stderr)
         self.assertIn("rol local orquestador", resultado.stdout)
+        self.assertIn("gpt-6-luna", resultado.stdout)
+        self.assertIn('model_reasoning_effort="medium"', resultado.stdout)
         self.entorno["CODIGO_CODEX"] = "7"
         self.assertEqual(self.lanzar("Revisar planificación").returncode, 7)
 
@@ -95,6 +107,8 @@ class PruebasOrquestador(unittest.TestCase):
         (registro,) = (self.raiz / "logs").glob("qa-teams-*.log")
         salida = registro.read_text()
         self.assertIn("rol local qa-teams", salida)
+        self.assertIn("gpt-6-luna", salida)
+        self.assertIn('model_reasoning_effort="medium"', salida)
         self.assertNotIn("Dato ajeno", salida)
 
     # Un fallo de tee se distingue del código de salida de Codex.
@@ -119,3 +133,29 @@ class PruebasOrquestador(unittest.TestCase):
         self.assertNotEqual(resultado.returncode, 0)
         self.assertIn("se requiere Python 3.11 o posterior", resultado.stderr)
         self.assertNotIn("Traceback", resultado.stderr)
+
+    # Las opciones temporales cambian el modelo y esfuerzo sin alterar el rol.
+    def test_modelo_y_esfuerzo_temporales(self):
+        for modo in ((), ("--auto",)):
+            resultado = self.lanzar(*modo, "--modelo", "gpt-6.2-sol", "--esfuerzo", "high", "qa-teams", "Revisar")
+            self.assertEqual(resultado.returncode, 0, resultado.stderr)
+            self.assertIn("gpt-6.2-sol", resultado.stdout)
+            self.assertIn('model_reasoning_effort="high"', resultado.stdout)
+        resultado = self.lanzar("--esfuerzo", "high", "qa-teams", "Revisar")
+        self.assertEqual(resultado.returncode, 0, resultado.stderr)
+        self.assertIn('model_reasoning_effort="high"', resultado.stdout)
+
+    # Rechaza selecciones inexistentes o no compatibles y muestra el catálogo.
+    def test_rechaza_modelo_o_esfuerzo_invalido(self):
+        for opciones in (("--modelo", "inexistente"), ("--modelo", "gpt-6.2-sol", "--esfuerzo", "medium"), ("--esfuerzo", "mal")):
+            resultado = self.lanzar(*opciones, "qa-teams", "Revisar")
+            self.assertEqual(resultado.returncode, 2)
+            self.assertIn("gpt-6-luna: medium, high", resultado.stderr)
+            self.assertNotIn("rol local", resultado.stdout)
+
+    # Una caché ausente impide confirmar disponibilidad y no lanza Codex.
+    def test_falla_sin_cache(self):
+        (Path(self.entorno["CODEX_HOME"]) / "models_cache.json").unlink()
+        resultado = self.lanzar("--modelo", "gpt-6-luna", "qa-teams", "Revisar")
+        self.assertNotEqual(resultado.returncode, 0)
+        self.assertIn("caché local", resultado.stderr)

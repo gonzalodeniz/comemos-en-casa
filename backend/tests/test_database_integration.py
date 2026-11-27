@@ -8,6 +8,7 @@ import subprocess
 import sys
 import threading
 from collections import Counter
+from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
@@ -32,6 +33,29 @@ from app.auth import allow_password_reset_request, increment_failure_bucket, pas
 from app.security import digest_rate_limit_key, digest_token
 
 
+@pytest.fixture(scope="module", autouse=True)
+def clientes_en_bucle_compartido():
+    """Ejecuta los clientes concurrentes en el mismo bucle de la aplicación ASGI."""
+    global TestClient
+    if os.getenv("RUN_DB_INTEGRATION") != "1":
+        yield
+        return
+    cliente_original = TestClient
+    with cliente_original(app) as servidor:
+        class ClienteConcurrente(cliente_original):
+            """Conserva cookies independientes y comparte el portal del servidor."""
+            @contextmanager
+            def _portal_factory(self):
+                """Utiliza el bucle de eventos del servidor durante cada petición."""
+                yield servidor.portal
+
+        TestClient = ClienteConcurrente
+        try:
+            yield
+        finally:
+            TestClient = cliente_original
+
+
 @pytest.mark.skipif(
     os.getenv("RUN_DB_INTEGRATION") != "1",
     reason="requires an isolated PostgreSQL instance and an applied migration",
@@ -49,7 +73,7 @@ def test_database_is_ready_and_latest_migration_is_applied():
         check=False,
     )
     assert migration.returncode == 0, migration.stderr
-    assert "0022_category_name_unique (head)" in migration.stdout
+    assert "0025_notification_preferences (head)" in migration.stdout
 
 
 @pytest.mark.skipif(
@@ -1097,7 +1121,7 @@ def test_postgresql_repeated_operation_rolls_back_all_rows_on_mid_batch_failure(
     os.getenv("RUN_DB_INTEGRATION") != "1",
     reason="requires a fresh, isolated PostgreSQL database with migrations applied",
 )
-def test_postgresql_repeated_delete_removes_only_exact_label_occurrences(
+def test_postgresql_repeated_delete_removes_all_occupied_occurrences(
     meal_integration_cleanup,
 ):
     cleanup = meal_integration_cleanup
@@ -1142,14 +1166,14 @@ def test_postgresql_repeated_delete_removes_only_exact_label_occurrences(
             cleanup=cleanup,
         )
         assert response.status_code == 200, response.text
-        assert response.json()["changed_dates"] == [dates[0].isoformat(), dates[2].isoformat()]
+        assert response.json()["changed_dates"] == [fecha.isoformat() for fecha in dates]
         with Session(engine) as session:
             rows = session.scalars(
                 select(MealAssignment).where(
                     MealAssignment.date.in_(dates), MealAssignment.slot == "dinner"
                 )
             ).all()
-            assert [(row.date, row.label_id) for row in rows] == [(dates[1], labels["pescado"])]
+            assert rows == []
     finally:
         cleanup.cleanup()
 

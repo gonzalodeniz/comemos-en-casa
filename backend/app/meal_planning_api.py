@@ -638,6 +638,9 @@ async def apply_meal_planning_operation(
                         aviso_actual = (current.reminder_days, current.reminder_time, current.reminder_message)
                         if current.label_id != label_id or aviso_actual != valores_aviso:
                             changed_dates.append(occurrence.isoformat())
+                            # Una nueva hora futura programa otro envío; editar el texto no lo duplica.
+                            if reminder is not None and aviso_actual[:2] != valores_aviso[:2]:
+                                current.reminder_sent_at = None
                             current.label_id = label_id
                             current.reminder_days, current.reminder_time, current.reminder_message = valores_aviso
                 elif current is not None and (operation.repeat is not None or current.label_id == label_id):

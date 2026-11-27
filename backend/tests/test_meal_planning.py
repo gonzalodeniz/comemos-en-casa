@@ -415,6 +415,48 @@ def test_envio_recordatorio_a_todos_los_usuarios_activos(meal_database, monkeypa
     assert api.deliver_due_meal_reminders(datetime(2026, 11, 2, 18, 1, tzinfo=timezone.utc)) == 0
     assert len(envios) == 2
 
+def test_reprograma_push_para_el_27_de_noviembre_tras_un_envio(meal_database, monkeypatch):
+    """Guarda y reprograma desde la API un aviso del mismo día, sin abrir la aplicación."""
+    import app.meal_planning_api as api
+    from app.models import PushSubscription, User
+
+    fecha = date(2026, 11, 27)
+    ahora = datetime(2026, 11, 27, 18, 40, tzinfo=timezone.utc)
+
+    class Reloj(datetime):
+        """Permite avanzar el reloj del guardado de forma controlada."""
+        @classmethod
+        def now(cls, tz=None):
+            return ahora.astimezone(tz)
+
+    cookies = authenticate(meal_database)
+    pescado, _ = seed_labels(meal_database)
+    with meal_database() as db:
+        usuario = db.scalar(select(User))
+        usuario.recordatorios_correo = False
+        usuario.recordatorios_push = True
+        db.add(PushSubscription(user_id=usuario.id, endpoint="https://fcm.googleapis.com/fcm/send/viernes", p256dh="clave", auth="secreto"))
+        db.add(MealAssignment(date=fecha, slot="lunch", label_id=pescado.id))
+        db.commit()
+    envios = []
+    monkeypatch.setattr(api, "datetime", Reloj)
+    monkeypatch.setattr(api, "SessionFactory", meal_database)
+    monkeypatch.setattr(api, "enviar_recordatorio_push", lambda *args: envios.append(args))
+    operacion = {"action": "assign", "start_date": fecha.isoformat(), "slot": "lunch", "label_id": str(pescado.id)}
+    for minuto in (45, 50):
+        alerta = {"days_before": 0, "send_time": f"18:{minuto}", "message": f"Preparar pescado a las 18:{minuto}"}
+        respuesta = post_with_session("/api/v1/meal-planning/operations", {**operacion, "reminder": alerta}, cookies)
+        assert respuesta.status_code == 200
+        assert api.deliver_due_meal_reminders(ahora) == 0
+        ahora = datetime(2026, 11, 27, 18, minuto, tzinfo=timezone.utc)
+        assert api.deliver_due_meal_reminders(ahora) == 1
+        assert api.deliver_due_meal_reminders(ahora) == 0
+    assert [envio[3:] for envio in envios] == [
+        ("Preparar pescado a las 18:45", pescado.name, fecha),
+        ("Preparar pescado a las 18:50", pescado.name, fecha),
+    ]
+
+
 def test_envio_programado_push_respeta_preferencias_y_cuentas_activas(meal_database, monkeypatch):
     """Envía push a los dispositivos de cuentas activas con ese canal habilitado."""
     import app.meal_planning_api as api
@@ -694,8 +736,8 @@ def test_no_envia_aviso_al_borrar_comida(meal_database, monkeypatch):
     assert api.deliver_due_meal_reminders(datetime(2099, 11, 7, 18, 0, tzinfo=timezone.utc)) == 0
     assert not envios
 
-# Comprueba que editar un recordatorio ya enviado no lo vuelve a enviar.
-def test_no_reenvia_aviso_ya_enviado_al_editarlo(meal_database, monkeypatch):
+# Comprueba que editar solo el mensaje no vuelve a enviar un recordatorio.
+def test_no_reenvia_aviso_ya_enviado_al_editar_mensaje(meal_database, monkeypatch):
     import app.meal_planning_api as api
     cookies = authenticate(meal_database)
     pescado, _ = seed_labels(meal_database)
@@ -706,7 +748,7 @@ def test_no_reenvia_aviso_ya_enviado_al_editarlo(meal_database, monkeypatch):
     envios = []
     monkeypatch.setattr(api, "send_meal_reminder_email", lambda *args: envios.append(args))
     assert api.deliver_due_meal_reminders(datetime(2099, 11, 7, 12, 0, tzinfo=timezone.utc)) == 1
-    operacion = {"action":"assign", "start_date":"2099-11-08", "slot":"lunch", "label_id":str(pescado.id), "reminder":{"days_before":1,"send_time":"18:00","message":"Modificado"}}
+    operacion = {"action":"assign", "start_date":"2099-11-08", "slot":"lunch", "label_id":str(pescado.id), "reminder":{"days_before":1,"send_time":"12:00","message":"Modificado"}}
     assert post_with_session("/api/v1/meal-planning/operations", operacion, cookies).status_code == 200
     assert api.deliver_due_meal_reminders(datetime(2099, 11, 7, 18, 0, tzinfo=timezone.utc)) == 0
     assert len(envios) == 1

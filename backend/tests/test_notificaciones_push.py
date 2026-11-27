@@ -52,5 +52,6 @@ def test_envio_push_cifra_el_contenido_y_no_sigue_redirecciones(monkeypatch):
     _, opciones = peticiones[0]
     assert opciones["allow_redirects"] is False
     assert opciones["headers"]["content-encoding"] == "aes128gcm"
+    assert opciones["headers"]["ttl"] == "900"
     assert "vapid" in opciones["headers"]["authorization"].lower()
     assert b"Sacar pollo" not in opciones["data"]

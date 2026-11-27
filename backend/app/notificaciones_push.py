@@ -6,6 +6,9 @@ from datetime import date
 import requests
 from pywebpush import webpush
 
+# Limita la entrega tardía si el dispositivo no está disponible de inmediato.
+VIGENCIA_PUSH_SEGUNDOS = 15 * 60
+
 
 class SesionSinRedirecciones(requests.Session):
     """Impide que un servicio push redirija la petición a otro destino."""
@@ -21,7 +24,7 @@ def enviar_push(endpoint: str, p256dh: str, auth: str, titulo: str, mensaje: str
     contacto = os.environ["PUSH_CONTACT"]
     datos = json.dumps({"titulo": titulo, "mensaje": mensaje}, ensure_ascii=False)
     with SesionSinRedirecciones() as sesion:
-        webpush(subscription_info={"endpoint": endpoint, "keys": {"p256dh": p256dh, "auth": auth}}, data=datos, vapid_private_key=clave, vapid_claims={"sub": contacto}, timeout=10, requests_session=sesion)
+        webpush(subscription_info={"endpoint": endpoint, "keys": {"p256dh": p256dh, "auth": auth}}, data=datos, vapid_private_key=clave, vapid_claims={"sub": contacto}, timeout=10, ttl=VIGENCIA_PUSH_SEGUNDOS, requests_session=sesion)
 
 
 def enviar_recordatorio_push(endpoint: str, p256dh: str, auth: str, mensaje: str, comida: str, fecha: date) -> None:

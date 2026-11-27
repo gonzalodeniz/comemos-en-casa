@@ -107,8 +107,8 @@ Al asignar, sustituir o eliminar una etiqueta, el usuario puede aplicar la opera
 2. Si se activa, el usuario elige un intervalo entero positivo de semanas.
 3. La operación parte de la fecha seleccionada y revisa las fechas coincidentes con el mismo día de la semana y la misma franja.
 4. El usuario elige una fecha final entre el inicio y el máximo anual de RN-09, ambos incluidos. Rigen las mismas reglas de CA-05: final inclusivo solo si coincide con una repetición, inicio igual a final válido, rechazo de finales anteriores al inicio o superiores al máximo, y cálculo desde el inicio aunque esté en el pasado.
-5. En cada fecha coincidente se elimina la asignación solo si contiene exactamente la misma etiqueta que se está borrando en la fecha inicial.
-6. Si una fecha coincidente está vacía o contiene otra etiqueta, no se modifica.
+5. En cada fecha coincidente se elimina la asignación existente, aunque contenga una etiqueta diferente a la inicial.
+6. Si una fecha coincidente está vacía, no se modifica.
 7. Antes de guardar, el sistema informa del intervalo y de las asignaciones que serán eliminadas.
 8. El borrado repetido actúa sobre las asignaciones existentes en el momento de la operación y no crea una regla que afecte a asignaciones añadidas posteriormente.
 9. Cancelar la confirmación no elimina ninguna asignación.
@@ -152,7 +152,7 @@ Al asignar, sustituir o eliminar una etiqueta, el usuario puede aplicar la opera
 
 **RN-11.** Una asignación o sustitución repetida reemplaza cualquier etiqueta existente en las fechas y franjas coincidentes.
 
-**RN-12.** Una eliminación repetida solo borra asignaciones cuya etiqueta coincida exactamente con la etiqueta seleccionada inicialmente.
+**RN-12.** Una eliminación repetida borra las asignaciones existentes en las fechas y la franja seleccionadas, con independencia de su etiqueta.
 
 **RN-13.** Una eliminación repetida no constituye una regla permanente y no afecta a asignaciones creadas después de ejecutarla.
 
@@ -232,11 +232,11 @@ Al asignar, sustituir o eliminar una etiqueta, el usuario puede aplicar la opera
 **cuando** el usuario elimina «Carne» y repite el borrado cada dos semanas,  
 **entonces** se elimina «Carne» de los almuerzos coincidentes hasta la fecha final elegida, incluida si coincide, dentro del máximo anual de RN-09.
 
-### Escenario 12 — No borrar una etiqueta diferente
+### Escenario 12 — Borrar una etiqueta diferente en una fecha coincidente
 
 **Dado** que el usuario repite el borrado de «Carne» y una fecha coincidente contiene «Pescado»,  
 **cuando** se ejecuta la operación,  
-**entonces** «Pescado» permanece sin cambios.
+**entonces** se elimina también la asignación de «Pescado».
 
 ### Escenario 13 — No aplicar el borrado a cambios futuros
 
@@ -316,7 +316,7 @@ Al asignar, sustituir o eliminar una etiqueta, el usuario puede aplicar la opera
 - Aceptar inicio y final iguales, rechazar finales fuera del intervalo válido y no imponer una restricción basada en hoy para la planificación histórica.
 - Ejecutar de forma transaccional las asignaciones, sustituciones y eliminaciones repetidas para evitar resultados parciales.
 - Informar antes de una sustitución repetida qué asignaciones existentes serán reemplazadas.
-- Al repetir un borrado, filtrar por fecha, franja y etiqueta exacta.
+- Al repetir un borrado, filtrar por fecha y franja.
 - Aplicar una política de «última escritura prevalece» cuando dos usuarios modifiquen la misma fecha y franja.
 - Usar fechas locales para los días planificados y mantener los cálculos consistentes con la zona horaria IANA `Atlantic/Canary`.
 
@@ -335,7 +335,7 @@ Al asignar, sustituir o eliminar una etiqueta, el usuario puede aplicar la opera
 - [ ] Cancelar una confirmación individual o repetida no modifica la planificación.
 - [ ] Las asignaciones repetidas se guardan como copias independientes.
 - [ ] Una sustitución repetida reemplaza las etiquetas coincidentes existentes.
-- [ ] Un borrado repetido solo elimina la misma etiqueta.
+- [ ] Un borrado repetido elimina las asignaciones existentes en las fechas y la franja seleccionadas, aunque tengan etiquetas diferentes.
 - [ ] La planificación es compartida y está protegida mediante autenticación.
 - [ ] Se han probado cambios de mes, año, límite anual y edición concurrente.
 - [ ] La funcionalidad y los criterios de aceptación están documentados.

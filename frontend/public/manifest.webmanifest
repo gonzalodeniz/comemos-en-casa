@@ -1,0 +1,10 @@
+{
+  "name": "Comemos en casa",
+  "start_url": "/comemos/",
+  "scope": "/comemos/",
+  "display": "standalone",
+  "icons": [
+    { "src": "/comemos/icono-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/comemos/icono-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

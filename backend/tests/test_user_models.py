@@ -16,6 +16,25 @@ from sqlalchemy.orm import Session
 from app.models import Base, FoodLabel, MealAssignment, User
 
 
+def test_existing_users_keep_email_only_after_notification_migration(monkeypatch):
+    """Conserva el correo para las cuentas anteriores a la migración."""
+    import importlib
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+    from sqlalchemy import text
+
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    with engine.begin() as connection:
+        connection.execute(text("CREATE TABLE users (id INTEGER PRIMARY KEY)"))
+        connection.execute(text("INSERT INTO users (id) VALUES (1)"))
+        migration = importlib.import_module("migrations.versions.0025_notification_preferences")
+        monkeypatch.setattr(migration, "op", Operations(MigrationContext.configure(connection)))
+        migration.upgrade()
+        row = connection.execute(text("SELECT recordatorios_correo, recordatorios_push FROM users WHERE id = 1")).one()
+        assert tuple(row) == (1, 0)
+    engine.dispose()
+
+
 def test_user_last_view_is_persisted():
     """Comprueba que la última vista pertenece al usuario y se conserva."""
     engine = create_engine("sqlite+pysqlite:///:memory:")
@@ -69,7 +88,8 @@ def test_food_catalog_migration_follows_meal_planning_and_auth_migrations():
     root = Path(__file__).resolve().parents[1]
     script = ScriptDirectory(dir=str(root / "migrations"))
 
-    assert script.get_heads() == ["0024_meal_reminders"]
+    assert script.get_heads() == ["0025_notification_preferences"]
+    assert script.get_revision("0025_notification_preferences").down_revision == "0024_meal_reminders"
     assert script.get_revision("0022_category_name_unique").down_revision == "0021_user_last_view"
     assert script.get_revision("0021_user_last_view").down_revision == "0020_backup_schedule"
     assert script.get_revision("0020_backup_schedule").down_revision == "0019_product_name_unique"

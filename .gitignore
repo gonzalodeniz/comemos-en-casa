@@ -16,3 +16,6 @@ data/**/*.webp
 data/**/*.png
 data/**/*.jpg
 data/**/*.jpeg
+
+# Registros locales del lanzador de agentes
+logs/

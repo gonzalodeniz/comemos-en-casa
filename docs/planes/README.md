@@ -1,7 +1,8 @@
 # Planes y tareas
 
 - `docs/planes/`: propuestas de alcance y criterios de aceptación. Un plan puede quedar pendiente de aprobación; [arquitectura-base](arquitectura-base.md) ya está aprobado, pero mover un plan aquí **no** lo aprueba ni inicia su ejecución.
-- `odd/tasks/`: documentos de tareas de ejecución, uno por iniciativa que requiera seguimiento. Se crean tras aprobar el plan y solicitar expresamente las tareas o autorizar la implementación, enlazando el plan aprobado; generar tareas no autoriza por sí solo ejecutarlas. No duplican aquí el texto del plan. Por petición expresa del usuario puede prepararse un borrador TASKS antes de aprobar el plan; en ese caso ambos mantienen su aprobación pendiente y no se inicia la implementación.
+- [`docs/seguimiento/`](../seguimiento/README.md): documentos nuevos de tareas de ejecución, uno por iniciativa. Se crean tras aprobar el plan y solicitar expresamente las tareas o autorizar la implementación. Enlazan el plan sin duplicarlo; generar tareas no autoriza ejecutarlas. Si el usuario pide expresamente un borrador antes de aprobar el plan, marcarlo como pendiente de aprobación y no implementar.
+- `odd/tasks/`: documentos de tareas existentes. Permanecen en su ubicación y se actualizan allí, sin crear un segundo documento.
 
 Las historias de usuario y decisiones de producto permanecen en `docs/`. La arquitectura tiene un [documento de tareas](../../odd/tasks/architecture-foundation.md); sus tareas y evidencias se registran allí durante la ejecución.
 

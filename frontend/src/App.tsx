@@ -249,8 +249,16 @@ export default function App() {
     await apiRequest<UserResponse>(`/users/${userId}`, {
       method: "PATCH",
       csrfToken,
-      body: { name: field(form, "name"), email: field(form, "email") },
+      body: { name: field(form, "name"), email: field(form, "email"), ...(userId === currentUser?.id ? { recordatorios_correo: form.has("recordatorios_correo"), recordatorios_push: form.has("recordatorios_push") } : {}) },
     });
+    if (userId === currentUser?.id && !form.has("recordatorios_push") && "serviceWorker" in navigator) {
+      const registro = await navigator.serviceWorker.getRegistration(import.meta.env.BASE_URL);
+      const suscripcion = await registro?.pushManager.getSubscription();
+      if (suscripcion) {
+        await apiRequest<null>("/push/subscriptions", { method: "DELETE", csrfToken, body: { endpoint: suscripcion.endpoint } });
+        await suscripcion.unsubscribe();
+      }
+    }
     await loadUsers();
     if (userId === currentUser?.id) {
       const updated = users.find((user) => user.id === userId);
@@ -399,6 +407,7 @@ export default function App() {
                       user={user}
                       isCurrentUser={user.id === currentUser.id}
                       loading={loading}
+                      csrfToken={csrfToken}
                       onUpdate={(form) => updateUser(user.id, form)}
                       onActivation={() => mutateUser(user, changeActivation)}
                       onDelete={() => mutateUser(user, deleteUser)}
@@ -430,6 +439,7 @@ type UserCardProps = {
   user: User;
   isCurrentUser: boolean;
   loading: boolean;
+  csrfToken: string;
   onUpdate: (form: FormData) => Promise<void>;
   onActivation: () => void;
   onDelete: () => void;
@@ -437,9 +447,134 @@ type UserCardProps = {
   onSubmit: (event: FormEvent<HTMLFormElement>, action: (form: FormData) => Promise<void>) => void;
 };
 
-function UserCard({ user, isCurrentUser, loading, onUpdate, onActivation, onDelete, onPassword, onSubmit }: UserCardProps) {
+// Espera solo al worker de esta aplicación y evita que su instalación bloquee el perfil indefinidamente.
+function esperarWorkerPush(registro: ServiceWorkerRegistration): Promise<void> {
+  if (registro.active?.state === "activated") return Promise.resolve();
+  const worker = registro.installing ?? registro.waiting ?? registro.active;
+  if (!worker) return Promise.reject(new Error("No se encontró el trabajador de notificaciones."));
+  return new Promise((resolve, reject) => {
+    // Limpia la espera tanto si el navegador activa el worker como si falla.
+    function terminar(error?: Error) {
+      window.clearTimeout(limite);
+      worker?.removeEventListener("statechange", comprobar);
+      if (error) reject(error);
+      else resolve();
+    }
+    // Consulta el estado actual, incluso si cambió antes de instalar el listener.
+    function comprobar() {
+      if (worker?.state === "activated") terminar();
+      if (worker?.state === "redundant") terminar(new Error("El trabajador de notificaciones no pudo iniciarse."));
+    }
+    const limite = window.setTimeout(() => terminar(new Error("La activación de notificaciones tardó demasiado.")), 10000);
+    worker.addEventListener("statechange", comprobar);
+    comprobar();
+  });
+}
+
+// Obtiene la suscripción del navegador para el ámbito de esta aplicación.
+async function suscripcionDeEsteDispositivo() {
+  const registro = await navigator.serviceWorker?.getRegistration?.(import.meta.env.BASE_URL);
+  return registro?.pushManager?.getSubscription();
+}
+
+function UserCard({ user, isCurrentUser, loading, csrfToken, onUpdate, onActivation, onDelete, onPassword, onSubmit }: UserCardProps) {
   const [editing, setEditing] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const [pushActivo, setPushActivo] = useState(user.recordatorios_push ?? false);
+  const [estadoActivacionPush, setEstadoActivacionPush] = useState("");
+  const [activandoPush, setActivandoPush] = useState(false);
+  const [dispositivoActivo, setDispositivoActivo] = useState(false);
+  useEffect(() => {
+    if (!editing || !isCurrentUser) return;
+    let vigente = true;
+    setDispositivoActivo(false);
+    void (async () => {
+      const suscripcion = await suscripcionDeEsteDispositivo();
+      if (!suscripcion) return;
+      const estado = await apiRequest<{ active: boolean }>("/push/subscriptions/status", {
+        method: "POST", csrfToken, body: { endpoint: suscripcion.endpoint },
+      });
+      if (vigente) setDispositivoActivo(estado.active);
+    })().catch(() => {
+      if (vigente) setEstadoActivacionPush("No se pudo comprobar la activación de este dispositivo.");
+    });
+    return () => { vigente = false; };
+  }, [editing, isCurrentUser, csrfToken]);
+  const [probandoPush, setProbandoPush] = useState(false);
+  const [resultadoPush, setResultadoPush] = useState("");
+  // Solicita una prueba inmediata para los dispositivos de la cuenta actual.
+  async function probarNotificacion() {
+    setProbandoPush(true);
+    setResultadoPush("");
+    try {
+      await apiRequest<null>("/push/test", { method: "POST", csrfToken });
+      setResultadoPush("Notificación de prueba enviada.");
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        setDispositivoActivo(false);
+        setResultadoPush("No hay dispositivos registrados. Activa este dispositivo y vuelve a probar.");
+      } else {
+        setResultadoPush("No se pudo enviar la notificación de prueba. Comprueba que el dispositivo esté activado.");
+      }
+    } finally {
+      setProbandoPush(false);
+    }
+  }
+  // Solicita el permiso sin alterar la selección del correo.
+  async function cambiarPush(activar: boolean) {
+    if (!activar) { setPushActivo(false); setEstadoActivacionPush(""); return; }
+    setActivandoPush(true);
+    setEstadoActivacionPush("Activando notificaciones móviles…");
+    try {
+      if (!("Notification" in window) || !("serviceWorker" in navigator) || await Notification.requestPermission() !== "granted") {
+        setEstadoActivacionPush("Las notificaciones móviles no están activas en este dispositivo. Comprueba los permisos del navegador.");
+        return;
+      }
+      const { public_key } = await apiRequest<{ public_key: string }>("/push/public-key");
+      const base64 = public_key.replace(/-/g, "+").replace(/_/g, "/");
+      const clave = Uint8Array.from(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "=")), (caracter) => caracter.charCodeAt(0));
+      const registro = await navigator.serviceWorker.register(`${import.meta.env.BASE_URL}notificaciones-worker.js`);
+      await esperarWorkerPush(registro);
+      let suscripcion = await registro.pushManager.getSubscription();
+      if (suscripcion) {
+        const estado = await apiRequest<{ active: boolean }>("/push/subscriptions/status", {
+          method: "POST", csrfToken, body: { endpoint: suscripcion.endpoint },
+        });
+        if (!estado.active) {
+          await suscripcion.unsubscribe();
+          suscripcion = null;
+        }
+      }
+      suscripcion ??= await registro.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: clave });
+      await apiRequest<null>("/push/subscriptions", { method: "POST", csrfToken, body: suscripcion.toJSON() });
+      setEstadoActivacionPush("Notificaciones móviles activadas en este dispositivo.");
+      setPushActivo(true);
+      setDispositivoActivo(true);
+    } catch {
+      setEstadoActivacionPush("Las notificaciones móviles no están activas en este dispositivo. Vuelve a intentarlo.");
+    } finally {
+      setActivandoPush(false);
+    }
+  }
+  // Retira solo este dispositivo sin cambiar la preferencia de la cuenta.
+  async function desactivarDispositivo() {
+    setActivandoPush(true);
+    setResultadoPush("");
+    try {
+      const suscripcion = await suscripcionDeEsteDispositivo();
+      if (suscripcion) {
+        await apiRequest<null>("/push/subscriptions", { method: "DELETE", csrfToken, body: { endpoint: suscripcion.endpoint } });
+        setDispositivoActivo(false);
+        await suscripcion.unsubscribe();
+      }
+      setDispositivoActivo(false);
+      setEstadoActivacionPush("Notificaciones móviles desactivadas en este dispositivo.");
+    } catch {
+      setEstadoActivacionPush("No se pudo completar la desactivación. Vuelve a intentarlo.");
+    } finally {
+      setActivandoPush(false);
+    }
+  }
   return (
     <article className="user-card">
       <div className="user-card-heading">
@@ -456,9 +591,11 @@ function UserCard({ user, isCurrentUser, loading, onUpdate, onActivation, onDele
         <form className="inline-form" onSubmit={(event) => { onSubmit(event, onUpdate); setEditing(false); }}>
           <label>Nombre<input name="name" defaultValue={user.name} required maxLength={150} /></label>
           <label>Correo electrónico<input name="email" type="email" defaultValue={user.email} required maxLength={320} /></label>
+          {isCurrentUser && <label><input type="checkbox" name="recordatorios_correo" defaultChecked={user.recordatorios_correo ?? true} />Recordatorios por correo</label>}
+          {isCurrentUser && <><label><input type="checkbox" name="recordatorios_push" checked={pushActivo} disabled={activandoPush} onChange={(event) => void cambiarPush(event.target.checked)} />Notificaciones móviles</label>{pushActivo && <><button type="button" className="secondary" disabled={activandoPush} onClick={() => void (dispositivoActivo ? desactivarDispositivo() : cambiarPush(true))}>{dispositivoActivo ? "Desactivar en este dispositivo" : "Activar en este dispositivo"}</button><button type="button" className="secondary" aria-label="Probar notificación móvil" title="Probar notificación móvil" disabled={probandoPush || activandoPush} onClick={() => void probarNotificacion()}><AppIcon name="bell" /></button>{resultadoPush && <p role="status">{resultadoPush}</p>}</>}{estadoActivacionPush && <p role="status">{estadoActivacionPush}</p>}</>}
           <div className="button-row">
-            <button disabled={loading}>Guardar cambios</button>
-            <button type="button" className="secondary" onClick={() => setEditing(false)}>Cancelar</button>
+            <button disabled={loading || activandoPush}>Guardar cambios</button>
+            <button type="button" className="secondary" disabled={activandoPush} onClick={() => { setPushActivo(user.recordatorios_push ?? false); setEstadoActivacionPush(""); setEditing(false); }}>Cancelar</button>
           </div>
         </form>
       )}
@@ -475,7 +612,7 @@ function UserCard({ user, isCurrentUser, loading, onUpdate, onActivation, onDele
       )}
 
       <div className="button-row actions">
-        <button type="button" className="secondary" disabled={loading} onClick={() => setEditing(!editing)}>Editar perfil</button>
+        <button type="button" className="secondary" disabled={loading || activandoPush} onClick={() => setEditing(!editing)}>Editar perfil</button>
         <button type="button" className="secondary" disabled={loading} onClick={() => setPasswordOpen(!passwordOpen)}>Cambiar contraseña</button>
         {!isCurrentUser && (
           <>

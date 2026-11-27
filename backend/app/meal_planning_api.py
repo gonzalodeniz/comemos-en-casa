@@ -628,13 +628,18 @@ async def apply_meal_planning_operation(
                             )
                         )
                         changed_dates.append(occurrence.isoformat())
-                    elif current.label_id != label_id:
-                        current.label_id = label_id
-                        changed_dates.append(occurrence.isoformat())
-                    if current is not None:
-                        current.reminder_days = reminder.days_before if reminder else None
-                        current.reminder_time = reminder.send_time if reminder else None
-                        current.reminder_message = reminder.message if reminder else None
+                    else:
+                        # Cuenta la fecha una sola vez aunque cambien el plato y el recordatorio.
+                        valores_aviso = (
+                            reminder.days_before if reminder else None,
+                            reminder.send_time if reminder else None,
+                            reminder.message if reminder else None,
+                        )
+                        aviso_actual = (current.reminder_days, current.reminder_time, current.reminder_message)
+                        if current.label_id != label_id or aviso_actual != valores_aviso:
+                            changed_dates.append(occurrence.isoformat())
+                            current.label_id = label_id
+                            current.reminder_days, current.reminder_time, current.reminder_message = valores_aviso
                 elif current is not None and (operation.repeat is not None or current.label_id == label_id):
                     db.delete(current)
                     changed_dates.append(occurrence.isoformat())

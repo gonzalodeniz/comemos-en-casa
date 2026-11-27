@@ -10,6 +10,27 @@ from app.models import MealAssignment
 from meal_planning_test_support import meal_database, api_get, api_post, authenticate, seed_labels, post_with_session
 
 
+def test_guardar_cambios_del_recordatorio_sin_cambiar_comida(meal_database):
+    """Cuenta las altas, ediciones y bajas del recordatorio, pero no los guardados idénticos."""
+    cookies = authenticate(meal_database)
+    pescado, _ = seed_labels(meal_database)
+    fecha = date(2099, 11, 8)
+    with meal_database() as db:
+        db.add(MealAssignment(date=fecha, slot="lunch", label_id=pescado.id))
+        db.commit()
+
+    operacion = {"action": "assign", "start_date": fecha.isoformat(), "slot": "lunch", "label_id": str(pescado.id)}
+    aviso = {"days_before": 1, "send_time": "18:00", "message": "Preparar pescado"}
+    for recordatorio, cambios in [(aviso, 1), (aviso, 0), ({**aviso, "send_time": "19:00"}, 1), (None, 1), (None, 0)]:
+        respuesta = post_with_session("/api/v1/meal-planning/operations", {**operacion, "reminder": recordatorio}, cookies)
+        assert respuesta.status_code == 200
+        assert respuesta.json()["changed_count"] == cambios
+        assert respuesta.json()["changed_dates"] == ([fecha.isoformat()] if cambios else [])
+        with meal_database() as db:
+            asignacion = db.scalar(select(MealAssignment))
+            assert asignacion.reminder_time == (recordatorio["send_time"] if recordatorio else None)
+
+
 def test_meal_planning_reads_require_an_active_session(meal_database):
     assert api_get("/api/v1/food-labels").status_code == 401
     assert (

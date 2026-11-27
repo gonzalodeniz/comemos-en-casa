@@ -394,6 +394,57 @@ def test_envio_recordatorio_a_todos_los_usuarios_activos(meal_database, monkeypa
     assert api.deliver_due_meal_reminders(datetime(2026, 11, 2, 18, 1, tzinfo=timezone.utc)) == 0
     assert len(envios) == 2
 
+def test_envio_programado_push_respeta_preferencias_y_cuentas_activas(meal_database, monkeypatch):
+    """Envía push a los dispositivos de cuentas activas con ese canal habilitado."""
+    import app.meal_planning_api as api
+    from app.models import PushSubscription, User
+
+    pescado, _ = seed_labels(meal_database)
+    with meal_database() as db:
+        for nombre, correo, push, activo in [
+            ("correo", True, False, True), ("ambos", True, True, True),
+            ("push", False, True, True), ("ninguno", False, False, True),
+            ("inactivo", True, True, False),
+        ]:
+            email = f"{nombre}@example.test"
+            usuario = User(name=nombre, email=email, email_canonical=email, password_hash="hash", is_active=activo, recordatorios_correo=correo, recordatorios_push=push)
+            db.add(usuario)
+            db.flush()
+            db.add(PushSubscription(user_id=usuario.id, endpoint=f"https://fcm.googleapis.com/fcm/send/{nombre}", p256dh="clave", auth="secreto"))
+        db.add(MealAssignment(date=date(2026, 11, 2), slot="lunch", label_id=pescado.id, reminder_days=0, reminder_time="18:00", reminder_message="Sacar pollo"))
+        db.commit()
+    envios = []
+    monkeypatch.setattr(api, "SessionFactory", meal_database)
+    monkeypatch.setattr(api, "send_meal_reminder_email", lambda *args: None)
+    monkeypatch.setattr(api, "enviar_recordatorio_push", lambda *args: envios.append(args), raising=False)
+    assert api.deliver_due_meal_reminders(datetime(2026, 11, 2, 18, 0, tzinfo=timezone.utc)) == 1
+    assert {envio[0].rsplit("/", 1)[-1] for envio in envios} == {"ambos", "push"}
+    assert all(envio[3:] == ("Sacar pollo", pescado.name, date(2026, 11, 2)) for envio in envios)
+
+
+def test_envio_programado_respeta_preferencia_de_correo(meal_database, monkeypatch):
+    """Envía correo solo a las cuentas activas que lo han elegido."""
+    import app.meal_planning_api as api
+    from app.models import User
+
+    pescado, _ = seed_labels(meal_database)
+    with meal_database() as db:
+        for nombre, correo, push, activo in [
+            ("solo-correo", True, False, True), ("ambos", True, True, True),
+            ("solo-push", False, True, True), ("ninguno", False, False, True),
+            ("inactivo", True, True, False),
+        ]:
+            email = f"{nombre}@example.test"
+            db.add(User(name=nombre, email=email, email_canonical=email, password_hash="hash", is_active=activo, recordatorios_correo=correo, recordatorios_push=push))
+        db.add(MealAssignment(date=date(2026, 11, 2), slot="lunch", label_id=pescado.id, reminder_days=0, reminder_time="18:00", reminder_message="Sacar pollo"))
+        db.commit()
+    envios = []
+    monkeypatch.setattr(api, "SessionFactory", meal_database)
+    monkeypatch.setattr(api, "send_meal_reminder_email", lambda *args: envios.append(args))
+    assert api.deliver_due_meal_reminders(datetime(2026, 11, 2, 18, 0, tzinfo=timezone.utc)) == 1
+    assert {envio[0] for envio in envios} == {"solo-correo@example.test", "ambos@example.test"}
+
+
 # Comprueba el envío inmediato sin alterar el recordatorio programado.
 def test_probar_recordatorio_envia_copia_sin_modificar_programacion(meal_database, monkeypatch):
     import app.meal_planning_api as api
@@ -420,6 +471,55 @@ def test_probar_recordatorio_envia_copia_sin_modificar_programacion(meal_databas
         comida = db.get(MealAssignment, identificador)
         assert comida.reminder_sent_at is None
         assert comida.reminder_days == 1
+
+def test_probar_recordatorio_envia_push_a_dispositivos_habilitados(meal_database, monkeypatch):
+    """Envía la copia de prueba por push sin modificar la programación."""
+    import app.meal_planning_api as api
+    from app.models import PushSubscription, User
+
+    cookies = authenticate(meal_database)
+    pescado, _ = seed_labels(meal_database)
+    with meal_database() as db:
+        usuario = db.scalar(select(User))
+        usuario.recordatorios_push = True
+        db.add(PushSubscription(user_id=usuario.id, endpoint="https://fcm.googleapis.com/fcm/send/uno", p256dh="clave", auth="secreto"))
+        comida = MealAssignment(date=date(2027, 1, 5), slot="lunch", label_id=pescado.id, reminder_days=1, reminder_time="18:00", reminder_message="Sacar pollo")
+        db.add(comida)
+        db.commit()
+        identificador = comida.id
+    envios = []
+    monkeypatch.setattr(api, "send_meal_reminder_email", lambda *args: None)
+    monkeypatch.setattr(api, "enviar_recordatorio_push", lambda *args: envios.append(args))
+    respuesta = post_with_session(f"/api/v1/meal-planning/{identificador}/reminder/test", {}, cookies)
+    assert respuesta.status_code == 200
+    assert envios == [("https://fcm.googleapis.com/fcm/send/uno", "clave", "secreto", "Sacar pollo", pescado.name, date(2027, 1, 5))]
+    with meal_database() as db:
+        assert db.get(MealAssignment, identificador).reminder_sent_at is None
+
+
+def test_probar_recordatorio_respeta_preferencia_de_correo(meal_database, monkeypatch):
+    """Respeta el canal de correo también al enviar una copia de prueba."""
+    import app.meal_planning_api as api
+    from app.models import User
+
+    cookies = authenticate(meal_database)
+    authenticate(meal_database)
+    pescado, _ = seed_labels(meal_database)
+    with meal_database() as db:
+        usuarios = db.scalars(select(User).order_by(User.email)).all()
+        usuarios[0].recordatorios_correo = False
+        esperado = usuarios[1].email
+        comida = MealAssignment(date=date(2027, 1, 5), slot="lunch", label_id=pescado.id, reminder_days=1, reminder_time="18:00", reminder_message="Sacar pollo")
+        db.add(comida)
+        db.commit()
+        identificador = comida.id
+    envios = []
+    monkeypatch.setattr(api, "send_meal_reminder_email", lambda *args: envios.append(args))
+    respuesta = post_with_session(f"/api/v1/meal-planning/{identificador}/reminder/test", {}, cookies)
+    assert respuesta.status_code == 200
+    assert [envio[0] for envio in envios] == [esperado]
+    assert respuesta.json()["recipients"] == 1
+
 
 # Comprueba las respuestas del envío de prueba cuando falta la comida o su aviso.
 def test_probar_recordatorio_rechaza_comidas_sin_aviso(meal_database, monkeypatch):

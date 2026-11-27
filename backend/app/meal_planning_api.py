@@ -24,8 +24,9 @@ from sqlalchemy.orm import Session
 from app.auth import ActiveSession, get_active_session, require_csrf
 from app.database import get_database_session
 from app.database import SessionFactory
-from app.models import FoodLabel, MealAssignment, RecipeFoodLabel, User
+from app.models import FoodLabel, MealAssignment, RecipeFoodLabel, User, PushSubscription
 from app.mailer import send_meal_reminder_email
+from app.notificaciones_push import enviar_recordatorio_push
 from app.meal_planning import repetition_dates
 from app.food_images import InvalidFoodImage, async_publication_lock, crop_to_webp, publish_temporary, save_temporary, temporary_path
 from app.safe_image_url import UnsafeImageURL, safe_fetch_image
@@ -50,12 +51,18 @@ def deliver_due_meal_reminders(now: datetime | None = None) -> int:
                 db.commit()
                 if reserva.rowcount != 1:
                     continue
-                destinatarios = db.scalars(select(User.email).where(User.is_active.is_(True))).all()
+                destinatarios = db.scalars(select(User.email).where(User.is_active.is_(True), User.recordatorios_correo.is_(True))).all()
                 for correo in destinatarios:
                     try:
                         send_meal_reminder_email(correo, assignment.reminder_message, label.name, assignment.date)
                     except Exception:
                         logger.exception("meal_reminder_delivery_failed assignment_id=%s", assignment.id)
+                dispositivos = db.scalars(select(PushSubscription).join(User, PushSubscription.user_id == User.id).where(User.is_active.is_(True), User.recordatorios_push.is_(True))).all()
+                for dispositivo in dispositivos:
+                    try:
+                        enviar_recordatorio_push(dispositivo.endpoint, dispositivo.p256dh, dispositivo.auth, assignment.reminder_message, label.name, assignment.date)
+                    except Exception:
+                        logger.error("meal_reminder_push_delivery_failed assignment_id=%s", assignment.id)
                 enviados += 1
         db.commit()
     return enviados
@@ -539,12 +546,15 @@ async def probar_recordatorio(
     comida, plato = resultado
     if comida.reminder_days is None or comida.reminder_message is None:
         raise HTTPException(status_code=409, detail="Meal has no active reminder")
-    destinatarios = db.scalars(select(User.email).where(User.is_active.is_(True))).all()
+    destinatarios = db.scalars(select(User.email).where(User.is_active.is_(True), User.recordatorios_correo.is_(True))).all()
+    dispositivos = db.scalars(select(PushSubscription).join(User, PushSubscription.user_id == User.id).where(User.is_active.is_(True), User.recordatorios_push.is_(True))).all()
     try:
         for correo in destinatarios:
             await asyncio.to_thread(send_meal_reminder_email, correo, comida.reminder_message, plato.name, comida.date)
+        for dispositivo in dispositivos:
+            await asyncio.to_thread(enviar_recordatorio_push, dispositivo.endpoint, dispositivo.p256dh, dispositivo.auth, comida.reminder_message, plato.name, comida.date)
     except Exception as error:
-        logger.exception("meal_reminder_test_failed")
+        logger.error("meal_reminder_test_failed")
         raise HTTPException(status_code=503, detail="Reminder test delivery failed; some recipients may have received it") from error
     return {"recipients": len(destinatarios)}
 

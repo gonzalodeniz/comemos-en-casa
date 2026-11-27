@@ -9,4 +9,4 @@ La aplicación web se podrá instalar en el móvil y enviará notificaciones pus
 ## Backlog
 
 - **HU-021 · Pendiente** — Como usuario de Comemos en Casa, quiero instalar la aplicación en mi móvil para abrirla directamente desde su icono y seguir usándola como hasta ahora.
-- **HU-020 · Pendiente** — Como usuario de Comemos en Casa, quiero activar o desactivar las notificaciones push de los recordatorios de comidas en mi móvil para decidir si recibo los avisos directamente de la aplicación. Requiere: HU-021.
+- **HU-020 · En validación** — Como usuario de Comemos en Casa, quiero elegir en mi perfil correo, notificaciones móviles, ambos o ninguno para los recordatorios de comidas. Las cuentas existentes conservan inicialmente solo correo. Requiere: HU-021 y validación real en Android e iPhone.

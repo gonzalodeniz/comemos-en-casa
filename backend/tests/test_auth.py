@@ -355,6 +355,160 @@ def create_family_user(client, email="other@example.test", password="another sec
     return response.json()["user"]
 
 
+def test_public_push_key_requires_configured_server(auth_client, monkeypatch):
+    """Entrega la clave pública solo cuando el servicio está configurado."""
+    client, _ = auth_client
+    authenticated_user(client)
+    monkeypatch.delenv("PUSH_PUBLIC_KEY", raising=False)
+    assert client.get("/api/v1/push/public-key").status_code == 503
+    monkeypatch.setenv("PUSH_PUBLIC_KEY", "clave-publica")
+    monkeypatch.delenv("PUSH_PRIVATE_KEY", raising=False)
+    assert client.get("/api/v1/push/public-key").status_code == 503
+    monkeypatch.setenv("PUSH_PRIVATE_KEY", "clave-privada")
+    monkeypatch.setenv("PUSH_CONTACT", "mailto:admin@example.test")
+    assert client.get("/api/v1/push/public-key").json() == {"public_key": "clave-publica"}
+
+
+@pytest.mark.parametrize("endpoint", ["http://fcm.googleapis.com/fcm/send/x", "https://127.0.0.1/", "https://fcm.googleapis.com.evil.test/x", "https://user@fcm.googleapis.com/x", "https://evil.test/x"])
+def test_push_subscription_rejects_untrusted_endpoints(auth_client, endpoint):
+    """Impide registrar destinos arbitrarios para el envío desde el servidor."""
+    client, _ = auth_client
+    authenticated_user(client)
+    headers = {"Origin": "http://localhost:5173", "X-CSRF-Token": client.cookies[CSRF_COOKIE]}
+    assert client.post("/api/v1/push/subscriptions", headers=headers, json={"endpoint": endpoint, "keys": {"p256dh": "clave", "auth": "secreto"}}).status_code == 422
+
+
+def test_push_test_sends_only_to_authenticated_user_devices(auth_client, monkeypatch):
+    """Envía la prueba a los dispositivos propios sin notificar a otras cuentas."""
+    from app.models import PushSubscription
+    import app.auth as autenticacion
+
+    client, factory = auth_client
+    first = authenticated_user(client)
+    other = create_family_user(client)
+    with factory() as db:
+        db.add_all([
+            PushSubscription(user_id=UUID(first["id"]), endpoint="https://fcm.googleapis.com/fcm/send/propio", p256dh="p", auth="a"),
+            PushSubscription(user_id=UUID(other["id"]), endpoint="https://fcm.googleapis.com/fcm/send/otro", p256dh="p", auth="a"),
+        ])
+        db.commit()
+    envios = []
+    monkeypatch.setattr(autenticacion, "enviar_push", lambda *args: envios.append(args), raising=False)
+    assert client.post("/api/v1/push/test").status_code == 403
+    headers = {"Origin": "http://localhost:5173", "X-CSRF-Token": client.cookies[CSRF_COOKIE]}
+    response = client.post("/api/v1/push/test", headers=headers)
+    assert response.status_code == 204
+    assert [envio[0] for envio in envios] == ["https://fcm.googleapis.com/fcm/send/propio"]
+
+
+def test_push_test_skips_expired_device_and_sends_to_valid_one(auth_client, monkeypatch):
+    """Retira una suscripción caducada sin bloquear el envío al resto."""
+    from types import SimpleNamespace
+    from pywebpush import WebPushException
+    from app.models import PushSubscription
+    import app.auth as autenticacion
+
+    client, factory = auth_client
+    usuario = authenticated_user(client)
+    urls = [f"https://fcm.googleapis.com/fcm/send/{sufijo}" for sufijo in ("caducada", "vigente")]
+    with factory() as db:
+        db.add_all([PushSubscription(user_id=UUID(usuario["id"]), endpoint=url, p256dh="p", auth="a") for url in urls])
+        db.commit()
+    envios = []
+
+    def enviar(endpoint, *_args):
+        """Simula el rechazo definitivo de una suscripción."""
+        if endpoint == urls[0]:
+            raise WebPushException("expired", response=SimpleNamespace(status_code=410))
+        envios.append(endpoint)
+
+    monkeypatch.setattr(autenticacion, "enviar_push", enviar)
+    headers = {"Origin": "http://localhost:5173", "X-CSRF-Token": client.cookies[CSRF_COOKIE]}
+    assert client.post("/api/v1/push/test", headers=headers).status_code == 204
+    assert envios == [urls[1]]
+    for url, esperado in zip(urls, (False, True)):
+        assert client.post("/api/v1/push/subscriptions/status", headers=headers, json={"endpoint": url}).json() == {"active": esperado}
+
+
+def test_push_test_reports_missing_subscription_or_delivery_failure(auth_client, monkeypatch):
+    """No presenta como entregada una prueba sin dispositivos o con error."""
+    from app.models import PushSubscription
+    import app.auth as autenticacion
+
+    client, factory = auth_client
+    first = authenticated_user(client)
+    headers = {"Origin": "http://localhost:5173", "X-CSRF-Token": client.cookies[CSRF_COOKIE]}
+    assert client.post("/api/v1/push/test", headers=headers).status_code == 409
+    with factory() as db:
+        db.add(PushSubscription(user_id=UUID(first["id"]), endpoint="https://fcm.googleapis.com/fcm/send/propio", p256dh="p", auth="a"))
+        db.commit()
+
+    def falla(*_args):
+        """Simula un error del servicio de notificaciones."""
+        raise RuntimeError("delivery failed")
+
+    monkeypatch.setattr(autenticacion, "enviar_push", falla)
+    assert client.post("/api/v1/push/test", headers=headers).status_code == 503
+
+
+def test_push_subscription_belongs_to_current_user_and_can_be_removed(auth_client):
+    """Registra y elimina la suscripción del dispositivo para su propia cuenta."""
+    client, factory = auth_client
+    first = authenticated_user(client)
+    headers = {"Origin": "http://localhost:5173", "X-CSRF-Token": client.cookies[CSRF_COOKIE]}
+    suscripcion = {"endpoint": "https://fcm.googleapis.com/fcm/send/example", "keys": {"p256dh": "clave-publica", "auth": "secreto"}}
+    assert client.post("/api/v1/push/subscriptions", headers=headers, json=suscripcion).status_code == 204
+    from app.models import PushSubscription
+    with factory() as db:
+        guardada = db.scalar(select(PushSubscription))
+        assert str(guardada.user_id) == first["id"]
+        assert guardada.endpoint == suscripcion["endpoint"]
+        assert guardada.p256dh == "clave-publica"
+        assert guardada.auth == "secreto"
+    assert client.request("DELETE", "/api/v1/push/subscriptions", headers=headers, json={"endpoint": suscripcion["endpoint"]}).status_code == 204
+    with factory() as db:
+        assert db.scalar(select(PushSubscription)) is None
+
+
+def test_push_subscription_cannot_be_removed_by_another_user(auth_client):
+    """Impide que otra cuenta elimine la suscripción del dispositivo."""
+    client, factory = auth_client
+    authenticated_user(client)
+    create_family_user(client)
+    headers = {"Origin": "http://localhost:5173", "X-CSRF-Token": client.cookies[CSRF_COOKIE]}
+    endpoint = "https://fcm.googleapis.com/fcm/send/example"
+    suscripcion = {"endpoint": endpoint, "keys": {"p256dh": "clave", "auth": "secreto"}}
+    assert client.post("/api/v1/push/subscriptions", json=suscripcion).status_code == 403
+    assert client.post("/api/v1/push/subscriptions", headers=headers, json=suscripcion).status_code == 204
+    client.cookies.clear()
+    assert login(client, "other@example.test", "another secret").status_code == 200
+    headers["X-CSRF-Token"] = client.cookies[CSRF_COOKIE]
+    assert client.request("DELETE", "/api/v1/push/subscriptions", headers=headers, json={"endpoint": endpoint}).status_code == 204
+    from app.models import PushSubscription
+    with factory() as db:
+        assert db.scalar(select(PushSubscription)).endpoint == endpoint
+
+
+def test_notification_channel_preferences_are_saved_per_user(auth_client):
+    """Comprueba que las cuatro combinaciones se guardan por cuenta."""
+    client, _ = auth_client
+    first = authenticated_user(client)
+    other = create_family_user(client)
+    headers = {"Origin": "http://localhost:5173", "X-CSRF-Token": client.cookies[CSRF_COOKIE]}
+
+    for correo, movil in [(True, False), (False, True), (True, True), (False, False)]:
+        response = client.patch(
+            f"/api/v1/users/{first['id']}", headers=headers,
+            json={"recordatorios_correo": correo, "recordatorios_push": movil},
+        )
+        assert response.status_code == 200
+        user = client.get(f"/api/v1/users/{first['id']}").json()["user"]
+        assert (user["recordatorios_correo"], user["recordatorios_push"]) == (correo, movil)
+
+    other_user = client.get(f"/api/v1/users/{other['id']}").json()["user"]
+    assert (other_user["recordatorios_correo"], other_user["recordatorios_push"]) == (True, False)
+
+
 def test_user_management_edits_profiles_and_rejects_duplicates(auth_client):
     client, _ = auth_client
     first = authenticated_user(client)

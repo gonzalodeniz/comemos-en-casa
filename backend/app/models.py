@@ -42,6 +42,8 @@ class User(Base):
     email_canonical: Mapped[str] = mapped_column(String(320), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(512), nullable=False)
     ultima_vista: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    recordatorios_correo: Mapped[bool] = mapped_column(default=True, server_default="true", nullable=False)
+    recordatorios_push: Mapped[bool] = mapped_column(default=False, server_default="false", nullable=False)
     is_active: Mapped[bool] = mapped_column(
         default=True, server_default="true", nullable=False
     )
@@ -51,6 +53,16 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class PushSubscription(Base):
+    """Relaciona una suscripción de navegador con la cuenta propietaria."""
+    __tablename__ = "push_subscriptions"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    endpoint: Mapped[str] = mapped_column(String(2048), nullable=False, unique=True)
+    p256dh: Mapped[str] = mapped_column(String(256), nullable=False)
+    auth: Mapped[str] = mapped_column(String(256), nullable=False)
 
 
 class UserSession(Base):

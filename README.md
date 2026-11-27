@@ -23,6 +23,18 @@ La API usa `/api/v1`. Autenticación: `GET /auth/bootstrap`, `POST /auth/registe
 
 La última vista principal se guarda por usuario con `PUT /auth/last-view` (requiere sesión y CSRF) y se recupera mediante `GET /auth/session`, también desde otro dispositivo. Si no existe o ya no es válida, se abre Planificación. Requiere aplicar la migración `0021_user_last_view`.
 
+### Recordatorios móviles
+
+Aplica la migración `0025_notification_preferences`. Cada cuenta puede elegir correo y notificaciones móviles en su perfil; las cuentas existentes conservan el correo activado. Para activar push, configura en el entorno de Compose `PUSH_PUBLIC_KEY`, `PUSH_PRIVATE_KEY` y `PUSH_CONTACT` (por ejemplo, `mailto:administrador@example.org`). Conserva la pareja de claves entre reinicios y mantenla privada; no la subas al repositorio. Si falta configuración, no se podrán activar notificaciones móviles. El correo de recuperación de contraseña no depende de estas preferencias.
+
+Con las dependencias del backend instaladas, puedes generar una pareja VAPID local con el siguiente comando; sus resultados incluyen un secreto, así que no compartas la salida:
+
+```sh
+.venv/bin/python -c 'from cryptography.hazmat.primitives.asymmetric import ec; from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat; from base64 import urlsafe_b64encode as b; k=ec.generate_private_key(ec.SECP256R1()); enc=lambda x:b(x).rstrip(b"=").decode(); print("PUSH_PRIVATE_KEY="+enc(k.private_numbers().private_value.to_bytes(32,"big"))); print("PUSH_PUBLIC_KEY="+enc(k.public_key().public_bytes(Encoding.X962,PublicFormat.UncompressedPoint)))'
+```
+
+Las notificaciones requieren un contexto seguro y permiso del navegador. En iPhone, usa la aplicación instalada en la pantalla de inicio. Activa cada dispositivo desde el perfil. El servidor debe poder llegar a los servicios push de los navegadores compatibles. La entrega puede fallar si el navegador revoca el permiso o el dispositivo pierde su suscripción.
+
 El catálogo permite renombrar categorías y exige nombres únicos sin distinguir mayúsculas ni espacios en los extremos, como para los productos. Aplica la migración `0022_category_name_unique` antes de usar esta versión. Si ya hay categorías con nombres coincidentes, la migración se detiene para que se revisen y corrijan los duplicados sin perder productos.
 
 ## Pruebas

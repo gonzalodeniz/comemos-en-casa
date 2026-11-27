@@ -61,6 +61,8 @@ export type User = {
   name: string;
   email: string;
   is_active: boolean;
+  recordatorios_correo?: boolean;
+  recordatorios_push?: boolean;
 };
 
 export type UserResponse = { user: Omit<User, "is_active"> & { is_active?: boolean } };

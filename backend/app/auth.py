@@ -4,13 +4,14 @@ Agrupa los flujos de acceso, administración y recuperación de cuentas, aplican
 """
 
 import logging
+import os
 import threading
 import asyncio
 import hmac
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
@@ -27,10 +28,13 @@ from app.models import (
     LoginAttemptBucket,
     LoginAttemptEvent,
     PasswordResetToken,
+    PushSubscription,
     User,
     UserSession,
 )
 from app.mailer import send_password_reset_email
+from app.notificaciones_push import enviar_push
+from pywebpush import WebPushException
 from app.security import (
     canonicalize_email,
     digest_rate_limit_key,
@@ -84,10 +88,39 @@ class UltimaVista(BaseModel):
     vista: str = Field(min_length=1, max_length=32)
 
 
+class ClavesPush(BaseModel):
+    """Valida las claves proporcionadas por el navegador."""
+    p256dh: str = Field(min_length=1, max_length=256)
+    auth: str = Field(min_length=1, max_length=256)
+
+
+class SuscripcionPush(BaseModel):
+    """Valida el destino y las claves de una suscripción."""
+    endpoint: str = Field(min_length=1, max_length=2048)
+    keys: ClavesPush
+
+    @field_validator("endpoint")
+    @classmethod
+    def validar_destino(cls, endpoint: str) -> str:
+        """Rechaza destinos ajenos a servicios push admitidos."""
+        url = urlsplit(endpoint)
+        host = url.hostname or ""
+        if url.scheme != "https" or url.username or url.password or url.port not in (None, 443) or not (host == "fcm.googleapis.com" or host == "updates.push.services.mozilla.com" or host.endswith(".push.apple.com")):
+            raise ValueError("Unsupported push endpoint")
+        return endpoint
+
+
+class DestinoPush(BaseModel):
+    """Identifica el dispositivo cuya suscripción se retira."""
+    endpoint: str = Field(min_length=1, max_length=2048)
+
+
 class UserUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=150)
     email: str | None = Field(default=None, min_length=3, max_length=320)
     is_active: bool | None = None
+    recordatorios_correo: bool | None = None
+    recordatorios_push: bool | None = None
 
     @field_validator("name")
     @classmethod
@@ -215,8 +248,8 @@ async def get_active_session(
         ) from error
 
 
-def public_user(user: User) -> dict[str, str]:
-    return {"id": str(user.id), "name": user.name, "email": user.email}
+def public_user(user: User) -> dict[str, str | bool]:
+    return {"id": str(user.id), "name": user.name, "email": user.email, "recordatorios_correo": user.recordatorios_correo, "recordatorios_push": user.recordatorios_push}
 
 
 def revoke_user_sessions(db: Session, user_id: UUID, now: datetime) -> None:
@@ -514,7 +547,7 @@ async def register_initial(
     request: Request,
     response: Response,
     db: Session = Depends(get_database_session),
-) -> dict[str, dict[str, str]]:
+) -> dict[str, dict[str, str | bool]]:
     require_allowed_origin(request)
     try:
         async with lock_first_registration(db):
@@ -546,7 +579,7 @@ async def login(
     request: Request,
     response: Response,
     db: Session = Depends(get_database_session),
-) -> dict[str, dict[str, str]]:
+) -> dict[str, dict[str, str | bool]]:
     # Mantiene errores indistinguibles y verifica una contraseña ficticia si la cuenta no existe.
     require_allowed_origin(request)
     try:
@@ -656,7 +689,7 @@ async def register_family_member(
     response: Response,
     active_session: ActiveSession = Depends(get_active_session),
     db: Session = Depends(get_database_session),
-) -> dict[str, dict[str, str]]:
+) -> dict[str, dict[str, str | bool]]:
     require_csrf(request, active_session)
     try:
         user = await create_user(db, credentials)
@@ -670,6 +703,93 @@ async def register_family_member(
             status_code=status.HTTP_409_CONFLICT,
             detail="Account cannot be created",
         ) from error
+
+
+@router.get("/push/public-key")
+async def obtener_clave_push(active_session: ActiveSession = Depends(get_active_session)) -> dict[str, str]:
+    """Devuelve la clave pública para registrar un dispositivo."""
+    clave = os.getenv("PUSH_PUBLIC_KEY", "").strip()
+    if not clave or not os.getenv("PUSH_PRIVATE_KEY", "").strip() or not os.getenv("PUSH_CONTACT", "").strip():
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Push notifications are not configured")
+    return {"public_key": clave}
+
+
+@router.post("/push/test", status_code=status.HTTP_204_NO_CONTENT)
+async def probar_push(request: Request, active_session: ActiveSession = Depends(get_active_session), db: Session = Depends(get_database_session)) -> Response:
+    """Envía una notificación de prueba solo a la cuenta autenticada."""
+    require_csrf(request, active_session)
+    dispositivos = db.scalars(select(PushSubscription).where(PushSubscription.user_id == active_session.user.id)).all()
+    if not dispositivos:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No active push subscription")
+    enviados = 0
+    fallo = False
+    for dispositivo in dispositivos:
+        try:
+            await asyncio.to_thread(enviar_push, dispositivo.endpoint, dispositivo.p256dh, dispositivo.auth, "Comemos en casa", "Esta es una notificación de prueba.")
+            enviados += 1
+        except WebPushException as error:
+            codigo = error.response.status_code if error.response is not None else None
+            if codigo in (404, 410):
+                db.delete(dispositivo)
+            else:
+                fallo = True
+                logger.warning("push_test_provider_failed status=%s", codigo)
+        except Exception as error:
+            fallo = True
+            logger.warning("push_test_delivery_failed type=%s", type(error).__name__)
+    db.commit()
+    if not enviados:
+        if fallo:
+            raise HTTPException(status_code=503, detail="Push test delivery failed")
+        raise HTTPException(status_code=409, detail="No active push subscription")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/push/subscriptions", status_code=status.HTTP_204_NO_CONTENT)
+async def registrar_suscripcion_push(
+    datos: SuscripcionPush, request: Request,
+    active_session: ActiveSession = Depends(get_active_session),
+    db: Session = Depends(get_database_session),
+) -> Response:
+    """Asocia el dispositivo autenticado con la cuenta actual."""
+    require_csrf(request, active_session)
+    suscripcion = db.scalar(select(PushSubscription).where(PushSubscription.endpoint == datos.endpoint))
+    if suscripcion is None:
+        suscripcion = PushSubscription(endpoint=datos.endpoint, user_id=active_session.user.id, p256dh=datos.keys.p256dh, auth=datos.keys.auth)
+        db.add(suscripcion)
+    else:
+        suscripcion.user_id = active_session.user.id
+        suscripcion.p256dh = datos.keys.p256dh
+        suscripcion.auth = datos.keys.auth
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/push/subscriptions/status")
+async def consultar_suscripcion_push(
+    datos: DestinoPush, request: Request,
+    active_session: ActiveSession = Depends(get_active_session),
+    db: Session = Depends(get_database_session),
+) -> dict[str, bool]:
+    """Comprueba si el dispositivo está registrado para la cuenta actual."""
+    require_csrf(request, active_session)
+    identificador = db.scalar(select(PushSubscription.id).where(
+        PushSubscription.endpoint == datos.endpoint, PushSubscription.user_id == active_session.user.id,
+    ))
+    return {"active": identificador is not None}
+
+
+@router.delete("/push/subscriptions", status_code=status.HTTP_204_NO_CONTENT)
+async def eliminar_suscripcion_push(
+    datos: DestinoPush, request: Request,
+    active_session: ActiveSession = Depends(get_active_session),
+    db: Session = Depends(get_database_session),
+) -> Response:
+    """Retira únicamente la suscripción de la cuenta autenticada."""
+    require_csrf(request, active_session)
+    db.execute(delete(PushSubscription).where(PushSubscription.endpoint == datos.endpoint, PushSubscription.user_id == active_session.user.id))
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/users")
@@ -716,6 +836,11 @@ async def update_user(
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
                 )
+
+            if changes.recordatorios_correo is not None:
+                user.recordatorios_correo = changes.recordatorios_correo
+            if changes.recordatorios_push is not None:
+                user.recordatorios_push = changes.recordatorios_push
 
             if changes.is_active is False:
                 if user.id == active_session.user.id:

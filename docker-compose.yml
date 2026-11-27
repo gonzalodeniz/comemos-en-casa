@@ -56,6 +56,9 @@ services:
       EMAIL_SMTP_PASSWORD: ${EMAIL_SMTP_PASSWORD:-}
       EMAIL_FROM: ${EMAIL_FROM:-Comemos en casa <no-reply@localhost>}
       EMAIL_SMTP_STARTTLS: ${EMAIL_SMTP_STARTTLS:-false}
+      PUSH_PUBLIC_KEY: ${PUSH_PUBLIC_KEY:-}
+      PUSH_PRIVATE_KEY: ${PUSH_PRIVATE_KEY:-}
+      PUSH_CONTACT: ${PUSH_CONTACT:-}
     ports:
       - "127.0.0.1:8000:8000"
     volumes:

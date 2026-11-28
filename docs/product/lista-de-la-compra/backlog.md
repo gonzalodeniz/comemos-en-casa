@@ -6,7 +6,7 @@ Estados: `Pendiente`, `En curso`, `Hecha`.
 
 ## Especificaciones relacionadas
 
-- [Catálogo de productos — HIT-001](../../historias-usuarios/HIT-001-lista-compra/especificacion-catalogo-productos.md): requisitos confirmados y alcance implementable con las API actuales. Renombrar, mover y borrar elementos queda pendiente de ampliar las API y, para el borrado, adaptar la persistencia. Este documento no cambia los estados de las historias existentes.
+- [Catálogo de productos — HIT-001](../../historias-usuarios/HIT-001-lista-compra/especificacion-catalogo-productos.md): requisitos confirmados y alcance actual. Ya se pueden mover productos entre categorías existentes desde su modal; la categoría especial **Sin categoría** sigue pendiente. Este documento no cambia los estados de las historias existentes.
 
 ## Historias
 

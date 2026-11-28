@@ -3,12 +3,10 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import { ApiError } from "./api";
 import ImagenCatalogo, { type RecorteCatalogo } from "./ImagenCatalogo";
 import AppIcon from "./AppIcon";
-import type { ShoppingCategory, ShoppingProduct, ResultadoBusquedaProducto } from "./mealPlanningApi";
+import type { CambioProductoCatalogo, ShoppingCategory, ShoppingProduct, ResultadoBusquedaProducto } from "./mealPlanningApi";
 
 // Describe una actualización de la imagen de un elemento existente.
 type CambioImagen = { name?: string; image_token?: string; remove_image?: true };
-// Describe una modificación del nombre y, opcionalmente, de la imagen del producto.
-type CambioProducto = { name?: string; image_token?: string; remove_image?: true };
 // Define los servicios existentes y el estado de carga del catálogo.
 type Props = {
   onConsultarUso?: (id: string) => Promise<boolean>;
@@ -23,7 +21,7 @@ type Props = {
   onSearchProducts?: (consulta: string) => Promise<{ products: ResultadoBusquedaProducto[] }>;
   onGetProducts: (categoryId: string) => Promise<ShoppingProduct[]>;
   onUpdateCategoryImage: (id: string, cambio: CambioImagen) => Promise<ShoppingCategory>;
-  onUpdateProductImage: (categoriaId: string, id: string, cambio: CambioProducto) => Promise<ShoppingProduct>;
+  onUpdateProductImage: (categoriaId: string, id: string, cambio: CambioProductoCatalogo) => Promise<ShoppingProduct>;
   onImportImage: (url: string) => Promise<string>;
   onPrepareImage: (imagen: string, recorte: RecorteCatalogo) => Promise<string>;
 };
@@ -55,6 +53,7 @@ export default function ProductCatalog({ categories, cargandoCategorias, errorCa
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(false);
   const [nombre, setNombre] = useState("");
+  const [destinoId, setDestinoId] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [uso, setUso] = useState<boolean | null>(null);
   const [editor, setEditor] = useState<Editor>(null);
@@ -91,10 +90,11 @@ export default function ProductCatalog({ categories, cargandoCategorias, errorCa
     else setError(mensaje);
   }
 
-  /** Abre un editor nuevo sin conservar imágenes de otro formulario. */
+  /** Abre un editor nuevo sin conservar cambios de otro formulario. */
   function abrirEditor(valor: Editor) {
     setUso(null);
     setEditor(valor); setImagen(""); setRecorte(null); setLeyendo(false);
+    setDestinoId(valor?.categoriaId ?? "");
     setQuitar(false); setError(""); setNombre(valor?.id ? valor.nombre : ""); setVersionEditor((actual) => actual + 1);
   }
 
@@ -126,7 +126,7 @@ export default function ProductCatalog({ categories, cargandoCategorias, errorCa
     catch (causa) { if (causa instanceof ApiError && causa.status === 401) onSessionExpired(); throw causa; }
   }
 
-  /** Guarda una creación o un cambio de imagen con la API existente. */
+  /** Guarda una creación o los cambios del editor con la API del catálogo. */
   async function guardar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     if (!editor || guardando) return;
@@ -148,8 +148,15 @@ export default function ProductCatalog({ categories, cargandoCategorias, errorCa
       } else if (editor.tipo === "categoria") {
         await onUpdateCategoryImage(editor.id, { ...(nombre.trim() !== editor.nombre ? { name: nombre.trim() } : {}), ...(token ? { image_token: token } : quitar ? { remove_image: true as const } : {}) });
       } else if (editor.categoriaId) {
-        const actualizado = await onUpdateProductImage(editor.categoriaId, editor.id, { name: nombre.trim(), ...(token ? { image_token: token } : quitar ? { remove_image: true as const } : {}) });
-        setProductos((actuales) => actuales.map((item) => item.id === editor.id ? actualizado : item));
+        const movido = destinoId !== editor.categoriaId;
+        const actualizado = await onUpdateProductImage(editor.categoriaId, editor.id, { name: nombre.trim(), ...(movido ? { category_id: destinoId } : {}), ...(token ? { image_token: token } : quitar ? { remove_image: true as const } : {}) });
+        if (movido && categoria?.id === editor.categoriaId) {
+          setProductos((actuales) => actuales.filter((item) => item.id !== actualizado.id));
+        } else if (movido && categoria?.id === destinoId) {
+          setProductos((actuales) => [...actuales.filter((item) => item.id !== actualizado.id), actualizado].sort((a, b) => a.name.localeCompare(b.name, "es")));
+        } else if (!movido) {
+          setProductos((actuales) => actuales.map((item) => item.id === actualizado.id ? actualizado : item));
+        }
         setRevisionBusqueda((actual) => actual + 1);
       }
       setEditor(null); setImagen(""); setRecorte(null); setNombre("");
@@ -172,7 +179,7 @@ export default function ProductCatalog({ categories, cargandoCategorias, errorCa
   /** Presenta las mismas acciones para productos de una categoría o de una búsqueda. */
   function tarjetasProducto(elementos: (ShoppingProduct & { category_id?: string })[]) {
     return <div className="catalogo-productos-grid">{elementos.map((producto) => <article className="catalogo-productos-tarjeta" key={producto.id}>
-        <button className="catalogo-tarjeta-contenido catalogo-producto-activar" type="button" aria-label={"Gestionar imagen de " + producto.name} disabled={guardando} onClick={() => abrirEditor({ tipo: "producto", id: producto.id, nombre: producto.name, imagen: !!producto.image_url, categoriaId: producto.category_id ?? categoria?.id })}>{producto.image_url ? <img src={urlImagen(producto.image_url)} alt="" /> : <span className="catalogo-productos-imagen" aria-hidden="true"><AppIcon name="utensils" /></span>}<strong>{producto.name}</strong></button>
+        <button className="catalogo-tarjeta-contenido catalogo-producto-activar" type="button" aria-label={"Gestionar imagen de " + producto.name} disabled={guardando || cargando} onClick={() => abrirEditor({ tipo: "producto", id: producto.id, nombre: producto.name, imagen: !!producto.image_url, categoriaId: producto.category_id ?? categoria?.id })}>{producto.image_url ? <img src={urlImagen(producto.image_url)} alt="" /> : <span className="catalogo-productos-imagen" aria-hidden="true"><AppIcon name="utensils" /></span>}<strong>{producto.name}</strong></button>
       </article>)}</div>;
   }
 
@@ -208,6 +215,11 @@ export default function ProductCatalog({ categories, cargandoCategorias, errorCa
       {!editorModal && <h3>{titulo}</h3>}
       {editorModal && error && <p role="alert">{error}</p>}
       <label>{editor.tipo === "categoria" ? "Nombre de la categoría" : "Nombre del producto"}<input value={nombre} onChange={(evento) => setNombre(evento.target.value)} maxLength={100} required /></label>
+      {editor.tipo === "producto" && editor.id && editor.categoriaId && categories.some((elemento) => elemento.id === editor.categoriaId) && <label>Categoría
+        <select value={destinoId} disabled={guardando || uso !== null} onChange={(evento) => setDestinoId(evento.target.value)}>
+          {[...categories].sort((a, b) => a.name.localeCompare(b.name, "es")).map((elemento) => <option key={elemento.id} value={elemento.id}>{elemento.name}</option>)}
+        </select>
+      </label>}
       <ImagenCatalogo key={versionEditor} importar={importar} cambiar={(datos, area, ocupado) => { setImagen(datos); setRecorte(area); setLeyendo(ocupado); if (datos || ocupado) setQuitar(false); }} />
       {editor.imagen && <label><input type="checkbox" checked={quitar} onChange={(evento) => { setQuitar(evento.target.checked); if (evento.target.checked) { setImagen(""); setRecorte(null); setLeyendo(false); setVersionEditor((actual) => actual + 1); } }} />Quitar imagen actual</label>}
       {uso !== null && <div role="group" aria-label="Confirmar borrado"><p>¿Quieres borrar {editor.nombre}?</p><p>{uso ? "El producto está en la lista de la compra. Sus entradas también se borrarán." : "El producto no está en la lista de la compra."}</p></div>}

@@ -13,6 +13,62 @@ beforeEach(() => {
   HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
 });
 
+// Comprueba el traslado desde el modal y la actualización de la categoría de origen.
+it("mueve un producto a otra categoría solo al guardar el modal", async () => {
+  const usuario = userEvent.setup();
+  const pera = { id: "p", name: "Pera" };
+  const categorias = [{ id: "1", name: "Frutas" }, { id: "2", name: "Verduras" }];
+  let categoriaActual = "1";
+  const actualizar = vi.fn(async (_origen: string, _producto: string, cambio: { category_id?: string }) => {
+    categoriaActual = cambio.category_id ?? categoriaActual;
+    return pera;
+  });
+  render(<ProductCatalog categories={categorias} onGetProducts={async (id) => id === categoriaActual ? [pera] : []} onCreateCategory={vi.fn()} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} onUpdateCategoryImage={vi.fn()} onUpdateProductImage={actualizar} onImportImage={vi.fn()} onPrepareImage={vi.fn()} />);
+  await usuario.click(screen.getByRole("button", { name: "Frutas" }));
+  const abrir = await screen.findByRole("button", { name: "Gestionar imagen de Pera" });
+  await usuario.click(abrir);
+  let dialogo = within(screen.getByRole("dialog", { name: "Producto Pera" }));
+  const categoria = dialogo.getByRole<HTMLSelectElement>("combobox", { name: "Categoría" });
+  expect(categoria.value).toBe("1");
+  await usuario.selectOptions(categoria, "2");
+  await usuario.click(dialogo.getByRole("button", { name: "Cancelar" }));
+  expect(actualizar).not.toHaveBeenCalled();
+
+  await usuario.click(abrir);
+  dialogo = within(screen.getByRole("dialog", { name: "Producto Pera" }));
+  expect(dialogo.getByRole<HTMLSelectElement>("combobox", { name: "Categoría" }).value).toBe("1");
+  await usuario.selectOptions(dialogo.getByRole("combobox", { name: "Categoría" }), "2");
+  await usuario.click(dialogo.getByRole("button", { name: "Guardar" }));
+  expect(actualizar).toHaveBeenCalledWith("1", "p", { name: "Pera", category_id: "2" });
+  expect(await screen.findByText("No hay productos en esta categoría.")).toBeTruthy();
+  expect(screen.queryByRole("dialog")).toBeNull();
+  await usuario.click(screen.getByRole("button", { name: "Volver a categorías" }));
+  await usuario.click(screen.getByRole("button", { name: "Verduras" }));
+  expect(await screen.findByRole("button", { name: "Gestionar imagen de Pera" })).toBeTruthy();
+});
+
+// Comprueba que una búsqueda utiliza la categoría real del producto, no la que está abierta.
+it("mueve un resultado de búsqueda a la categoría abierta", async () => {
+  const usuario = userEvent.setup();
+  const pera = { id: "p", name: "Pera" };
+  const buscar = vi.fn().mockResolvedValueOnce({ products: [{ ...pera, category_id: "1" }] })
+    .mockResolvedValue({ products: [{ ...pera, category_id: "2" }] });
+  const actualizar = vi.fn().mockResolvedValue(pera);
+  render(<ProductCatalog categories={[{ id: "1", name: "Frutas" }, { id: "2", name: "Otros" }]} onGetProducts={async () => []} onSearchProducts={buscar} onCreateCategory={vi.fn()} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} onUpdateCategoryImage={vi.fn()} onUpdateProductImage={actualizar} onImportImage={vi.fn()} onPrepareImage={vi.fn()} />);
+  await usuario.click(screen.getByRole("button", { name: "Otros" }));
+  await usuario.type(screen.getByRole("textbox", { name: "Buscar productos" }), "per");
+  await usuario.click(await screen.findByRole("button", { name: "Gestionar imagen de Pera" }));
+  const dialogo = within(screen.getByRole("dialog", { name: "Producto Pera" }));
+  const categoria = dialogo.getByRole<HTMLSelectElement>("combobox", { name: "Categoría" });
+  expect(categoria.value).toBe("1");
+  await usuario.selectOptions(categoria, "2");
+  await usuario.click(dialogo.getByRole("button", { name: "Guardar" }));
+  expect(actualizar).toHaveBeenCalledWith("1", "p", { name: "Pera", category_id: "2" });
+  expect(buscar).toHaveBeenCalledTimes(2);
+  await usuario.click(screen.getByRole("button", { name: "Limpiar búsqueda" }));
+  expect(screen.getByRole("button", { name: "Gestionar imagen de Pera" })).toBeTruthy();
+});
+
 // Comprueba la búsqueda global, la edición con la categoría del resultado y la limpieza.
 it("busca productos en todo el catálogo y permite gestionar el resultado", async () => {
   const usuario = userEvent.setup();

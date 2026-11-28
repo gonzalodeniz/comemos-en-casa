@@ -91,8 +91,11 @@ export function createShoppingProduct(categoryId: string, name: string, csrfToke
   return apiRequest(`/shopping-categories/${categoryId}/products`, { method: "POST", csrfToken, body: { name, ...(imageToken ? { image_token: imageToken } : {}) } });
 }
 
-/** Actualiza la imagen de un producto existente. */
-export function updateShoppingProductImage(categoryId: string, productId: string, csrfToken: string, change: { name?: string; image_token?: string; remove_image?: true }): Promise<ShoppingProduct> {
+/** Describe los cambios que admite la edición de un producto existente. */
+export type CambioProductoCatalogo = { name?: string; category_id?: string; image_token?: string; remove_image?: true };
+
+/** Actualiza el nombre, la categoría o la imagen de un producto existente. */
+export function updateShoppingProductImage(categoryId: string, productId: string, csrfToken: string, change: CambioProductoCatalogo): Promise<ShoppingProduct> {
   return apiRequest(`/shopping-categories/${categoryId}/products/${productId}`, { method: "PATCH", csrfToken, body: change });
 }
 

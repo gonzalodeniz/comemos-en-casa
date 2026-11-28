@@ -43,11 +43,11 @@ def deliver_due_meal_reminders(now: datetime | None = None) -> int:
     instant = now or datetime.now(timezone.utc)
     enviados = 0
     with SessionFactory() as db:
-        pendientes = db.execute(select(MealAssignment, FoodLabel).join(FoodLabel).where(MealAssignment.reminder_days.is_not(None), MealAssignment.reminder_sent_at.is_(None))).all()
+        pendientes = db.execute(select(MealAssignment, FoodLabel).join(FoodLabel).where(MealAssignment.reminder_days.is_not(None), MealAssignment.reminder_skipped.is_(False), MealAssignment.reminder_sent_at.is_(None))).all()
         for assignment, label in pendientes:
             envio = datetime.combine(assignment.date - timedelta(days=assignment.reminder_days), time.fromisoformat(assignment.reminder_time), tzinfo=CANARY_ZONE)
             if envio <= instant.astimezone(CANARY_ZONE):
-                reserva = db.execute(update(MealAssignment).where(MealAssignment.id == assignment.id, MealAssignment.reminder_sent_at.is_(None), MealAssignment.reminder_days == assignment.reminder_days, MealAssignment.reminder_time == assignment.reminder_time, MealAssignment.reminder_message == assignment.reminder_message).values(reminder_sent_at=instant))
+                reserva = db.execute(update(MealAssignment).where(MealAssignment.id == assignment.id, MealAssignment.reminder_skipped.is_(False), MealAssignment.reminder_sent_at.is_(None), MealAssignment.reminder_days == assignment.reminder_days, MealAssignment.reminder_time == assignment.reminder_time, MealAssignment.reminder_message == assignment.reminder_message).values(reminder_sent_at=instant))
                 db.commit()
                 if reserva.rowcount != 1:
                     continue
@@ -203,6 +203,26 @@ def _operation_data(operation: MealPlanningOperation) -> dict[str, object]:
     }
 
 
+def _valores_recordatorio_guardado(asignacion: MealAssignment | None) -> tuple[int | None, str | None, str | None]:
+    """Obtiene la configuración persistida, sin incluir el estado de entrega."""
+    if asignacion is None:
+        return None, None, None
+    return asignacion.reminder_days, asignacion.reminder_time, asignacion.reminder_message
+
+
+def _valores_recordatorio_previsto(aviso: MealReminder | None) -> tuple[int | None, str | None, str | None]:
+    """Obtiene la configuración solicitada independientemente de su estado de envío."""
+    return (None, None, None) if aviso is None else (aviso.days_before, aviso.send_time, aviso.message)
+
+
+def _recordatorio_vencido(aviso: MealReminder | None, fecha: date, instante: datetime) -> bool:
+    """Indica si debe omitirse el envío al programar o cambiar el horario."""
+    if aviso is None:
+        return False
+    envio = datetime.combine(fecha - timedelta(days=aviso.days_before), time.fromisoformat(aviso.send_time), tzinfo=CANARY_ZONE)
+    return envio.astimezone(timezone.utc) <= instante.astimezone(timezone.utc)
+
+
 def build_preview(
     db: Session, operation: MealPlanningOperation
 ) -> dict[str, object]:
@@ -222,10 +242,11 @@ def build_preview(
     by_date = {row.date: row for row in rows}
     entries: list[dict[str, object]] = []
     changes: list[str] = []
-    snapshot: list[dict[str, str | None]] = []
+    snapshot: list[dict[str, object]] = []
     requires_confirmation = False
     for occurrence in dates:
         current = by_date.get(occurrence)
+        aviso_actual = _valores_recordatorio_guardado(current)
         current_label = (
             db.get(FoodLabel, current.label_id) if current is not None else None
         )
@@ -233,7 +254,8 @@ def build_preview(
             if current is None:
                 change = "assign"
             elif current.label_id == operation.label_id:
-                change = "unchanged"
+                aviso_previsto = _valores_recordatorio_previsto(operation.reminder)
+                change = "update_reminder" if aviso_actual != aviso_previsto else "unchanged"
             else:
                 change = "replace"
                 requires_confirmation = True
@@ -272,6 +294,7 @@ def build_preview(
                 "date": occurrence.isoformat(),
                 "assignment_id": str(current.id) if current is not None else None,
                 "label_id": str(current.label_id) if current is not None else None,
+                "reminder": aviso_actual,
             }
         )
 
@@ -518,6 +541,7 @@ async def get_meal_planning(
                     "days_before": assignment.reminder_days,
                     "send_time": assignment.reminder_time,
                     "message": assignment.reminder_message,
+                    **({"skipped": True} if assignment.reminder_skipped else {}),
                 },
                 "label": {
                     "id": str(label.id),
@@ -580,6 +604,7 @@ async def apply_meal_planning_operation(
     require_csrf(request, active_session)
     try:
         with serialize_meal_planning_writes(db):
+            instante = datetime.now(CANARY_ZONE)
             preview = build_preview(db, operation)
             expected_token = operation.preview_token
             current_token = str(preview["preview_token"])
@@ -611,36 +636,29 @@ async def apply_meal_planning_operation(
             for occurrence in dates:
                 current = by_date.get(occurrence)
                 if operation.action == "assign":
-                    reminder = operation.reminder
-                    if reminder is not None:
-                        envio = datetime.combine(occurrence - timedelta(days=reminder.days_before), time.fromisoformat(reminder.send_time), tzinfo=CANARY_ZONE)
-                        if envio <= datetime.now(CANARY_ZONE):
-                            reminder = None
+                    valores_aviso = _valores_recordatorio_previsto(operation.reminder)
                     if current is None:
                         db.add(
                             MealAssignment(
                                 date=occurrence,
                                 slot=operation.slot,
                                 label_id=label_id,
-                                reminder_days=reminder.days_before if reminder else None,
-                                reminder_time=reminder.send_time if reminder else None,
-                                reminder_message=reminder.message if reminder else None,
+                                reminder_days=valores_aviso[0],
+                                reminder_time=valores_aviso[1],
+                                reminder_message=valores_aviso[2],
+                                reminder_skipped=_recordatorio_vencido(operation.reminder, occurrence, instante),
                             )
                         )
                         changed_dates.append(occurrence.isoformat())
                     else:
                         # Cuenta la fecha una sola vez aunque cambien el plato y el recordatorio.
-                        valores_aviso = (
-                            reminder.days_before if reminder else None,
-                            reminder.send_time if reminder else None,
-                            reminder.message if reminder else None,
-                        )
-                        aviso_actual = (current.reminder_days, current.reminder_time, current.reminder_message)
+                        aviso_actual = _valores_recordatorio_guardado(current)
                         if current.label_id != label_id or aviso_actual != valores_aviso:
                             changed_dates.append(occurrence.isoformat())
-                            # Una nueva hora futura programa otro envío; editar el texto no lo duplica.
-                            if reminder is not None and aviso_actual[:2] != valores_aviso[:2]:
+                            # Un cambio de horario vuelve a evaluar el envío; editar el texto no lo duplica.
+                            if aviso_actual[:2] != valores_aviso[:2]:
                                 current.reminder_sent_at = None
+                                current.reminder_skipped = _recordatorio_vencido(operation.reminder, occurrence, instante)
                             current.label_id = label_id
                             current.reminder_days, current.reminder_time, current.reminder_message = valores_aviso
                 elif current is not None and (operation.repeat is not None or current.label_id == label_id):

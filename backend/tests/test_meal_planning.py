@@ -2,12 +2,131 @@
 from datetime import date, datetime, timezone
 from uuid import uuid4
 
+import pytest
 from sqlalchemy import select, text
 
 from app.models import MealAssignment
 
 
 from meal_planning_test_support import meal_database, api_get, api_post, authenticate, seed_labels, post_with_session
+
+
+@pytest.mark.parametrize(("hora", "repeticiones", "avisos"), [
+    (None, 1, [False]),
+    ("19:00", 1, [True]),
+    ("18:00", 1, [False]),
+    ("17:59", 2, [False, True]),
+])
+def test_guardar_y_recargar_comidas_con_y_sin_recordatorio(meal_database, monkeypatch, hora, repeticiones, avisos):
+    """Verifica desde la API las fechas guardadas y los avisos recuperados en otra sesión."""
+    class Reloj(datetime):
+        """Fija las 18:00 de Canarias en horario de verano."""
+        @classmethod
+        def now(cls, tz=None):
+            """Devuelve el mismo instante en la zona solicitada."""
+            return datetime(2026, 7, 5, 17, 0, tzinfo=timezone.utc).astimezone(tz)
+
+    monkeypatch.setattr("app.meal_planning_api.datetime", Reloj)
+    cookies = authenticate(meal_database)
+    otra_sesion = authenticate(meal_database)
+    pescado, _ = seed_labels(meal_database)
+    fechas = ["2026-07-05", "2026-07-12"][:repeticiones]
+    aviso = {"days_before": 0, "send_time": hora, "message": "Preparar pescado"} if hora else None
+    operacion = {
+        "action": "assign", "start_date": fechas[0], "slot": "dinner", "label_id": str(pescado.id),
+        "repeat": {"interval_weeks": 1, "end_date": fechas[-1]} if repeticiones > 1 else None,
+        "reminder": aviso,
+    }
+    previa = post_with_session("/api/v1/meal-planning/preview", operacion, cookies).json()
+    respuesta = post_with_session("/api/v1/meal-planning/operations", {**operacion, "preview_token": previa["preview_token"]}, cookies)
+    assert respuesta.status_code == 200
+    assert previa["changed_dates"] == respuesta.json()["changed_dates"] == fechas
+
+    consulta = api_get("/api/v1/meal-planning", params={"start_date": fechas[0], "end_date": fechas[-1]}, cookies=otra_sesion)
+    assert consulta.status_code == 200
+    assert [(fila["date"], fila["slot"], fila["label"]["name"], fila["reminder"]) for fila in consulta.json()["assignments"]] == [
+        (fecha, "dinner", "Pescado", aviso if tiene_aviso or aviso is None else {**aviso, "skipped": True})
+        for fecha, tiene_aviso in zip(fechas, avisos)
+    ]
+
+
+def test_serie_de_lentejas_conserva_el_aviso_vencido_sin_enviarlo(meal_database, monkeypatch):
+    """Reproduce la serie quincenal comunicada y comprueba la reprogramación del primer aviso."""
+    import app.meal_planning_api as api
+    from app.models import FoodLabel
+
+    class Reloj(datetime):
+        """Fija el guardado cuatro horas después del primer aviso."""
+        @classmethod
+        def now(cls, tz=None):
+            """Devuelve el instante fijo en la zona solicitada."""
+            return datetime(2026, 11, 28, 13, 0, tzinfo=timezone.utc).astimezone(tz)
+
+    monkeypatch.setattr(api, "datetime", Reloj)
+    monkeypatch.setattr(api, "SessionFactory", meal_database)
+    envios = []
+    monkeypatch.setattr(api, "send_meal_reminder_email", lambda *args: envios.append(args))
+    cookies = authenticate(meal_database)
+    with meal_database() as db:
+        lentejas = FoodLabel(code="lentejas", name="Lentejas")
+        db.add(lentejas)
+        db.commit()
+
+    aviso = {"days_before": 2, "send_time": "09:00", "message": "Comprar chorizo para las lentejas"}
+    operacion = {"action": "assign", "start_date": "2026-11-30", "slot": "lunch", "label_id": str(lentejas.id), "reminder": aviso}
+    serie = {**operacion, "repeat": {"interval_weeks": 2, "end_date": "2027-11-29"}}
+    ruta = "/api/v1/meal-planning/operations"
+    previa = post_with_session("/api/v1/meal-planning/preview", serie, cookies).json()
+    respuesta = post_with_session(ruta, {**serie, "preview_token": previa["preview_token"]}, cookies)
+    assert respuesta.status_code == 200
+    consulta = api_get("/api/v1/meal-planning", params={"start_date": "2026-11-30", "end_date": "2027-11-29"}, cookies=cookies)
+    comidas = consulta.json()["assignments"]
+    assert len(comidas) == 27
+    assert (comidas[0]["date"], comidas[0]["reminder"]) == ("2026-11-30", {**aviso, "skipped": True})
+    assert (comidas[1]["date"], comidas[1]["reminder"]) == ("2026-12-14", aviso)
+    assert (comidas[-1]["date"], comidas[-1]["reminder"]) == ("2027-11-29", aviso)
+    assert api.deliver_due_meal_reminders(datetime(2026, 11, 28, 13, 1, tzinfo=timezone.utc)) == 0
+    assert envios == []
+
+    mensaje_editado = {**aviso, "message": "Comprar chorizo"}
+    assert post_with_session(ruta, {**operacion, "reminder": mensaje_editado}, cookies).status_code == 200
+    assert api.deliver_due_meal_reminders(datetime(2026, 11, 28, 13, 2, tzinfo=timezone.utc)) == 0
+    nuevo_aviso = {**mensaje_editado, "send_time": "18:00"}
+    assert post_with_session(ruta, {**operacion, "reminder": nuevo_aviso}, cookies).status_code == 200
+    assert api.deliver_due_meal_reminders(datetime(2026, 11, 28, 18, 0, tzinfo=timezone.utc)) == 1
+    assert api.deliver_due_meal_reminders(datetime(2026, 12, 12, 9, 0, tzinfo=timezone.utc)) == 1
+    assert [envio[1:] for envio in envios] == [
+        (mensaje_editado["message"], "Lentejas", date(2026, 11, 30)),
+        (aviso["message"], "Lentejas", date(2026, 12, 14)),
+    ]
+
+
+def test_cambio_concurrente_del_recordatorio_invalida_la_previsualizacion(meal_database):
+    """Evita sobrescribir silenciosamente el aviso de otra sesión sin cambiar el plato."""
+    primera_sesion = authenticate(meal_database)
+    segunda_sesion = authenticate(meal_database)
+    pescado, _ = seed_labels(meal_database)
+    operacion = {"action": "assign", "start_date": "2099-11-08", "slot": "lunch", "label_id": str(pescado.id)}
+    ruta = "/api/v1/meal-planning/operations"
+    assert post_with_session(ruta, operacion, primera_sesion).status_code == 200
+
+    aviso = {"days_before": 1, "send_time": "18:00", "message": "Aviso de la primera sesión"}
+    pendiente = {**operacion, "reminder": aviso}
+    token = post_with_session("/api/v1/meal-planning/preview", pendiente, primera_sesion).json()["preview_token"]
+    otro_aviso = {**aviso, "message": "Aviso de la segunda sesión"}
+    assert post_with_session(ruta, {**operacion, "reminder": otro_aviso}, segunda_sesion).status_code == 200
+
+    respuesta = post_with_session(ruta, {**pendiente, "confirmed": True, "preview_token": token}, primera_sesion)
+    assert respuesta.status_code == 409
+    previa = respuesta.json()["detail"]["preview"]
+    assert previa["dates"][0]["change"] == "update_reminder"
+    assert previa["changed_dates"] == [operacion["start_date"]]
+    with meal_database() as db:
+        assert db.scalar(select(MealAssignment)).reminder_message == otro_aviso["message"]
+
+    respuesta = post_with_session(ruta, {**pendiente, "confirmed": True, "preview_token": previa["preview_token"]}, primera_sesion)
+    assert respuesta.status_code == 200
+    assert respuesta.json()["changed_count"] == 1
 
 
 def test_guardar_cambios_del_recordatorio_sin_cambiar_comida(meal_database):
@@ -22,9 +141,11 @@ def test_guardar_cambios_del_recordatorio_sin_cambiar_comida(meal_database):
     operacion = {"action": "assign", "start_date": fecha.isoformat(), "slot": "lunch", "label_id": str(pescado.id)}
     aviso = {"days_before": 1, "send_time": "18:00", "message": "Preparar pescado"}
     for recordatorio, cambios in [(aviso, 1), (aviso, 0), ({**aviso, "send_time": "19:00"}, 1), (None, 1), (None, 0)]:
-        respuesta = post_with_session("/api/v1/meal-planning/operations", {**operacion, "reminder": recordatorio}, cookies)
+        solicitud = {**operacion, "reminder": recordatorio}
+        previa = post_with_session("/api/v1/meal-planning/preview", solicitud, cookies).json()
+        respuesta = post_with_session("/api/v1/meal-planning/operations", {**solicitud, "preview_token": previa["preview_token"]}, cookies)
         assert respuesta.status_code == 200
-        assert respuesta.json()["changed_count"] == cambios
+        assert previa["changed_count"] == respuesta.json()["changed_count"] == cambios
         assert respuesta.json()["changed_dates"] == ([fecha.isoformat()] if cambios else [])
         with meal_database() as db:
             asignacion = db.scalar(select(MealAssignment))
@@ -352,7 +473,9 @@ def test_invalid_operations_reject_bad_dates_interval_slot_and_label(meal_databa
     with meal_database() as db:
         assert db.query(MealAssignment).count() == 0
 
-def test_failed_repeated_operation_rolls_back_the_entire_batch(meal_database):
+@pytest.mark.parametrize("recordatorio", [None, {"days_before": 1, "send_time": "18:00", "message": "Preparar pescado"}])
+def test_failed_repeated_operation_rolls_back_the_entire_batch(meal_database, recordatorio):
+    """Un error al guardar la segunda fecha descarta toda la serie, incluidos sus avisos."""
     cookies = authenticate(meal_database)
     pescado, _ = seed_labels(meal_database)
     with meal_database() as db:
@@ -360,17 +483,18 @@ def test_failed_repeated_operation_rolls_back_the_entire_batch(meal_database):
             text(
                 """CREATE TRIGGER reject_second_meal_date
                    BEFORE INSERT ON meal_assignments
-                   WHEN NEW.date = '2026-11-09'
+                   WHEN NEW.date = '2099-11-09'
                    BEGIN SELECT RAISE(ABORT, 'synthetic failure'); END"""
             )
         )
         db.commit()
     payload = {
         "action": "assign",
-        "start_date": "2026-11-02",
+        "start_date": "2099-11-02",
         "slot": "lunch",
         "label_id": str(pescado.id),
-        "repeat": {"interval_weeks": 1, "end_date": "2026-11-09"},
+        "repeat": {"interval_weeks": 1, "end_date": "2099-11-09"},
+        "reminder": recordatorio,
     }
 
     response = post_with_session("/api/v1/meal-planning/operations", payload, cookies)
@@ -391,7 +515,10 @@ def test_recordatorio_vencido_no_se_programa(meal_database, monkeypatch):
     respuesta = post_with_session("/api/v1/meal-planning/operations", {"action":"assign", "start_date":"2026-11-02", "slot":"lunch", "label_id":str(pescado.id), "reminder":{"days_before":0,"send_time":"18:00","message":"Sacar pollo"}}, cookies)
     assert respuesta.status_code == 200
     with meal_database() as db:
-        assert db.scalar(select(MealAssignment)).reminder_days is None
+        asignacion = db.scalar(select(MealAssignment))
+        assert asignacion.reminder_days == 0
+        assert asignacion.reminder_skipped is True
+        assert asignacion.reminder_sent_at is None
 
 # Verifica destinatarios activos, contenido y ausencia de reenvío tras un envío correcto.
 def test_envio_recordatorio_a_todos_los_usuarios_activos(meal_database, monkeypatch):

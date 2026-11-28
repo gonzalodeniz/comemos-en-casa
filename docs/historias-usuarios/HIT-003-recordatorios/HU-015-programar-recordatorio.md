@@ -12,7 +12,7 @@ Como usuario, quiero programar un recordatorio con mi propio mensaje, eligiendo 
 
 - [x] Dado el panel «Asignar comida» de la planificación semanal, cuando activo «Recordatorio» debajo de «Repetir», entonces puedo elegir los días de antelación (incluido 0) y la hora, y escribir el mensaje. Si lo dejo desactivado, no se programa ningún aviso.
 - [x] Dada una comida puntual con un aviso programado para una hora futura, cuando llega esa hora en Canarias, entonces todas las cuentas activas, incluida la que lo configuró, reciben un correo con el mensaje, la comida y su fecha. Con 0 días, el aviso se envía el mismo día de la comida. El formulario no muestra una etiqueta de zona horaria.
-- [x] Dada una comida cuya hora de envío ya pasó, cuando guardo el recordatorio, entonces no se envía el correo ni se muestra un aviso sobre la omisión.
+- [x] Dada una comida cuya hora de envío ya pasó, al guardar se conserva la configuración sin enviar el correo. La campana indica que el aviso venció y se puede volver a editar.
 
 La comprobación SMTP real con MailHog no se realizó; el usuario aceptó cerrar la historia sin ella. Los envíos se intentan una vez: los fallos se registran y no se reintentan, por lo que pueden perderse correos.
 

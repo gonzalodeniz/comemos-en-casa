@@ -540,10 +540,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
     void runExclusive(async () => {
       const result = await previewMealPlanning(snapshot, csrfToken);
       if (!result.requires_confirmation) {
-        const saved = await applyMealPlanning(snapshot, result.preview_token, csrfToken);
-        closeEditor();
-        setNotice(saved.changed_count === 0 ? "No había cambios que guardar." : `Se guardaron ${saved.changed_count} cambio${saved.changed_count === 1 ? "" : "s"}.`);
-        setRevision((value) => value + 1);
+        await guardarPrevisualizacion(snapshot, result);
         return;
       }
       previewOperationRef.current = snapshot;
@@ -552,29 +549,34 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
     });
   }
 
+  /** Guarda la operación o permite reconfirmarla si cambió la planificación. */
+  async function guardarPrevisualizacion(operacion: MealPlanningOperation, previa: MealPlanningPreview) {
+    try {
+      const resultado = await applyMealPlanning(operacion, previa.preview_token, csrfToken);
+      closeEditor();
+      setNotice(resultado.changed_count === 0 ? "No había cambios que guardar."
+        : resultado.changed_count === 1 ? "Se guardó 1 cambio." : `Se guardaron ${resultado.changed_count} cambios.`);
+      setRevision((valor) => valor + 1);
+    } catch (causa: unknown) {
+      if (!(causa instanceof ApiError) || causa.status !== 409) throw causa;
+      const actualizada = await previewMealPlanning(operacion, csrfToken);
+      previewOperationRef.current = operacion;
+      setPreview(actualizada);
+      setForceReconfirmation(true);
+      setError("La planificación cambió desde la vista previa. Revisa el estado actualizado antes de confirmar.");
+    }
+  }
+
   function saveOperation() {
     const operation = previewOperationRef.current;
     if (!operation || !preview) return;
-    void runExclusive(async () => {
-      try {
-        const result = await applyMealPlanning(operation, preview.preview_token, csrfToken);
-        closeEditor();
-        setNotice(
-          result.changed_count === 0
-            ? "No había cambios que guardar."
-            : `Se guardaron ${result.changed_count} cambio${result.changed_count === 1 ? "" : "s"}.`,
-        );
-        setRevision((value) => value + 1);
-      } catch (cause: unknown) {
-        if (!(cause instanceof ApiError) || cause.status !== 409) throw cause;
-        const refreshed = await previewMealPlanning(operation, csrfToken);
-        setPreview(refreshed);
-        setForceReconfirmation(true);
-        setError("La planificación cambió desde la vista previa. Revisa el estado actualizado antes de confirmar.");
-      }
-    });
+    void runExclusive(() => guardarPrevisualizacion(operation, preview));
   }
 
+  // Muestra la omisión solo mientras se mantenga el horario guardado.
+  const avisoGuardado = assignmentMap.get(`${editorDate}:${editorSlot}`)?.reminder;
+  const avisoVencido = avisoGuardado?.skipped && draft?.reminderDays === String(avisoGuardado.days_before)
+    && draft.reminderTime === avisoGuardado.send_time;
   const title = formatDateLabel(queryDate, { month: "long", year: "numeric" });
 
   return (
@@ -723,6 +725,7 @@ export default function MealPlanning({ csrfToken, onSessionExpired, onOpenRecipe
                 </div>
                 {draft.action === "assign" && <div className="repeat-panel">
                   <label className="repeat-toggle"><AppIcon name="bell" /><strong>Recordatorio</strong><input type="checkbox" role="switch" checked={draft.reminderEnabled} onChange={(event) => { setDraft({ ...draft, reminderEnabled: event.target.checked }); setPreview(null); }} /></label>
+                  {draft.reminderEnabled && avisoVencido && <p className="repeat-summary">Este aviso no se enviará porque su hora ya pasó. Puedes elegir un horario futuro.</p>}
                   {draft.reminderEnabled && <div className="repeat-fields">
                     <label>Días de antelación<input aria-label="Días de antelación" type="number" min="0" step="1" value={draft.reminderDays} onChange={(event) => setDraft({ ...draft, reminderDays: event.target.value })} required /></label>
                     <label>Hora<input aria-label="Hora del recordatorio" type="time" value={draft.reminderTime} onChange={(event) => setDraft({ ...draft, reminderTime: event.target.value })} required /></label>
@@ -777,6 +780,7 @@ function previewChangeLabel(
 ): string {
   if (change === "assign") return `Asignar ${resulting?.name ?? "etiqueta"}`;
   if (change === "replace") return `Sustituir ${current?.name ?? "etiqueta"} por ${resulting?.name ?? "etiqueta"}`;
+  if (change === "update_reminder") return `Actualizar recordatorio de ${resulting?.name ?? "la comida"}`;
   if (change === "delete") return `Eliminar ${current?.name ?? "etiqueta"}`;
   if (change === "unchanged") return `Ya tiene ${current?.name ?? "esta etiqueta"}`;
   return "Sin cambios: la etiqueta exacta no coincide";

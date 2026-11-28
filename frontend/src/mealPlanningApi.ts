@@ -110,7 +110,7 @@ export type MealAssignment = {
   date: string;
   slot: MealSlot;
   label: FoodLabel;
-  reminder?: null | { days_before: number; send_time: string; message: string };
+  reminder?: null | { days_before: number; send_time: string; message: string; skipped?: boolean };
 };
 export type MealPlanningResponse = {
   start_date: string;
@@ -130,7 +130,7 @@ export type MealPlanningOperation = {
 export type MealPlanningPreviewEntry = {
   date: string;
   slot: MealSlot;
-  change: "assign" | "replace" | "unchanged" | "delete" | "no_op";
+  change: "assign" | "replace" | "update_reminder" | "unchanged" | "delete" | "no_op";
   current_label: FoodLabel | null;
   resulting_label: FoodLabel | null;
 };

@@ -35,6 +35,28 @@ def test_existing_users_keep_email_only_after_notification_migration(monkeypatch
     engine.dispose()
 
 
+def test_migracion_de_aviso_omitido_conserva_avisos_existentes(monkeypatch):
+    """Comprueba el valor inicial al migrar y que revertir no habilita envíos vencidos."""
+    import importlib
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+    from sqlalchemy import text
+
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    with engine.begin() as connection:
+        connection.execute(text("CREATE TABLE meal_assignments (id INTEGER PRIMARY KEY, reminder_days INTEGER, reminder_time TEXT, reminder_message TEXT)"))
+        connection.execute(text("INSERT INTO meal_assignments VALUES (1, 2, '09:00', 'Pendiente'), (2, 2, '09:00', 'Vencido')"))
+        migration = importlib.import_module("migrations.versions.0026_meal_reminder_skipped")
+        monkeypatch.setattr(migration, "op", Operations(MigrationContext.configure(connection)))
+        migration.upgrade()
+        assert connection.execute(text("SELECT reminder_skipped FROM meal_assignments ORDER BY id")).scalars().all() == [0, 0]
+        connection.execute(text("UPDATE meal_assignments SET reminder_skipped = TRUE WHERE id = 2"))
+        migration.downgrade()
+        filas = connection.execute(text("SELECT reminder_days, reminder_time, reminder_message FROM meal_assignments ORDER BY id")).all()
+        assert filas == [(2, "09:00", "Pendiente"), (None, None, None)]
+    engine.dispose()
+
+
 def test_user_last_view_is_persisted():
     """Comprueba que la última vista pertenece al usuario y se conserva."""
     engine = create_engine("sqlite+pysqlite:///:memory:")
@@ -88,7 +110,8 @@ def test_food_catalog_migration_follows_meal_planning_and_auth_migrations():
     root = Path(__file__).resolve().parents[1]
     script = ScriptDirectory(dir=str(root / "migrations"))
 
-    assert script.get_heads() == ["0025_notification_preferences"]
+    assert script.get_heads() == ["0026_meal_reminder_skipped"]
+    assert script.get_revision("0026_meal_reminder_skipped").down_revision == "0025_notification_preferences"
     assert script.get_revision("0025_notification_preferences").down_revision == "0024_meal_reminders"
     assert script.get_revision("0022_category_name_unique").down_revision == "0021_user_last_view"
     assert script.get_revision("0021_user_last_view").down_revision == "0020_backup_schedule"

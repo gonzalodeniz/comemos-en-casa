@@ -16,13 +16,16 @@ Los usuarios pueden programar avisos por correo para tener los ingredientes list
 ## Decisiones de producto
 
 - Se admiten 0 días de antelación para enviar el aviso el mismo día de la comida. La hora se interpreta en `Atlantic/Canary`, sin mostrar una etiqueta de zona horaria en el formulario.
-- Si al guardar ya pasó la hora prevista de envío para una fecha, se omite el aviso sin notificarlo en la interfaz.
+- Si al programar o cambiar el horario ya pasó la hora prevista de envío para una fecha, se omite el envío automático, no la configuración. La campana indica que el aviso venció y el editor conserva la antelación, la hora y el mensaje. Cambiar el horario por uno futuro vuelve a programar el envío de esa fecha.
 - En una comida repetida se programa un aviso para cada fecha. Por ejemplo, si la comida se repite cada domingo y el aviso es un día antes a las 18:00, se envía cada sábado a las 18:00.
 - Al editar la comida o el recordatorio, se actualizan los avisos pendientes que correspondan. Al borrar la comida o desactivar el recordatorio, se cancelan. Mover un aviso ya enviado a una nueva fecha u hora futura programa un nuevo envío; editar solo el texto no lo reenvía.
+- La vista previa cuenta también los cambios que afectan solo al recordatorio. Si otra sesión cambia la comida o el recordatorio entre la vista previa y el guardado, se conserva el borrador y se pide revisar y confirmar antes de volver a guardar.
 
 ## Stack y pruebas
 
 Se mantiene el stack actual: React, FastAPI y PostgreSQL. Para comprobar los envíos en desarrollo se utiliza MailHog.
+
+La migración `0026_meal_reminder_skipped` distingue los avisos omitidos de los pendientes. Al desplegar, aplica la migración y evita que un planificador anterior procese avisos mientras la versión nueva empieza a guardarlos. Los avisos que la versión anterior descartó deben volver a configurarse en la comida correspondiente.
 
 ## Documentación relacionada
 

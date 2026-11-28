@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // Comprueba la consulta y la sesión del catálogo mediante interacciones.
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ApiError } from "./api";
@@ -127,13 +127,43 @@ it("crea una categoría con imagen importada y recortada", async () => {
   const preparar = vi.fn().mockResolvedValue("token");
   render(<ProductCatalog categories={[]} onGetProducts={vi.fn()} onCreateCategory={crear} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} onUpdateCategoryImage={vi.fn()} onUpdateProductImage={vi.fn()} onImportImage={vi.fn().mockResolvedValue("data:image/png;base64,YQ==")} onPrepareImage={preparar} />);
   await usuario.click(screen.getByRole("button", { name: "Nueva categoría" }));
-  await usuario.type(screen.getByLabelText("Nombre de la categoría"), "Frutas");
+  const dialogo = within(screen.getByRole("dialog", { name: "Nueva categoría" }));
+  await usuario.type(dialogo.getByLabelText("Nombre de la categoría"), "Frutas");
   await usuario.type(screen.getByLabelText("URL de imagen"), "https://example.com/imagen.png");
   await usuario.click(screen.getByRole("button", { name: "Importar imagen" }));
   await usuario.click(await screen.findByRole("button", { name: "Confirmar recorte" }));
   await usuario.click(screen.getByRole("button", { name: "Guardar" }));
   expect(preparar).toHaveBeenCalledWith("data:image/png;base64,YQ==", { x: 0, y: 0, width: 10, height: 10 });
   expect(crear).toHaveBeenCalledWith("Frutas", "token");
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+// Comprueba el error dentro del modal y que el cierre descarta el borrador.
+it("mantiene el formulario en el modal si falla la creación y permite descartarlo", async () => {
+  const usuario = userEvent.setup();
+  const crear = vi.fn().mockRejectedValue(new ApiError(409, "Duplicate"));
+  render(<ProductCatalog categories={[]} onGetProducts={vi.fn()} onCreateCategory={crear} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} onUpdateCategoryImage={vi.fn()} onUpdateProductImage={vi.fn()} onImportImage={vi.fn()} onPrepareImage={vi.fn()} />);
+  const abrir = screen.getByRole("button", { name: "Nueva categoría" });
+  await usuario.click(abrir);
+  const ventana = screen.getByRole("dialog", { name: "Nueva categoría" });
+  const dialogo = within(ventana);
+  const nombre = dialogo.getByLabelText<HTMLInputElement>("Nombre de la categoría");
+  await usuario.type(nombre, "Frutas");
+  await usuario.click(dialogo.getByRole("button", { name: "Guardar" }));
+  expect((await dialogo.findByRole("alert")).textContent).toBe("Ya existe una categoría con ese nombre.");
+  expect(nombre.value).toBe("Frutas");
+
+  // jsdom no genera el evento nativo de cierre al pulsar Escape.
+  fireEvent(ventana, new Event("cancel", { cancelable: true }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(document.activeElement).toBe(abrir);
+
+  await usuario.click(abrir);
+  const reabierto = within(screen.getByRole("dialog", { name: "Nueva categoría" }));
+  expect(reabierto.getByLabelText<HTMLInputElement>("Nombre de la categoría").value).toBe("");
+  await usuario.click(reabierto.getByRole("button", { name: "Cancelar" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(crear).toHaveBeenCalledOnce();
 });
 
 it("quita la imagen de una categoría solo al guardar", async () => {

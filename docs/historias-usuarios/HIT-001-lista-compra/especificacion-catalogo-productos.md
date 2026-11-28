@@ -18,7 +18,7 @@ Este documento recoge el comportamiento acordado durante el refinamiento. Comple
 - Mostrar las categorías en tarjetas, ordenadas alfabéticamente por nombre.
 - Cada categoría tiene nombre e imagen opcional. Si no tiene imagen, mostrar una imagen predeterminada.
 - No mostrar descripciones ni filtros; tampoco los filtros «Alimentación», «Hogar» y «Otros» del prototipo.
-- Ofrecer la acción **Nueva categoría**.
+- La acción **Nueva categoría** abre el formulario de creación en una ventana modal.
 - Al pulsar una categoría, abrir una pantalla con sus productos y las acciones para gestionarlos.
 - El menú de tres puntos de cada categoría permite **Editar** y **Borrar**, salvo la categoría especial descrita a continuación.
 

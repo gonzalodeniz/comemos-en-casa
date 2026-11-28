@@ -31,8 +31,8 @@ type Props = {
 // Identifica el formulario activo sin presentar acciones no admitidas.
 type Editor = { tipo: "categoria" | "producto"; id: string; nombre: string; imagen: boolean; categoriaId?: string } | null;
 
-/** Presenta el editor de producto como diálogo modal y devuelve el foco al cerrarlo. */
-function ModalProducto({ titulo, cerrar, ocupado, children }: { titulo: string; cerrar: () => void; ocupado: boolean; children: ReactNode }) {
+/** Presenta un editor del catálogo como diálogo modal y devuelve el foco al cerrarlo. */
+function ModalCatalogo({ titulo, cerrar, ocupado, children }: { titulo: string; cerrar: () => void; ocupado: boolean; children: ReactNode }) {
   const dialogo = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const origen = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -40,7 +40,7 @@ function ModalProducto({ titulo, cerrar, ocupado, children }: { titulo: string; 
     ventana?.showModal();
     return () => { if (ventana?.open) ventana.close(); origen?.focus(); };
   }, []);
-  return <dialog ref={dialogo} className="catalogo-modal" aria-labelledby="titulo-modal-producto" onCancel={(evento) => { evento.preventDefault(); if (!ocupado) cerrar(); }}><h3 id="titulo-modal-producto">{titulo}</h3>{children}</dialog>;
+  return <dialog ref={dialogo} className="catalogo-modal" aria-labelledby="titulo-modal-catalogo" onCancel={(evento) => { evento.preventDefault(); if (!ocupado) cerrar(); }}><h3 id="titulo-modal-catalogo">{titulo}</h3>{children}</dialog>;
 }
 
 /** Construye la ruta autenticada de una imagen del catálogo. */
@@ -181,6 +181,9 @@ export default function ProductCatalog({ categories, cargandoCategorias, errorCa
     {busqueda && <button type="button" className="compra-accion" aria-label="Limpiar búsqueda" onClick={() => { setRespuestaBusqueda(undefined); setBusqueda(""); }}><AppIcon name="close" /></button>}
   </div>;
 
+  // Solo la creación de productos conserva el formulario en línea.
+  const editorModal = !!editor && (editor.tipo === "categoria" || !!editor.id);
+
   return <section className="catalogo-productos">
     {categoria ? <>
       <button className="catalogo-volver" type="button" disabled={guardando} onClick={() => { revision.current++; setCategoria(null); setError(""); abrirEditor(null); }}><AppIcon name="chevron-left" />Volver a categorías</button>
@@ -196,10 +199,14 @@ export default function ProductCatalog({ categories, cargandoCategorias, errorCa
       </article>)}</div>)}
     </>}
     {buscando && (!respuestaVigente ? <p role="status">Buscando productos…</p> : respuestaVigente.productos === null ? <p role="alert">No se pudieron buscar los productos. <button type="button" onClick={() => setRevisionBusqueda((actual) => actual + 1)}>Reintentar</button></p> : respuestaVigente.productos.length ? tarjetasProducto(respuestaVigente.productos) : <p role="status">No se encontraron productos.</p>)}
-    {error && !(editor?.tipo === "producto" && editor.id) && <p role="alert">{error}</p>}
-    {editor && (() => { const formulario = <form className="catalogo-editor" onSubmit={(evento) => void guardar(evento)} aria-label={editor.id && editor.tipo === "producto" ? "Producto " + editor.nombre : editor.id ? "Categoría " + editor.nombre : editor.tipo === "categoria" ? "Nueva categoría" : "Nuevo producto"}>
-      {!(editor.id && editor.tipo === "producto") && <h3>{editor.id ? "Categoría " + editor.nombre : editor.tipo === "categoria" ? "Nueva categoría" : "Nuevo producto"}</h3>}
-      {editor.id && editor.tipo === "producto" && error && <p role="alert">{error}</p>}
+    {error && !editorModal && <p role="alert">{error}</p>}
+    {editor && (() => {
+      // Comparte el título visible con el nombre accesible del formulario.
+      const titulo = editor.tipo === "categoria" ? (editor.id ? "Categoría " + editor.nombre : "Nueva categoría") : (editor.id ? "Producto " + editor.nombre : "Nuevo producto");
+      // Mantiene las mismas acciones y campos en el modal y en el editor en línea.
+      const formulario = <form className="catalogo-editor" onSubmit={(evento) => void guardar(evento)} aria-label={titulo}>
+      {!editorModal && <h3>{titulo}</h3>}
+      {editorModal && error && <p role="alert">{error}</p>}
       <label>{editor.tipo === "categoria" ? "Nombre de la categoría" : "Nombre del producto"}<input value={nombre} onChange={(evento) => setNombre(evento.target.value)} maxLength={100} required /></label>
       <ImagenCatalogo key={versionEditor} importar={importar} cambiar={(datos, area, ocupado) => { setImagen(datos); setRecorte(area); setLeyendo(ocupado); if (datos || ocupado) setQuitar(false); }} />
       {editor.imagen && <label><input type="checkbox" checked={quitar} onChange={(evento) => { setQuitar(evento.target.checked); if (evento.target.checked) { setImagen(""); setRecorte(null); setLeyendo(false); setVersionEditor((actual) => actual + 1); } }} />Quitar imagen actual</label>}
@@ -212,6 +219,8 @@ export default function ProductCatalog({ categories, cargandoCategorias, errorCa
         <button type="button" aria-label="Cancelar" title="Cancelar" disabled={guardando} onClick={() => abrirEditor(null)}><AppIcon name="close" /></button>
         <button className="catalogo-borrar-producto" type="button" aria-label="Borrar producto" title="Borrar producto" disabled={guardando} onClick={() => void consultarBorrado(editor.id)}><AppIcon name="trash" /></button>
       </div> : <><button type="submit" disabled={guardando || leyendo}>{guardando ? "Guardando…" : "Guardar"}</button><button type="button" disabled={guardando} onClick={() => abrirEditor(null)}>Cancelar</button></>}
-    </form>; return editor.id && editor.tipo === "producto" ? <ModalProducto titulo={"Producto " + editor.nombre} cerrar={() => abrirEditor(null)} ocupado={guardando}>{formulario}</ModalProducto> : editor.id && editor.tipo === "categoria" ? <ModalProducto titulo={"Categoría " + editor.nombre} cerrar={() => abrirEditor(null)} ocupado={guardando}>{formulario}</ModalProducto> : formulario; })()}
+    </form>;
+      return editorModal ? <ModalCatalogo titulo={titulo} cerrar={() => abrirEditor(null)} ocupado={guardando}>{formulario}</ModalCatalogo> : formulario;
+    })()}
   </section>;
 }

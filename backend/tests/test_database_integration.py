@@ -73,7 +73,7 @@ def test_database_is_ready_and_latest_migration_is_applied():
         check=False,
     )
     assert migration.returncode == 0, migration.stderr
-    assert "0025_notification_preferences (head)" in migration.stdout
+    assert "0026_meal_reminder_skipped (head)" in migration.stdout
 
 
 @pytest.mark.skipif(

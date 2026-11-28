@@ -25,3 +25,5 @@ El build de despliegue define `VITE_BASE=/comemos/` y publica la interfaz bajo `
 ## Instalación móvil
 
 Con la aplicación disponible por HTTPS, usa la opción de instalación o de añadir a la pantalla de inicio del navegador móvil. La aplicación instalada necesita conexión; las notificaciones push no forman parte de esta funcionalidad.
+
+En iPhone, la página declara el logo como `apple-touch-icon` para la pantalla de inicio. Si una instalación anterior sigue mostrando una inicial, retira ese icono y vuelve a añadir la aplicación desde Safari.

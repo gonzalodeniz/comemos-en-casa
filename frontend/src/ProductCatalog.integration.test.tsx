@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // Comprueba la consulta y la sesión del catálogo mediante interacciones.
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ApiError } from "./api";
@@ -11,6 +11,62 @@ beforeEach(() => {
   // Simula el diálogo nativo que jsdom no implementa.
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
+});
+
+// Comprueba el traslado desde el modal y la actualización de la categoría de origen.
+it("mueve un producto a otra categoría solo al guardar el modal", async () => {
+  const usuario = userEvent.setup();
+  const pera = { id: "p", name: "Pera" };
+  const categorias = [{ id: "1", name: "Frutas" }, { id: "2", name: "Verduras" }];
+  let categoriaActual = "1";
+  const actualizar = vi.fn(async (_origen: string, _producto: string, cambio: { category_id?: string }) => {
+    categoriaActual = cambio.category_id ?? categoriaActual;
+    return pera;
+  });
+  render(<ProductCatalog categories={categorias} onGetProducts={async (id) => id === categoriaActual ? [pera] : []} onCreateCategory={vi.fn()} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} onUpdateCategoryImage={vi.fn()} onUpdateProductImage={actualizar} onImportImage={vi.fn()} onPrepareImage={vi.fn()} />);
+  await usuario.click(screen.getByRole("button", { name: "Frutas" }));
+  const abrir = await screen.findByRole("button", { name: "Gestionar imagen de Pera" });
+  await usuario.click(abrir);
+  let dialogo = within(screen.getByRole("dialog", { name: "Producto Pera" }));
+  const categoria = dialogo.getByRole<HTMLSelectElement>("combobox", { name: "Categoría" });
+  expect(categoria.value).toBe("1");
+  await usuario.selectOptions(categoria, "2");
+  await usuario.click(dialogo.getByRole("button", { name: "Cancelar" }));
+  expect(actualizar).not.toHaveBeenCalled();
+
+  await usuario.click(abrir);
+  dialogo = within(screen.getByRole("dialog", { name: "Producto Pera" }));
+  expect(dialogo.getByRole<HTMLSelectElement>("combobox", { name: "Categoría" }).value).toBe("1");
+  await usuario.selectOptions(dialogo.getByRole("combobox", { name: "Categoría" }), "2");
+  await usuario.click(dialogo.getByRole("button", { name: "Guardar" }));
+  expect(actualizar).toHaveBeenCalledWith("1", "p", { name: "Pera", category_id: "2" });
+  expect(await screen.findByText("No hay productos en esta categoría.")).toBeTruthy();
+  expect(screen.queryByRole("dialog")).toBeNull();
+  await usuario.click(screen.getByRole("button", { name: "Volver a categorías" }));
+  await usuario.click(screen.getByRole("button", { name: "Verduras" }));
+  expect(await screen.findByRole("button", { name: "Gestionar imagen de Pera" })).toBeTruthy();
+});
+
+// Comprueba que una búsqueda utiliza la categoría real del producto, no la que está abierta.
+it("mueve un resultado de búsqueda a la categoría abierta", async () => {
+  const usuario = userEvent.setup();
+  const pera = { id: "p", name: "Pera" };
+  const buscar = vi.fn().mockResolvedValueOnce({ products: [{ ...pera, category_id: "1" }] })
+    .mockResolvedValue({ products: [{ ...pera, category_id: "2" }] });
+  const actualizar = vi.fn().mockResolvedValue(pera);
+  render(<ProductCatalog categories={[{ id: "1", name: "Frutas" }, { id: "2", name: "Otros" }]} onGetProducts={async () => []} onSearchProducts={buscar} onCreateCategory={vi.fn()} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} onUpdateCategoryImage={vi.fn()} onUpdateProductImage={actualizar} onImportImage={vi.fn()} onPrepareImage={vi.fn()} />);
+  await usuario.click(screen.getByRole("button", { name: "Otros" }));
+  await usuario.type(screen.getByRole("textbox", { name: "Buscar productos" }), "per");
+  await usuario.click(await screen.findByRole("button", { name: "Gestionar imagen de Pera" }));
+  const dialogo = within(screen.getByRole("dialog", { name: "Producto Pera" }));
+  const categoria = dialogo.getByRole<HTMLSelectElement>("combobox", { name: "Categoría" });
+  expect(categoria.value).toBe("1");
+  await usuario.selectOptions(categoria, "2");
+  await usuario.click(dialogo.getByRole("button", { name: "Guardar" }));
+  expect(actualizar).toHaveBeenCalledWith("1", "p", { name: "Pera", category_id: "2" });
+  expect(buscar).toHaveBeenCalledTimes(2);
+  await usuario.click(screen.getByRole("button", { name: "Limpiar búsqueda" }));
+  expect(screen.getByRole("button", { name: "Gestionar imagen de Pera" })).toBeTruthy();
 });
 
 // Comprueba la búsqueda global, la edición con la categoría del resultado y la limpieza.
@@ -127,13 +183,43 @@ it("crea una categoría con imagen importada y recortada", async () => {
   const preparar = vi.fn().mockResolvedValue("token");
   render(<ProductCatalog categories={[]} onGetProducts={vi.fn()} onCreateCategory={crear} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} onUpdateCategoryImage={vi.fn()} onUpdateProductImage={vi.fn()} onImportImage={vi.fn().mockResolvedValue("data:image/png;base64,YQ==")} onPrepareImage={preparar} />);
   await usuario.click(screen.getByRole("button", { name: "Nueva categoría" }));
-  await usuario.type(screen.getByLabelText("Nombre de la categoría"), "Frutas");
+  const dialogo = within(screen.getByRole("dialog", { name: "Nueva categoría" }));
+  await usuario.type(dialogo.getByLabelText("Nombre de la categoría"), "Frutas");
   await usuario.type(screen.getByLabelText("URL de imagen"), "https://example.com/imagen.png");
   await usuario.click(screen.getByRole("button", { name: "Importar imagen" }));
   await usuario.click(await screen.findByRole("button", { name: "Confirmar recorte" }));
   await usuario.click(screen.getByRole("button", { name: "Guardar" }));
   expect(preparar).toHaveBeenCalledWith("data:image/png;base64,YQ==", { x: 0, y: 0, width: 10, height: 10 });
   expect(crear).toHaveBeenCalledWith("Frutas", "token");
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+
+// Comprueba el error dentro del modal y que el cierre descarta el borrador.
+it("mantiene el formulario en el modal si falla la creación y permite descartarlo", async () => {
+  const usuario = userEvent.setup();
+  const crear = vi.fn().mockRejectedValue(new ApiError(409, "Duplicate"));
+  render(<ProductCatalog categories={[]} onGetProducts={vi.fn()} onCreateCategory={crear} onCreateProduct={vi.fn()} onSessionExpired={vi.fn()} onUpdateCategoryImage={vi.fn()} onUpdateProductImage={vi.fn()} onImportImage={vi.fn()} onPrepareImage={vi.fn()} />);
+  const abrir = screen.getByRole("button", { name: "Nueva categoría" });
+  await usuario.click(abrir);
+  const ventana = screen.getByRole("dialog", { name: "Nueva categoría" });
+  const dialogo = within(ventana);
+  const nombre = dialogo.getByLabelText<HTMLInputElement>("Nombre de la categoría");
+  await usuario.type(nombre, "Frutas");
+  await usuario.click(dialogo.getByRole("button", { name: "Guardar" }));
+  expect((await dialogo.findByRole("alert")).textContent).toBe("Ya existe una categoría con ese nombre.");
+  expect(nombre.value).toBe("Frutas");
+
+  // jsdom no genera el evento nativo de cierre al pulsar Escape.
+  fireEvent(ventana, new Event("cancel", { cancelable: true }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(document.activeElement).toBe(abrir);
+
+  await usuario.click(abrir);
+  const reabierto = within(screen.getByRole("dialog", { name: "Nueva categoría" }));
+  expect(reabierto.getByLabelText<HTMLInputElement>("Nombre de la categoría").value).toBe("");
+  await usuario.click(reabierto.getByRole("button", { name: "Cancelar" }));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(crear).toHaveBeenCalledOnce();
 });
 
 it("quita la imagen de una categoría solo al guardar", async () => {

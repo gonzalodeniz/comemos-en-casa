@@ -18,7 +18,7 @@ Este documento recoge el comportamiento acordado durante el refinamiento. Comple
 - Mostrar las categorías en tarjetas, ordenadas alfabéticamente por nombre.
 - Cada categoría tiene nombre e imagen opcional. Si no tiene imagen, mostrar una imagen predeterminada.
 - No mostrar descripciones ni filtros; tampoco los filtros «Alimentación», «Hogar» y «Otros» del prototipo.
-- Ofrecer la acción **Nueva categoría**.
+- La acción **Nueva categoría** abre el formulario de creación en una ventana modal.
 - Al pulsar una categoría, abrir una pantalla con sus productos y las acciones para gestionarlos.
 - El menú de tres puntos de cada categoría permite **Editar** y **Borrar**, salvo la categoría especial descrita a continuación.
 
@@ -41,7 +41,7 @@ Este documento recoge el comportamiento acordado durante el refinamiento. Comple
 
 - Dentro de una categoría se pueden crear, editar y eliminar productos.
 - Cada producto tiene nombre e imagen opcional; si no tiene imagen, mostrar una imagen predeterminada.
-- Al editar un producto también se puede cambiar su categoría, incluida **Sin categoría**.
+- En el modal de un producto existente, el selector **Categoría** muestra su categoría actual y permite elegir otra de las categorías existentes. El traslado solo se aplica al pulsar **Guardar**, conserva la identidad del producto, su imagen y sus entradas en la lista de la compra. La opción especial **Sin categoría** sigue pendiente.
 - Al borrar un producto se solicita confirmación y se indica si está en la lista de la compra. Si se confirma, se eliminan también sus entradas pendientes y compradas; los ingredientes de recetas se conservan.
 - Los cambios en productos son visibles para los demás usuarios.
 
@@ -52,9 +52,10 @@ Reutilizar el comportamiento existente definido en [HU-009 — Imágenes de prod
 ## Restricciones y verificación pendiente
 
 - Para el borrado individual de productos se incorpora una operación de API autenticada y protegida contra CSRF.
-- Las API existentes no permiten renombrar ni borrar categorías o productos, cambiar un producto de categoría ni implementar la categoría especial. Su implementación queda pospuesta por decisión del usuario.
+- El `PATCH /api/v1/shopping-categories/{category_id}/products/{product_id}` admite `category_id` en el cuerpo como destino del traslado, mientras que la URL identifica la categoría de origen. Un destino inexistente se rechaza sin modificar el producto.
+- El borrado de categorías y la categoría especial **Sin categoría** siguen pendientes.
 - El borrado físico de productos también eliminaría sus entradas de compra por la relación en cascada; preservar dichas entradas requiere adaptar la persistencia.
-- En la interfaz actual se permite consultar y crear categorías y productos, y gestionar sus imágenes; no se muestran acciones que la API no admite.
+- En la interfaz actual se permite consultar, crear y renombrar categorías y productos, gestionar sus imágenes, mover productos entre categorías existentes y borrar productos.
 - No modificar ni reabrir las historias completadas de creación de categorías y productos (HU-007 y HU-008) ni la historia de imágenes (HU-009) por documentar este alcance adicional.
 - El buscador está disponible desde el listado de categorías y desde una categoría abierta. A partir de tres caracteres busca por nombre en todo el catálogo y permite gestionar los productos encontrados. Al limpiar la búsqueda vuelve a mostrarse la vista anterior.
 

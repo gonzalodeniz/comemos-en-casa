@@ -21,6 +21,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Uuid,
+    false,
     func,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -287,6 +288,8 @@ class MealAssignment(Base):
     reminder_time: Mapped[str | None] = mapped_column(String(5))
     reminder_message: Mapped[str | None] = mapped_column(Text)
     reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Distingue un aviso omitido al programarlo de un aviso pendiente o enviado.
+    reminder_skipped: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
 
 
 class BackupSchedule(Base):

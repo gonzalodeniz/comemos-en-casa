@@ -515,6 +515,7 @@ button.today-button-fixed { position: fixed; right: max(1rem, env(safe-area-inse
 .meal-editor .repeat-summary { margin: .5rem 0 0; padding: .4rem .5rem; border-radius: .4rem; background: #e8f7ef; color: #496c65; font-size: .75rem; }
 .meal-reminder { display: inline-flex; position: absolute; top: 50%; right: 5.5rem; transform: translateY(-50%); align-items: center; color: #00854a; }
 .meal-reminder .app-icon { width: 14px; height: 14px; }
+.meal-reminder-skipped { color: #5c6470; }
 .week-grid .meal-slot:has(.meal-reminder) { padding-right: 6.8rem; }
 .meal-editor .dish-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .4rem; }
 .meal-editor .dish-card { gap: .25rem; padding: .3rem; font-size: .8rem; }

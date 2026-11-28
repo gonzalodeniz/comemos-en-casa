@@ -29,12 +29,14 @@ export default function CalendarDay({ date, weekday, today, outsideMonth = false
       <div className="day-meals">
         {(Object.keys(SLOT_LABELS) as MealSlot[]).filter((slot) => visibleSlot === "both" || visibleSlot === slot).map((slot) => {
           const assignment = assignments.get(`${date}:${slot}`);
+          // Distingue un aviso vencido sin ocultar su configuración en el calendario.
+          const estadoAviso = assignment?.reminder?.skipped ? "Recordatorio vencido: no se enviará" : "Recordatorio activado";
           return (
             <div className={`meal-card${assignment ? " assigned" : ""}`} key={slot}>
             <div className={`meal-slot ${assignment ? "planned" : "unplanned"}`}>
               <MealThumbnail name={assignment?.label.name ?? "Sin planificar"} imageUrl={assignment?.label.image_url} onOpen={assignment ? () => onOpenRecipes(assignment.label.id) : undefined} />
               <span className="meal-details">{!compact && visibleSlot === "both" && <span className="etiqueta-comida-movil">{SLOT_LABELS[slot]}</span>}<strong>{assignment ? <button type="button" className="link-button meal-recipe-link" onClick={() => onOpenRecipes(assignment.label.id)}>{assignment.label.name}</button> : "Sin planificar"}</strong>{compact && assignment && <span className={`meal-card-status ${slot}`}>{SLOT_LABELS[slot]}</span>}</span>
-              {assignment?.reminder && <span className="meal-reminder" role="img" aria-label="Recordatorio activado" title="Recordatorio activado"><AppIcon name="bell" /></span>}
+              {assignment?.reminder && <span className={`meal-reminder${assignment.reminder.skipped ? " meal-reminder-skipped" : ""}`} role="img" aria-label={estadoAviso} title={estadoAviso}><AppIcon name="bell" /></span>}
               <button type="button" className="meal-edit" disabled={disabled}
                 aria-label={`${assignment ? "Editar" : "Añadir"} ${SLOT_LABELS[slot].toLowerCase()} del ${formatDateLabel(date, { dateStyle: "full" })}`}
                 title={assignment ? "Editar comida" : "Añadir comida"} onClick={() => onEdit(date, slot)}><AppIcon name={assignment ? "edit" : "plus"} /></button>

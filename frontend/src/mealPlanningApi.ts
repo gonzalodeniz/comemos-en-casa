@@ -91,8 +91,11 @@ export function createShoppingProduct(categoryId: string, name: string, csrfToke
   return apiRequest(`/shopping-categories/${categoryId}/products`, { method: "POST", csrfToken, body: { name, ...(imageToken ? { image_token: imageToken } : {}) } });
 }
 
-/** Actualiza la imagen de un producto existente. */
-export function updateShoppingProductImage(categoryId: string, productId: string, csrfToken: string, change: { name?: string; image_token?: string; remove_image?: true }): Promise<ShoppingProduct> {
+/** Describe los cambios que admite la edición de un producto existente. */
+export type CambioProductoCatalogo = { name?: string; category_id?: string; image_token?: string; remove_image?: true };
+
+/** Actualiza el nombre, la categoría o la imagen de un producto existente. */
+export function updateShoppingProductImage(categoryId: string, productId: string, csrfToken: string, change: CambioProductoCatalogo): Promise<ShoppingProduct> {
   return apiRequest(`/shopping-categories/${categoryId}/products/${productId}`, { method: "PATCH", csrfToken, body: change });
 }
 
@@ -107,7 +110,7 @@ export type MealAssignment = {
   date: string;
   slot: MealSlot;
   label: FoodLabel;
-  reminder?: null | { days_before: number; send_time: string; message: string };
+  reminder?: null | { days_before: number; send_time: string; message: string; skipped?: boolean };
 };
 export type MealPlanningResponse = {
   start_date: string;
@@ -127,7 +130,7 @@ export type MealPlanningOperation = {
 export type MealPlanningPreviewEntry = {
   date: string;
   slot: MealSlot;
-  change: "assign" | "replace" | "unchanged" | "delete" | "no_op";
+  change: "assign" | "replace" | "update_reminder" | "unchanged" | "delete" | "no_op";
   current_label: FoodLabel | null;
   resulting_label: FoodLabel | null;
 };

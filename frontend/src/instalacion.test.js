@@ -15,6 +15,8 @@ describe("instalación de la aplicación", () => {
   // Comprueba que los iconos declarados existen y tienen las dimensiones indicadas.
   it("publica los iconos de instalación en los tamaños declarados", () => {
     execFileSync("npm", ["run", "build"], { stdio: "pipe" });
+    const html = readFileSync("dist/index.html", "utf8");
+    expect(html).toMatch(/<link\s+rel="apple-touch-icon"\s+sizes="192x192"\s+href="\/comemos\/icono-192\.png"/);
     const manifiesto = JSON.parse(readFileSync("dist/manifest.webmanifest", "utf8"));
     for (const tamaño of [192, 512]) {
       const icono = manifiesto.icons.find((elemento) => elemento.sizes === `${tamaño}x${tamaño}`);

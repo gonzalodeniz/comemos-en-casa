@@ -1,8 +1,62 @@
 # Comprueba categorías y productos del catálogo compartido de compra.
+from uuid import uuid4
+
+import pytest
 from sqlalchemy import create_engine, select
 
 
-from meal_planning_test_support import meal_database, api_get, authenticate, post_with_session
+from meal_planning_test_support import meal_database, api_get, api_patch, authenticate, post_with_session
+
+
+def test_mover_producto_conserva_identidad_imagen_y_entradas(meal_database):
+    """Traslada el producto y publica la URL de imagen con la categoría de destino."""
+    from app.models import ShoppingCategory, ShoppingListItem, ShoppingProduct
+
+    cookies = authenticate(meal_database)
+    with meal_database() as db:
+        origen, destino = ShoppingCategory(name="Fruta"), ShoppingCategory(name="Otros")
+        db.add_all([origen, destino])
+        db.flush()
+        producto = ShoppingProduct(category_id=origen.id, name="Pera", image_path="productos/pera.webp")
+        db.add(producto)
+        db.flush()
+        entrada = ShoppingListItem(product_id=producto.id, quantity=1, unit="unit", purchased=False)
+        db.add(entrada)
+        db.commit()
+        origen_id, destino_id, producto_id, entrada_id = origen.id, destino.id, producto.id, entrada.id
+
+    base = "/api/v1/shopping-categories"
+    ruta_origen = f"{base}/{origen_id}/products"
+    ruta_destino = f"{base}/{destino_id}/products"
+    respuesta = api_patch(f"{ruta_origen}/{producto_id}", payload={"category_id": str(destino_id)}, cookies=cookies, csrf_token=cookies["csrf_token"])
+
+    assert respuesta.status_code == 200
+    trasladado = respuesta.json()
+    assert trasladado["id"] == str(producto_id)
+    assert trasladado["name"] == "Pera"
+    assert trasladado["image_url"].startswith(f"/shopping-categories/{destino_id}/products/{producto_id}/image?v=")
+    assert api_get(ruta_origen, cookies=cookies).json()["products"] == []
+    assert api_get(ruta_destino, cookies=cookies).json()["products"] == [trasladado]
+    assert api_get("/api/v1/shopping-products/search?q=pera", cookies=cookies).json()["products"] == [
+        {**trasladado, "category_id": str(destino_id)},
+    ]
+    with meal_database() as db:
+        assert db.get(ShoppingProduct, producto_id).image_path == "productos/pera.webp"
+        assert db.get(ShoppingListItem, entrada_id).product_id == producto_id
+
+
+@pytest.mark.parametrize(("destino", "estado"), [("no-es-un-uuid", 422), (str(uuid4()), 404)])
+def test_mover_producto_rechaza_destino_invalido_sin_aplicar_otros_cambios(meal_database, destino, estado):
+    """No modifica el producto si la categoría de destino no es válida."""
+    cookies = authenticate(meal_database)
+    categoria = post_with_session("/api/v1/shopping-categories", {"name": "Fruta"}, cookies).json()
+    base = f"/api/v1/shopping-categories/{categoria['id']}/products"
+    producto = post_with_session(base, {"name": "Pera"}, cookies).json()
+
+    respuesta = api_patch(f"{base}/{producto['id']}", payload={"category_id": destino, "name": "Manzana"}, cookies=cookies, csrf_token=cookies["csrf_token"])
+
+    assert respuesta.status_code == estado
+    assert api_get(base, cookies=cookies).json()["products"] == [producto]
 
 
 def test_renombrar_y_rechazar_duplicados_en_distintas_categorias(meal_database):

@@ -197,9 +197,9 @@ async def list_products(
 async def update_product_image(category_id: UUID, product_id: UUID, payload: dict[str, object],
     request: Request, session: ActiveSession = Depends(get_active_session),
     db: Session = Depends(get_database_session)):
-    """Sustituye o elimina la imagen del producto sin alterar su nombre."""
+    """Actualiza el nombre, la categoría o la imagen del producto en una sola operación."""
     require_csrf(request, session)
-    if not payload or set(payload) - {"name", "image_token", "remove_image"} or ("image_token" in payload and "remove_image" in payload) or ("remove_image" in payload and payload["remove_image"] is not True):
+    if not payload or set(payload) - {"name", "category_id", "image_token", "remove_image"} or ("image_token" in payload and "remove_image" in payload) or ("remove_image" in payload and payload["remove_image"] is not True):
         raise HTTPException(status_code=422, detail="Invalid image update")
     if "name" in payload and (not isinstance(payload["name"], str) or not payload["name"].strip() or len(payload["name"].strip()) > 100):
         raise HTTPException(status_code=422, detail="Invalid product name")
@@ -208,6 +208,17 @@ async def update_product_image(category_id: UUID, product_id: UUID, payload: dic
     product = db.get(ShoppingProduct, product_id)
     if product is None or product.category_id != category_id:
         raise HTTPException(status_code=404, detail="Product not found")
+    destino_id = category_id
+    if "category_id" in payload:
+        destino = payload["category_id"]
+        if not isinstance(destino, str):
+            raise HTTPException(status_code=422, detail="Invalid destination category")
+        try:
+            destino_id = UUID(destino)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail="Invalid destination category") from error
+        if destino_id != category_id and db.get(ShoppingCategory, destino_id) is None:
+            raise HTTPException(status_code=404, detail="Destination category not found")
     old_path = product.image_path
     new_path = None if payload.get("remove_image") else publish_temporary(images.DATA_ROOT, session.session.id, payload["image_token"], category="productos") if "image_token" in payload else old_path
     if "image_token" in payload and new_path is None:
@@ -215,6 +226,7 @@ async def update_product_image(category_id: UUID, product_id: UUID, payload: dic
     if "name" in payload:
         product.name = payload["name"].strip()
         product.name_canonical = unicodedata.normalize("NFC", product.name).casefold()
+    product.category_id = destino_id
     product.image_path = new_path
     try:
         db.commit()

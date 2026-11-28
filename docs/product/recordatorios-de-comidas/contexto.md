@@ -10,6 +10,7 @@ Los usuarios pueden programar avisos por correo para tener los ingredientes list
 - El aviso incluye el mensaje, la comida a la que corresponde y su fecha. Cada cuenta activa elige en su perfil si lo recibe por correo, por notificación móvil, por ambos o por ninguno. Las cuentas existentes mantienen inicialmente el correo activado.
 - Con las notificaciones móviles seleccionadas, la campana del perfil permite enviar una notificación de prueba inmediata a los dispositivos registrados de esa cuenta, sin avisar a otras cuentas ni modificar los recordatorios programados.
 - Los avisos móviles se solicitan de inmediato con una validez máxima de 15 minutos para que el servicio push pueda conservarlos brevemente si el dispositivo no está disponible.
+- Las notificaciones push usan el icono de Comemos en casa y una insignia monocroma con forma de casa para los sistemas que muestran el icono pequeño.
 - El botón «Desactivar en este dispositivo» retira solo la suscripción del navegador actual; no cambia la preferencia general de la cuenta.
 - Cada comida con un recordatorio activado muestra un icono pequeño junto a «Editar». El icono es informativo, no tiene aspecto de botón y no es interactivo.
 
